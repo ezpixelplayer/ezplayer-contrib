@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#120b1f">
+<title>MerryOnCherry – Put your message on the lights!</title>
+<style>
+:root { --bg: #120b1f; --card: #1d1430; --raise: #281c40; --line: #3a2d52; --fg: #ffffff; --muted: #c9bddc; --hot: #ff7a1a; --ok: #39d353; --rad: 18px; }
+/* Christmas: dark green with red */
+:root[data-theme="xm"] { --bg: #08180f; --card: #0f2619; --raise: #163422; --line: #24503a; --muted: #c4dccd; --hot: #ff3b3b; --ok: #7fe08a; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 560px; margin: 0 auto; padding: 20px 16px 40px; display: flex; flex-direction: column; gap: 16px; }
+h1 { margin: 4px 0 0; font-size: 30px; line-height: 1.15; }
+.kick { font-size: 13px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
+.note { font-size: 15px; color: var(--muted); margin: 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--rad); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; background: var(--card); border: 1px solid var(--line); border-radius: var(--rad); padding: 5px; }
+.tabs.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tabs.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.tabs.six { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pal { min-height: 52px; border-radius: 12px; border: 2px solid var(--line); color: #fff; font: inherit; font-weight: 700; text-shadow: 0 1px 3px #000, 0 0 6px #000; cursor: pointer; padding: 4px 8px; }
+.pal[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px var(--accent, #ff7a1a); }
+.prop { display: flex; align-items: center; gap: 8px; }
+.prop .em { font-size: 26px; }
+#propPv { width: 100%; max-width: 340px; align-self: center; background: #000; border-radius: 12px; }
+.c4 { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; background: #0a2a8c; padding: 7px; border-radius: 14px; touch-action: manipulation; }
+.c4 button { aspect-ratio: 1; border-radius: 50%; border: 0; padding: 0; background: #050a24; cursor: pointer; transition: transform .1s; }
+.c4.mine button:active { transform: scale(.92); }
+.c4 button.win { box-shadow: 0 0 0 3px #fff; }
+.c4 button.last { box-shadow: 0 0 0 2px rgba(255,255,255,.55); }
+.c4.off button { cursor: default; }
+.gstat { font-size: 18px; font-weight: 700; text-align: center; min-height: 27px; }
+.gbtns { display: flex; flex-direction: column; gap: 8px; }
+.tabs button { min-height: 52px; border: 0; border-radius: 14px; background: none; color: var(--muted); font: inherit; font-weight: 700; font-size: 15px; padding: 0 2px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--raise); color: var(--fg); }
+.lab { font-size: 15px; color: var(--muted); font-weight: 600; }
+input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-size: 19px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { min-height: 48px; padding: 8px 16px; border-radius: 999px; border: 2px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-weight: 600; cursor: pointer; }
+.chip[aria-pressed="true"] { border-color: var(--hot); }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.sw { width: 48px; height: 48px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+.sw[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 3px var(--bg) inset; }
+.sw.erase { background: repeating-linear-gradient(45deg, #000 0 6px, #444 6px 12px); }
+.prev { min-height: 64px; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: #000; padding: 12px; font-size: 26px; font-weight: 800; text-align: center; word-break: break-word; }
+.gifs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.gif { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; border-radius: 16px; border: 3px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.gif img { width: 76px; height: 76px; image-rendering: pixelated; background: #000; border-radius: 8px; }
+.gif[aria-pressed="true"] { border-color: var(--hot); }
+.gif { position: relative; }
+.gif b { position: absolute; top: 4px; right: 6px; min-width: 22px; height: 22px; border-radius: 11px; background: var(--hot); color: #fff; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+.anim { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; padding-top: 14px; border-top: 1px dashed var(--line); }
+.anim .apv { display: flex; justify-content: center; background: #000; border-radius: 14px; padding: 10px; }
+.anim .apv canvas { max-width: 100%; }
+.anim .ainfo { text-align: center; }
+.grid { display: grid; gap: 2px; background: #000; padding: 6px; border-radius: 14px; touch-action: none; user-select: none; }
+.cell { aspect-ratio: 1; border-radius: 3px; background: #1a1a1a; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.btn { min-height: 52px; padding: 10px 18px; border-radius: 14px; border: 1px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-weight: 700; cursor: pointer; }
+.btn.primary { background: var(--hot); border-color: var(--hot); color: #120b1f; font-size: 20px; width: 100%; min-height: 60px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.msg { min-height: 22px; font-size: 16px; text-align: center; margin: 0; }
+.msg.ok { color: var(--ok); } .msg.err { color: #ff9a9a; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <div class="kick" id="kick">MerryOnCherry</div>
+    <h1>Put your message on the lights!</h1>
+  </div>
+  <p class="note" id="intro">Pick a message, a picture or an effect, or make a drawing. It shows up on the lights in a moment.</p>
+  <p class="msg err" id="noShow" hidden>This address is not complete. Scan the QR code on the wall again.</p>
+  <p class="msg err" id="closed" hidden>The lights are not taking requests right now. Try again later!</p>
+
+  <section class="card" id="faceCard" hidden>
+    <div class="lab">Which side should it go on?</div>
+    <div class="chips" id="faces"></div>
+  </section>
+
+  <div class="tabs" role="tablist" id="tabs">
+    <button type="button" role="tab" aria-selected="true" data-tab="text">Message</button>
+    <button type="button" role="tab" aria-selected="false" data-tab="gif">Picture</button>
+    <button type="button" role="tab" aria-selected="false" data-tab="fx">Effect</button>
+    <button type="button" role="tab" aria-selected="false" data-tab="draw">Draw</button>
+    <button type="button" role="tab" aria-selected="false" data-tab="game" id="gameTab" hidden>🎮 Game</button>
+    <button type="button" role="tab" aria-selected="false" data-tab="prop" id="propTab" hidden>✨ Props</button>
+  </div>
+
+  <section class="card" id="pText">
+    <div id="freeBox">
+      <label class="lab" for="txt">Write your message (up to 40 letters)</label>
+      <input type="text" id="txt" maxlength="40" autocomplete="off">
+    </div>
+    <div class="lab" id="quickLab">Or pick one of these</div>
+    <div class="chips" id="quick"></div>
+    <div class="lab" id="txtColLab">Colour</div>
+    <div class="swatches" id="txtCols"></div>
+    <div class="prev" id="txtPrev"></div>
+    <div class="anim" id="txtStyle"></div>
+  </section>
+
+  <section class="card" id="pGif" hidden>
+    <div class="lab">Pick a picture</div>
+    <div class="chips"><button type="button" class="chip" id="multi" aria-pressed="false">➕ Put several pictures together (up to 3)</button></div>
+    <div class="chips" id="picked" hidden></div>
+    <div class="gifs" id="gifs"></div>
+    <div class="anim" id="gifAnim"></div>
+  </section>
+
+  <section class="card" id="pFx" hidden>
+    <div class="lab">Pick an effect</div>
+    <div class="chips" id="fxs"></div>
+    <div class="lab">Main colour</div>
+    <div class="swatches" id="fxC1"></div>
+    <div class="lab">Second colour</div>
+    <div class="swatches" id="fxC2"></div>
+    <p class="note">Some effects have their own colours (fire, rainbow…).</p>
+  </section>
+
+  <section class="card" id="pDraw" hidden>
+    <div class="lab">Draw with your finger</div>
+    <div class="swatches" id="drawCols"></div>
+    <div class="grid" id="grid"></div>
+    <div class="row"><button class="btn" type="button" id="clear">Clear all</button></div>
+    <div class="anim" id="drawAnim"></div>
+  </section>
+
+  <section class="card" id="pProp" hidden>
+    <div class="lab">Pick something in the show to light up</div>
+    <div class="chips" id="propList"></div>
+    <div class="lab">Pick an effect</div>
+    <div class="chips" id="propFx"></div>
+    <div class="lab">Pick the colours</div>
+    <div class="pals" id="propPals"></div>
+    <div id="myColsBox" hidden>
+      <div class="lab">Your colours (tap up to 3)</div>
+      <div class="swatches" id="myCols"></div>
+    </div>
+    <div class="lab">Speed</div>
+    <div class="chips" id="propSpeed"></div>
+    <canvas id="propPv" width="680" height="300"></canvas>
+    <p class="note" style="text-align:center">This is how it looks: the real thing is on the lights!</p>
+  </section>
+
+  <section class="card" id="pGame" hidden>
+    <div class="lab">🎮 Four in a Row</div>
+    <p class="note" id="gHow">Drop your discs and get four in a row (across, up and down, or diagonally) before the other player. The board shows on the lights!</p>
+    <div class="gstat" id="gStat" role="status"></div>
+    <div class="c4 off" id="gBoard"></div>
+    <p class="note" id="gTimer" style="text-align:center"></p>
+    <div class="gbtns" id="gBtns"></div>
+  </section>
+
+  <button class="btn primary" type="button" id="send">Show it on the lights!</button>
+  <p class="msg" id="msg" role="status"></p>
+  <p class="note" id="waitNote" hidden></p>
+</main>
+<script src="gifmaker.js?v=10"></script>
+<script>
+(() => {
+	const $ = id => document.getElementById(id);
+	const q = new URLSearchParams(location.search);
+	// ?t=<show code> (from the QR on the wall); sides, sizes, theme and free text come from the bridge's status
+	const TOPIC = (q.get('t') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+	const RELAY = 'https://ntfy.sh/';
+	let WAIT_MS = 0;   // time between two requests from this phone (set on the control page; 0 = no wait)
+	// the same 9 colours and ready messages as the bridge (showplay_bridge.py)
+	const PAL = ['000000', 'ffffff', 'ff2a2a', 'ff7a1a', 'ffd23f', '39d353', '2bb7ff', '9b5cff', 'ff4fd8'];
+	const QUICK = {
+		hw: ['Happy Halloween!', 'Boo!', 'Trick or treat!', 'Hello!', 'Spooky!', 'Pumpkin!'],
+		xm: ['Merry Christmas!', 'Happy Holidays!', 'Ho ho ho!', 'Hello!', 'Santa!', 'Let it snow!'],
+		ev: ['Happy Birthday!', 'Hooray!', 'Hello!', 'Happy New Year!', 'Happy Easter!', 'Love you!'],
+		'': ['Hello!', 'Hooray!', 'Boo!', 'Merry Christmas!', 'Happy Halloween!', 'Happy Birthday!'] };
+	const BAD = ['merda', 'caralho', 'foda', 'fodase', 'puta', 'cabrao', 'cona', 'piroca', 'pila', 'paneleiro', 'filhodaputa', 'corno', 'cu', 'mamas', 'boceta', 'porra', 'fuck', 'shit', 'bitch', 'dick', 'pussy', 'cunt', 'nigger', 'nazi', 'hitler'];
+	const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[0@]/g, 'o').replace(/[1!]/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/[5$]/g, 's');
+	const isBad = s => { const n = norm(s), words = n.split(/[^a-z]+/), joined = n.replace(/[^a-z]/g, ''); return BAD.some(b => words.includes(b) || (b.length >= 5 && joined.includes(b))); };
+
+	let cfg = { faces: [{ n: '', w: 16, h: 16 }], theme: '', free: true, title: '' };
+	// &theme=hw (Halloween), xm (Christmas) or ev (other celebrations) in the QR address fixes the theme of this page
+	const URL_THEME = ['hw', 'xm', 'ev'].includes(q.get('theme')) ? q.get('theme') : '';
+	const THEME_TAG = { hw: 'Halloween 🎃', xm: 'Christmas 🎄', ev: 'Celebrations 🎉' };
+	const setKick = () => { $('kick').textContent = (cfg.title || 'MerryOnCherry') + (URL_THEME ? ' · ' + THEME_TAG[URL_THEME] : ''); };
+	if (URL_THEME) {
+		cfg.theme = URL_THEME; document.documentElement.dataset.theme = URL_THEME;
+		document.querySelector('meta[name=theme-color]').content = URL_THEME === 'xm' ? '#08180f' : '#120b1f';
+	}
+	setKick();
+	let face = -1;   // -1 = all sides
+	let closed = !TOPIC;
+	if (!TOPIC) $('noShow').hidden = false;
+
+	// ---- tabs ----
+	let tab = 'text';
+	const panes = { text: $('pText'), gif: $('pGif'), fx: $('pFx'), draw: $('pDraw'), game: $('pGame'), prop: $('pProp') };
+	$('tabs').querySelectorAll('button').forEach(b => b.onclick = () => {
+		tab = b.dataset.tab;
+		$('tabs').querySelectorAll('button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+		Object.entries(panes).forEach(([k, p]) => p.hidden = k !== tab);
+		$('send').hidden = tab === 'game'; $('waitNote').hidden = tab === 'game' || !WAIT_MS;
+		if (tab === 'game') gameOpen();
+		say('');
+	});
+
+	const swatches = (box, list, sel, onPick) => {
+		box.replaceChildren(...list.map(i => {
+			const b = document.createElement('button'); b.type = 'button'; b.className = 'sw' + (i === 0 ? ' erase' : '');
+			if (i) b.style.background = '#' + PAL[i];
+			b.setAttribute('aria-label', i === 0 ? 'Eraser' : 'Colour ' + i); b.setAttribute('aria-pressed', String(i === sel));
+			b.onclick = () => { box.querySelectorAll('.sw').forEach(x => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true'); onPick(i); };
+			return b;
+		}));
+	};
+	const rgb = i => [0, 2, 4].map(j => parseInt(PAL[i].slice(j, j + 2), 16));
+
+	// ---- message ----
+	let txtCol = URL_THEME === 'xm' ? 2 : 3, quick = null;
+	const chosenText = () => cfg.free ? ($('txt').value.trim() || quick || '') : (quick || '');
+	const updPrev = () => { const v = chosenText(); $('txtPrev').textContent = v || '…'; $('txtPrev').style.color = '#' + PAL[txtCol]; if (typeof txtS !== 'undefined' && txtS.build) txtS.build(); };
+	const drawQuick = () => {
+		const list = QUICK[cfg.theme] || QUICK[''];
+		if (!list.includes(quick)) quick = list[0];
+		$('quick').replaceChildren(...list.map(t => {
+			const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = t; b.setAttribute('aria-pressed', String(t === quick));
+			b.onclick = () => { quick = t; $('txt').value = ''; drawQuick(); updPrev(); };
+			return b;
+		}));
+		$('freeBox').hidden = !cfg.free; $('quickLab').textContent = cfg.free ? 'Or pick one of these' : 'Pick a message';
+	};
+	swatches($('txtCols'), [1, 2, 3, 4, 5, 6, 7, 8], txtCol, i => { txtCol = i; updPrev(); });
+	$('txt').oninput = () => { if ($('txt').value.trim()) { quick = null; $('quick').querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', 'false')); } updPrev(); };
+
+	// ---- effects (the same keys as FX_LIST in showplay_bridge.py, which draws them) ----
+	const FXS = {
+		hw: [['haunted', '👻 Haunted house'], ['eyes', '👀 Eyes in the dark'], ['fire', '🔥 Fire'], ['lightning', '⚡ Lightning'], ['firenoise', '🔥 Magic flames'], ['blackhole', '🌀 Black hole']],
+		xm: [['snowfall', '❄️ Falling snow'], ['candy', '🍬 Candy cane'], ['retro', '🎄 Christmas tree'], ['twinkle', '✨ Twinkling stars'], ['fireworks', '🎆 Fireworks'], ['bursts', '💥 Colour bursts']],
+		ev: [['rainbow', '🌈 Rainbow'], ['fireworks', '🎆 Fireworks'], ['plasma', '🔮 Plasma'], ['ripple', '💧 Ripples'], ['matrix', '💚 Falling code'], ['pacifica', '🌊 Ocean']]
+	};
+	let fx = null, fxC1 = 3, fxC2 = 7;
+	swatches($('fxC1'), [1, 2, 3, 4, 5, 6, 7, 8], fxC1, i => { fxC1 = i; });
+	swatches($('fxC2'), [1, 2, 3, 4, 5, 6, 7, 8], fxC2, i => { fxC2 = i; });
+	const drawFx = () => {
+		const seen = new Set();
+		const list = (FXS[cfg.theme] || [].concat(FXS.hw, FXS.xm, FXS.ev)).filter(([k]) => !seen.has(k) && seen.add(k));
+		if (!fx || !list.some(([k]) => k === fx)) fx = list[0][0];
+		$('fxs').replaceChildren(...list.map(([k, n]) => {
+			const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = n; b.setAttribute('aria-pressed', String(k === fx));
+			b.onclick = () => { fx = k; drawFx(); };
+			return b;
+		}));
+	};
+
+	// ---- pictures (gifs/pack.json) ----
+	let gif = null, pack = [], gifs3 = [];   // up to 3 pictures, in the order they were tapped (gif = the first one)
+	const GM = window.CubeGM;
+	const drawGifs = () => {
+		if (typeof drawPicked === 'function') drawPicked();
+		const list = pack.filter(f => !cfg.theme || f.f.startsWith(cfg.theme + '-'));
+		$('gifs').replaceChildren(...list.map(f => {
+			const at = gifs3.indexOf(f.f), times = gifs3.filter(g => g === f.f).length;
+			const b = document.createElement('button'); b.type = 'button'; b.className = 'gif'; b.setAttribute('aria-pressed', String(at >= 0));
+			const im = document.createElement('img'); im.src = 'gifs/' + f.f; im.alt = '';
+			const s = document.createElement('span'); s.textContent = f.n;
+			b.append(im, s);
+			if (times > 1) { const nb = document.createElement('b'); nb.textContent = '×' + times; b.append(nb); }
+			b.onclick = () => {
+				// pictures that are a text (BOO!, HO HO HO) go alone and as they are
+				const TX = (GM && GM.TEXTGIF) || new Set();
+				if (!multi || TX.has(f.f)) gifs3 = [f.f];
+				else { gifs3 = gifs3.filter(g => !TX.has(g)); if (gifs3.length >= 3) gifs3.shift(); gifs3.push(f.f); }
+				gif = gifs3[0] || null; drawGifs(); loadGifSprite();
+			};
+			return b;
+		}));
+	};
+	let multi = false;
+	const drawPicked = () => {
+		$('picked').hidden = !multi || !gifs3.length;
+		$('picked').replaceChildren(...gifs3.map((g, i) => {
+			const f = pack.find(x => x.f === g) || { n: g };
+			const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = (i + 1) + '. ' + f.n + ' ✕';
+			b.setAttribute('aria-label', 'Remove ' + f.n);
+			b.onclick = () => { gifs3.splice(i, 1); gif = gifs3[0] || null; drawGifs(); loadGifSprite(); };
+			return b;
+		}));
+	};
+	$('multi').onclick = () => {
+		multi = !multi; $('multi').setAttribute('aria-pressed', String(multi));
+		if (!multi && gifs3.length > 1) gifs3 = gifs3.slice(0, 1);
+		gif = gifs3[0] || null; drawGifs(); loadGifSprite();
+	};
+	fetch('gifs/pack.json').then(r => r.json()).then(p => { pack = p; drawGifs(); }).catch(() => { $('gifs').textContent = 'The pictures did not load. Please try again.'; });
+
+	// ---- drawing (a grid the size of the chosen side) ----
+	let pen = 3, pixels = [], cells = [], down = false, gw = 0, gh = 0;
+	swatches($('drawCols'), [1, 2, 3, 4, 5, 6, 7, 8, 0], pen, i => pen = i);
+	const grid = $('grid');
+	const sizeNow = () => { const f = cfg.faces[Math.max(0, face)] || cfg.faces[0]; return [f.w, f.h]; };
+	const buildGrid = () => {
+		const [w, h] = sizeNow();
+		if (w === gw && h === gh) return;
+		gw = w; gh = h; pixels = new Array(w * h).fill(0);
+		grid.style.gridTemplateColumns = 'repeat(' + w + ', minmax(0, 1fr))';
+		grid.replaceChildren(); cells = pixels.map((_, i) => { const c = document.createElement('div'); c.className = 'cell'; c.dataset.i = i; grid.append(c); return c; });
+	};
+	const paint = e => {
+		const el = document.elementFromPoint(e.clientX, e.clientY);
+		if (!el || el.dataset.i === undefined || !grid.contains(el)) return;
+		const i = +el.dataset.i; if (pixels[i] === pen) return; pixels[i] = pen; cells[i].style.background = pen ? '#' + PAL[pen] : ''; clearTimeout(paint.t); paint.t = setTimeout(drawSprite, 150);
+	};
+	grid.addEventListener('pointerdown', e => { down = true; try { grid.setPointerCapture(e.pointerId); } catch (er) {} paint(e); e.preventDefault(); });
+	grid.addEventListener('pointermove', e => { if (down) paint(e); });
+	['pointerup', 'pointercancel'].forEach(ev => grid.addEventListener(ev, () => down = false));
+	$('clear').onclick = () => { pixels.fill(0); cells.forEach(c => c.style.background = ''); drawSprite(); };
+
+	// ---- bring the picture or the drawing to life (the GIF is made on this phone) ----
+	const ANIMS = [['orig', 'As it is'], ['bounce', '🦘 Bounce'], ['rainbow', '🌈 Rainbow'], ['pulse', '💓 Pulse'], ['blink', '💡 Blink'], ['shake', '🫨 Shake'],
+		['slide', '⬅️ Slide left'], ['slider', '➡️ Slide right'], ['slideup', '⬆️ Slide up'], ['slidedown', '⬇️ Slide down'], ['grow', '🔍 Grow'], ['shine', '✨ Shine']];
+	const fxMeta = f => /^slide/.test(f) ? 'slide' : f;   // the bridge knows the 4 slides as 'slide'
+	const BGS = [['', 'None'], ['snow', '❄️ Snow'], ['stars', '⭐ Stars'], ['confetti', '🎊 Confetti'], ['fireworks', '🎆 Fireworks'], ['hearts', '💖 Hearts'],
+		['fire', '🔥 Flames'], ['bats', '🦇 Bats'], ['sparkle', '🎇 Sparkles']];
+	const SPEEDS = [['Slow', 160], ['Normal', 90], ['Fast', 50]];
+	const mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; };
+	const chipRow = (row, list, cur, on) => row.replaceChildren(...list.map(([v, n]) => { const b = mk('button', 'chip', n); b.type = 'button'; b.setAttribute('aria-pressed', String(v === cur)); b.onclick = () => on(v); return b; }));
+	// draws the frames as LEDs, at the GIF's own speed
+	const ledLoop = (box, cv, pvw, getFrames, getSpeed) => {
+		let pi = 0, pt = 0;
+		const loop = now => {
+			requestAnimationFrame(loop);
+			const frames = getFrames();
+			if (box.offsetParent === null || pvw.hidden || !frames.length || now - pt < getSpeed()) return;
+			pt = now; pi = (pi + 1) % frames.length;
+			const [w, h] = sizeNow(), cell = Math.max(3, Math.floor(Math.min(300, (box.clientWidth || 300) - 20) / Math.max(w, h)));
+			if (cv.width !== cell * w * 2) { cv.width = cell * w * 2; cv.height = cell * h * 2; cv.style.width = cell * w + 'px'; cv.style.height = cell * h + 'px'; }
+			const g = cv.getContext('2d'); g.setTransform(2, 0, 0, 2, 0, 0); g.fillStyle = '#000'; g.fillRect(0, 0, cell * w, cell * h);
+			const f = frames[pi] || frames[0]; if (!f || f.length !== w * h) return;
+			for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const c = f[y * w + x]; g.fillStyle = c[0] + c[1] + c[2] > 9 ? 'rgb(' + c + ')' : '#15161c'; g.beginPath(); g.arc(x * cell + cell / 2, y * cell + cell / 2, cell * .42, 0, 6.283); g.fill(); }
+		};
+		requestAnimationFrame(loop);
+	};
+	const animBox = (box, kind) => {
+		const a = { fx: 'orig', bgfx: '', fit: 'fit', turns: false, tpos: 'bottom', sprites: [], txt: '', c1: URL_THEME === 'xm' ? 4 : 3, bg: 0, spd: 90, frames: [], bytes: null };
+		if (!GM) { box.hidden = true; return a; }
+		const chips = mk('div', 'chips'), bgR = mk('div', 'chips'), fitR = mk('div', 'chips'), turnR = mk('div', 'chips'), turnLab = mk('div', 'lab', 'How the pictures move'), tposR = mk('div', 'chips'), spd = mk('div', 'chips'), c1 = mk('div', 'swatches'), bg = mk('div', 'swatches');
+		const txt = mk('input'); txt.type = 'text'; txt.maxLength = 20; txt.autocomplete = 'off'; txt.placeholder = 'A name or a word (optional)';
+		const cv = mk('canvas'), info = mk('p', 'note ainfo'), pvw = mk('div', 'apv'); pvw.append(cv);
+		const drawChips = () => {
+			chipRow(chips, ANIMS, a.fx, v => { a.fx = v; drawChips(); a.build(); });
+			chipRow(bgR, BGS, a.bgfx, v => { a.bgfx = v; drawChips(); a.build(); });
+			chipRow(turnR, [[false, '👯 All together'], [true, '🔁 Taking turns']], a.turns, v => { a.turns = v; drawChips(); a.build(); });
+			turnLab.hidden = turnR.hidden = kind !== 'gif' || gifs3.length < 2;
+			chipRow(fitR, [['fit', '🖼️ Keep its shape'], ['stretch', '↔️ Stretch'], ['fill', '🔲 Fill (cuts the edges)']], a.fit, v => { a.fit = v; drawChips(); a.build(); });
+			chipRow(tposR, [['bottom', '⬇️ Bottom'], ['top', '⬆️ Top'], ['left', '⬅️ Left'], ['right', '➡️ Right'], ['middle', '🎯 On top of it']], a.tpos, v => { a.tpos = v; drawChips(); a.build(); });
+			chipRow(spd, SPEEDS.map(([n, ms]) => [ms, n]), a.spd, v => { a.spd = v; drawChips(); a.build(); });
+		};
+		box.append(mk('div', 'lab', 'Bring ' + (kind === 'draw' ? 'your drawing' : 'the picture') + ' to life'), chips, mk('div', 'lab', 'Background effect'), bgR, mk('div', 'lab', 'Size of the ' + (kind === 'draw' ? 'drawing' : 'picture')), fitR, turnLab, turnR,
+			mk('label', 'lab', 'Write a name or a word (optional)'), txt, mk('div', 'lab', 'Where the text goes'), tposR,
+			mk('div', 'lab', 'Colour of the text and the effect'), c1, mk('div', 'lab', 'Background colour'), bg, mk('div', 'lab', 'Speed'), spd, pvw, info);
+		swatches(c1, [1, 2, 3, 4, 5, 6, 7, 8], a.c1, i => { a.c1 = i; a.build(); });
+		swatches(bg, [0, 1, 2, 3, 4, 5, 6, 7, 8], a.bg, i => { a.bg = i; a.build(); });
+		bg.querySelector('.sw.erase').setAttribute('aria-label', 'Black'); bg.querySelector('.sw.erase').style.background = '#000';
+		txt.oninput = () => { a.txt = txt.value; a.build(); };
+		const isText = () => kind === 'gif' && gifs3.some(g => GM.TEXTGIF.has(g));
+		// a GIF is made here only when something changes the picture; otherwise the bridge shows the pack's GIF as it is
+		a.made = () => !isText() && (a.fx !== 'orig' || a.bgfx !== '' || a.fit !== 'fit' || a.txt.trim() !== '' || a.bg !== 0 || (kind === 'gif' && gifs3.length > 1));
+		a.build = () => {
+			turnLab.hidden = turnR.hidden = kind !== 'gif' || gifs3.length < 2;
+			const [w, h] = sizeNow();
+			const sp = a.sprites.length ? a.sprites : null;
+			info.textContent = ''; a.bytes = null; a.frames = [];
+			pvw.hidden = !a.made() || (!sp && !a.txt.trim());
+			[...box.children].forEach(el => { if (el !== info) el.hidden = isText() || (el === pvw && pvw.hidden); });
+			if (isText()) { info.textContent = 'This picture is already a text: it goes alone and as it is. To add your own text, pick another picture and write it here.'; return; }
+			if (pvw.hidden) { info.textContent = kind === 'gif' && a.fx === 'orig' && !a.bgfx && gifs3.length < 2 ? 'As it is: the picture shows with its own animation.' : ''; return; }
+			if (a.txt.trim() && isBad(a.txt)) { info.textContent = 'That word can\'t be shown. Pick another one!'; return; }
+			a.frames = GM.frames({ W: w, H: h, delay: a.spd, sprites: a.sprites, fx: a.fx === 'orig' ? 'still' : a.fx, bgfx: a.bgfx, fit: a.fit, turns: a.turns, text: a.txt, tpos: a.tpos, c1: rgb(a.c1), bg: rgb(a.bg) });
+			a.bytes = GM.encode(a.frames, w, h, a.spd);
+			if (a.bytes.length > 60000) { info.textContent = 'That is too big for the lights. Pick another animation or a shorter text.'; a.bytes = null; }
+		};
+		ledLoop(box, cv, pvw, () => a.frames, () => a.spd);
+		drawChips();
+		return a;
+	};
+	const gifA = animBox($('gifAnim'), 'gif'), drawA = animBox($('drawAnim'), 'draw');
+
+	// ---- how the message is shown: scrolling (drawn by the bridge), or placed / two lines / animated (a GIF made here) ----
+	const txtS = { style: 'scroll', fx: 'still', bgfx: '', bg: 0, spd: 90, t2: '', c2: URL_THEME === 'xm' ? 5 : 7, d1: 'stay', d2: 'stay', ts: 'auto', frames: [], bytes: null };
+	if (GM) {
+		const box = $('txtStyle');
+		const styles = mk('div', 'chips'), fxs = mk('div', 'chips'), bgfxs = mk('div', 'chips'), spd = mk('div', 'chips'), bg = mk('div', 'swatches'), c2 = mk('div', 'swatches'), tsz = mk('div', 'chips');
+		const d1 = mk('div', 'chips'), d2 = mk('div', 'chips'), d1lab = mk('div', 'lab', 'Top line'), d2lab = mk('div', 'lab', 'Bottom line'), c2lab = mk('div', 'lab', 'Colour of the bottom line');
+		const t2 = mk('input'); t2.type = 'text'; t2.maxLength = 40; t2.autocomplete = 'off'; t2.placeholder = 'Text of the bottom line';
+		const t2lab = mk('label', 'lab', 'Bottom line'), cv = mk('canvas'), pvw = mk('div', 'apv'), info = mk('p', 'note ainfo'); pvw.append(cv);
+		const extra = [mk('div', 'lab', 'Letter size'), tsz, mk('div', 'lab', 'Text movement'), fxs, mk('div', 'lab', 'Background effect'), bgfxs, d1lab, d1, d2lab, d2, mk('div', 'lab', 'Background colour'), bg, mk('div', 'lab', 'Speed'), spd, pvw];
+		const draw = () => {
+			chipRow(styles, [['scroll', '➡️ Scrolling (normal)'], ['top', '⬆️ At the top'], ['middle', '⏺️ In the middle'], ['bottom', '⬇️ At the bottom'], ['left', '⬅️ Sideways, left'], ['right', '➡️ Sideways, right']].concat(cfg.free ? [['two', '↕️ Two lines']] : []), txtS.style, v => { txtS.style = v; draw(); txtS.build(); });
+			chipRow(fxs, [['still', 'Still']].concat(ANIMS.slice(1)), txtS.fx, v => { txtS.fx = v; draw(); txtS.build(); });
+			chipRow(bgfxs, BGS, txtS.bgfx, v => { txtS.bgfx = v; draw(); txtS.build(); });
+			chipRow(spd, SPEEDS.map(([n, ms]) => [ms, n]), txtS.spd, v => { txtS.spd = v; draw(); txtS.build(); });
+			const DIRS = [['stay', '⏸️ Stays still'], ['left', '⬅️ To the left'], ['right', '➡️ To the right'], ['up', '⬆️ Up'], ['down', '⬇️ Down']];
+			chipRow(tsz, [['auto', '🪄 Automatic'], ['1', 'Small'], ['2', 'Medium'], ['3', 'Big']], txtS.ts, v => { txtS.ts = v; draw(); txtS.build(); });
+			chipRow(d1, DIRS, txtS.d1, v => { txtS.d1 = v; draw(); txtS.build(); });
+			chipRow(d2, DIRS, txtS.d2, v => { txtS.d2 = v; draw(); txtS.build(); });
+			const on = txtS.style !== 'scroll', two = txtS.style === 'two';
+			extra.concat([info]).forEach(e => e.hidden = !on);
+			t2lab.hidden = t2.hidden = c2lab.hidden = c2.hidden = !two;
+			d2lab.hidden = d2.hidden = !two;
+			d1lab.textContent = two ? 'Top line' : 'The text';
+			$('txtColLab').textContent = two ? 'Colour of the top line' : 'Colour';
+		};
+		box.append(mk('div', 'lab', 'How it shows'), styles, t2lab, t2, c2lab, c2, ...extra, info);
+		swatches(c2, [1, 2, 3, 4, 5, 6, 7, 8], txtS.c2, i => { txtS.c2 = i; txtS.build(); });
+		swatches(bg, [0, 1, 2, 3, 4, 5, 6, 7, 8], txtS.bg, i => { txtS.bg = i; txtS.build(); });
+		bg.querySelector('.sw.erase').setAttribute('aria-label', 'Black'); bg.querySelector('.sw.erase').style.background = '#000';
+		t2.oninput = () => { txtS.t2 = t2.value; txtS.build(); };
+		txtS.build = () => {
+			txtS.bytes = null; txtS.frames = []; info.textContent = '';
+			if (txtS.style === 'scroll') return;
+			const t1 = chosenText().slice(0, 40), l2 = txtS.style === 'two' ? txtS.t2.trim().slice(0, 40) : '';
+			if (!t1 && !l2) { info.textContent = 'Write or pick a message.'; return; }
+			if (isBad(t1) || (l2 && isBad(l2))) { info.textContent = 'That message can\'t be shown. Pick another one!'; return; }
+			const [w, h] = sizeNow();
+			txtS.frames = GM.frames({ W: w, H: h, delay: txtS.spd, sprites: [], fx: txtS.fx, text: t1, text2: l2, tpos: txtS.style === 'two' ? 'top' : txtS.style, bgfx: txtS.bgfx, c1: rgb(txtCol), c2: rgb(txtS.c2), dir1: txtS.d1, dir2: txtS.d2, tsize: txtS.ts, bg: rgb(txtS.bg) });
+			txtS.bytes = GM.encode(txtS.frames, w, h, txtS.spd);
+			if (txtS.bytes.length > 60000) { info.textContent = 'That is too big for the lights. Pick a shorter text.'; txtS.bytes = null; }
+		};
+		ledLoop(box, cv, pvw, () => txtS.frames, () => txtS.spd);
+		txtS.draw = draw;
+		draw();
+	} else $('txtStyle').hidden = true;
+	// the chosen GIF (its fullest frame) or the drawing, as the sprite to animate
+	const spCache = {};
+	const loadGifSprite = async () => {
+		if (!GM) return;
+		const want = gifs3.slice();
+		for (const g of want) if (!spCache[g]) { try { spCache[g] = await GM.loadSprite('gifs/' + g); } catch (e) {} }
+		if (want.join() !== gifs3.join()) return;
+		gifA.sprites = want.filter(g => spCache[g]).map(g => ({ w: 16, h: 16, px: spCache[g] }));
+		gifA.build();
+	};
+	const drawSprite = () => { if (!GM) return; drawA.sprites = pixels.some(v => v) ? [{ w: gw, h: gh, px: pixels.map(v => v ? rgb(v) : null) }] : []; drawA.build(); };
+
+	// ---- sides of the cube ----
+	const drawFaces = () => {
+		$('faceCard').hidden = cfg.faces.length < 2;
+		const sameSize = cfg.faces.every(f => f.w === cfg.faces[0].w && f.h === cfg.faces[0].h);
+		if (face === -1 && !sameSize) face = 0;
+		const opts = (sameSize ? [[-1, 'All sides']] : []).concat(cfg.faces.map((f, i) => [i, f.n || 'Side ' + (i + 1)]));
+		$('faces').replaceChildren(...opts.map(([v, t]) => {
+			const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = t; b.setAttribute('aria-pressed', String(v === face));
+			b.onclick = () => { face = v; drawFaces(); buildGrid(); drawSprite(); gifA.build && gifA.build(); if (txtS.build) txtS.build(); };
+			return b;
+		}));
+	};
+
+	// ---- props of the show (the same effects, palettes and speeds as showplay_bridge.py) ----
+	const PFX = [['flap', '🦋 Flap'], ['wave', '🌊 Colour wave'], ['rise', '⬆️ Rising'], ['spin', '🌀 Spin'], ['breathe', '💓 Breathe'], ['sparkle', '✨ Sparkle'],
+		['fire', '🔥 Fire'], ['ripple', '💧 Ripples'], ['chase', '🏃 Chase'], ['comet', '☄️ Comet'], ['confetti', '🎉 Confetti'], ['solid', '🎨 Colours']];
+	const PALS = [['rainbow', 'Rainbow', ['ff0000', 'ff8000', 'ffff00', '00ff00', '00ffff', '0000ff', 'ff00ff']], ['halloween', 'Halloween', ['ff6a00', '7a00ff', '39ff14', 'ff6a00', '7a00ff']],
+		['christmas', 'Christmas', ['ff0000', '00ff40', 'ffffff', 'ff0000', '00ff40']], ['fire', 'Fire', ['300000', 'ff2000', 'ff8000', 'ffd000', 'ffffa0']], ['ice', 'Ice', ['ffffff', '80e0ff', '0060ff', '00ffff']],
+		['ocean', 'Ocean', ['001060', '0060ff', '00e0d0', '80ffff']], ['candy', 'Candy', ['ff4fd8', 'ffffff', 'ff2a2a', 'ffffff']], ['forest', 'Forest', ['004000', '00a030', '80ff40', 'ffd23f']],
+		['sunset', 'Sunset', ['ff2a00', 'ff7a1a', 'ffd23f', '9b5cff']], ['gold', 'Gold', ['ffd700', 'ff9f00', 'fff3b0']], ['party', 'Party', ['ff00aa', '00ffcc', 'ffee00', '7a00ff']]];
+	const SPEED = [[0, '🐢 Slow'], [1, 'Normal'], [2, '🚀 Fast']], SPM = [0.5, 1, 1.8];
+	let prop = 0, pfx = 'flap', ppal = URL_THEME === 'hw' ? 'halloween' : URL_THEME === 'xm' ? 'christmas' : 'rainbow', pspd = 1, myCols = [3, 7];
+	const hexc = h => [0, 2, 4].map(j => parseInt(h.slice(j, j + 2), 16));
+	const palCols = () => ppal === 'custom' ? myCols.map(i => PAL[i]) : (PALS.find(p => p[0] === ppal) || PALS[0])[2];
+	function lut(cols, wrap) {
+		let cs = cols.map(hexc); if (cs.length === 1) cs = [cs[0], cs[0].map(v => v / 3 | 0)];
+		const pts = wrap ? cs.concat([cs[0]]) : cs, out = [];
+		for (let i = 0; i < 256; i++) { const f = wrap ? i / 256 * (pts.length - 1) : i / 255 * (pts.length - 1), k = Math.min(f | 0, pts.length - 2), x = f - k; out.push([0, 1, 2].map(j => pts[k][j] + (pts[k + 1][j] - pts[k][j]) * x | 0)); }
+		return out;
+	}
+	function drawProps() {
+		const ps = cfg.props || []; if (prop >= ps.length) prop = 0;
+		chipRow($('propList'), ps.map((p, i) => [i, p.e + ' ' + (p.n || 'Prop ' + (i + 1))]), prop, v => { prop = v; drawProps(); });
+		chipRow($('propFx'), PFX, pfx, v => { pfx = v; drawProps(); pvReset(); });
+		chipRow($('propSpeed'), SPEED, pspd, v => { pspd = v; drawProps(); });
+		$('propPals').replaceChildren(...PALS.concat([['custom', '🎨 My colours', myCols.map(i => PAL[i])]]).map(([k, n, cols]) => {
+			const b = document.createElement('button'); b.type = 'button'; b.className = 'pal'; b.textContent = n; b.setAttribute('aria-pressed', String(k === ppal));
+			b.style.background = 'linear-gradient(90deg,' + cols.map(c => '#' + c).join(',') + ')';
+			b.onclick = () => { ppal = k; drawProps(); }; return b;
+		}));
+		$('myColsBox').hidden = ppal !== 'custom';
+		$('myCols').replaceChildren(...[1, 2, 3, 4, 5, 6, 7, 8].map(i => {
+			const b = document.createElement('button'); b.type = 'button'; b.className = 'sw'; b.style.background = '#' + PAL[i]; b.setAttribute('aria-label', 'Colour ' + i);
+			b.setAttribute('aria-pressed', String(myCols.includes(i)));
+			b.onclick = () => { if (myCols.includes(i)) { if (myCols.length > 1) myCols = myCols.filter(x => x !== i); } else { myCols.push(i); if (myCols.length > 3) myCols.shift(); } drawProps(); };
+			return b;
+		}));
+	}
+	// preview: a pair of wings drawn as dots, with the same effect maths as the bridge
+	const PV = (() => {
+		const pts = [];
+		for (let side = 0; side < 2; side++) {
+			// a feathered wing: 7 feathers fanning out from the body, each a row of lights
+			for (let f = 0; f < 7; f++) {
+				const ang = (55 - f * 16) * Math.PI / 180, len = 0.95 - Math.abs(f - 2) * 0.08, n = 26 + f;
+				for (let k = 0; k < n; k++) {
+					const r = 0.12 + (k / (n - 1)) * len * 0.88, wob = Math.sin(k / n * Math.PI) * 0.035;
+					const ux = Math.cos(ang) * r, vy = 0.5 + Math.sin(ang) * r * 0.55 + wob;
+					const u = 1 - ux;   // this wing's own across position, body at u = 1 for the left wing
+					pts.push({ side, wx: side ? 0.5 + ux * 0.5 : 0.5 - ux * 0.5, wy: vy, u: side ? ux : u, v: vy, d: ux,
+						ang: ((Math.atan2(vy - 0.5, ux - 0.5) / 6.2832) % 1 + 1) % 1, rad: Math.min(1, Math.hypot(ux - 0.5, vy - 0.5) * 1.42) });
+				}
+			}
+		}
+		const per = pts.length / 2;
+		pts.forEach((p, i) => { p.order = (i % per) / (per - 1); p.st = 0; p.cr = 0; p.x = p.wx; p.y = p.wy; });
+		return pts;
+	})();
+	let pvLast = 0;
+	const pvReset = () => PV.forEach(p => { p.st = 0; });
+	function pvFrame(now) {
+		requestAnimationFrame(pvFrame);
+		if (tab !== 'prop') return;
+		const cv = $('propPv'), g = cv.getContext('2d'), W = cv.width, H = cv.height;
+		const tt = now / 1000, sp = SPM[pspd], t = tt * sp, dt = Math.min(0.2, Math.max(0, tt - pvLast)) * sp; pvLast = tt;
+		const L = lut(palCols(), pfx !== 'fire'), S2 = Math.sin;
+		g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+		for (const p of PV) {
+			let pos = 0, b = 1;
+			if (pfx === 'flap') { const beat = 0.55 + 0.45 * S2(t * 6); pos = (p.d * 0.6 + t * 0.15) % 1; b = beat * (0.35 + 0.65 * (0.5 + 0.5 * S2((p.d * 2.2 - t * 2.4) * 6.2832))); }
+			else if (pfx === 'wave') pos = ((p.d - t * 0.25) % 1 + 1) % 1;
+			else if (pfx === 'rise') pos = ((p.v - t * 0.3) % 1 + 1) % 1;
+			else if (pfx === 'spin') pos = (p.ang + t * 0.25) % 1;
+			else if (pfx === 'breathe') { b = 0.15 + 0.85 * (0.5 + 0.5 * S2(t * 2.2)); pos = (t * 0.05 + p.d * 0.3) % 1; }
+			else if (pfx === 'ripple') { pos = ((p.rad * 1.5 - t * 0.4) % 1 + 1) % 1; b = 0.25 + 0.75 * (0.5 + 0.5 * S2((p.rad * 3 - t * 1.2) * 6.2832)); }
+			else if (pfx === 'chase') { pos = ((p.order * 3 - t * 0.3) % 1 + 1) % 1; b = (((p.order * 12 - t * 1.2) % 1) + 1) % 1 < 0.5 ? 1 : 0.08; }
+			else if (pfx === 'comet') { const head = (t * 0.25) % 1; b = Math.max(0, 1 - (((head - p.order) % 1 + 1) % 1) * 6); pos = (head + 0.3 * b) % 1; }
+			else if (pfx === 'fire') { const n = (S2(p.u * 9 + t * 2.1 + S2(p.v * 5 + t * 3.3)) + S2(p.v * 7 - t * 4.7 + p.u * 3) + 2) / 4; pos = Math.max(0, Math.min(0.999, (1.1 - p.v * 1.25) * (0.45 + 0.75 * n))); }
+			else if (pfx === 'sparkle' || pfx === 'confetti') {
+				p.st *= Math.pow(0.25, dt * (pfx === 'sparkle' ? 3 : 1.5)); if (Math.random() < dt * (pfx === 'sparkle' ? 2.5 : 1.2)) { p.st = 1; p.cr = Math.random() * 256 | 0; }
+				b = Math.max(pfx === 'sparkle' ? 0.12 : 0, p.st); pos = pfx === 'confetti' ? p.cr / 256 : (p.cr / 256 + t * 0.05) % 1;
+			} else pos = (p.d * 0.8 + t * 0.03) % 1;
+			const c = L[(pos * 256 | 0) & 255];
+			g.fillStyle = 'rgb(' + (c[0] * b | 0) + ',' + (c[1] * b | 0) + ',' + (c[2] * b | 0) + ')';
+			g.beginPath(); g.arc(20 + p.x * (W - 40), H - 10 - p.y * (H - 20), 5.5, 0, 6.283); g.fill();
+		}
+	}
+	requestAnimationFrame(pvFrame);
+
+	// ---- game: four in a row (the bridge keeps the game and posts the board on "<code>-game") ----
+	const rnd = n => { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map(v => 'abcdefghijklmnopqrstuvwxyz0123456789'[v % 36]).join(''); };
+	const keep = (key, n, re) => { try { let v = localStorage.getItem(key); if (!v || !re.test(v)) { v = rnd(n); localStorage.setItem(key, v); } return v; } catch (e) { return rnd(n); } };
+	const PID = keep('cubePid', 16, /^[a-z0-9]{16}$/);   // secret: only this phone and the bridge know it
+	const TAG = keep('cubeTag', 6, /^[a-z0-9]{6}$/);     // public: in the posted board, so this phone knows which player it is
+	let G = { st: 'idle' }, gGot = 0, gBusy = false, gES = null, gSentN = -1;
+	const gSend = o => fetch(RELAY + TOPIC, { method: 'POST', body: JSON.stringify(Object.assign({ k: 'game', g: 'c4', p: PID, tag: TAG }, o)) });
+	const gCells = [];
+	for (let i = 0; i < 42; i++) { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', 'Column ' + (i % 7 + 1)); b.onclick = () => gMove(i % 7); gCells.push(b); }
+	$('gBoard').append(...gCells);
+	const gMe = () => (G.tags || []).indexOf(TAG);
+	async function gMove(c) {
+		if (G.st !== 'playing' || gMe() !== G.turn || gBusy || G.b[c] !== '0' || gSentN === G.n) return;
+		gBusy = true; gSentN = G.n; gDraw();
+		try { await gSend({ a: 'move', id: G.id, n: G.n, c }); } catch (e) { gSentN = -1; say('It could not be sent. Please try again.', 'err'); }
+		gBusy = false; gDraw();
+	}
+	async function gAct(o, okMsg) {
+		if (gBusy) return; gBusy = true; gDraw();
+		try { const r = await gSend(o); if (!r.ok) throw 0; if (okMsg) $('gStat').textContent = okMsg; } catch (e) { say('It could not be sent. Please try again.', 'err'); }
+		setTimeout(() => { gBusy = false; gDraw(); }, 1500);
+	}
+	const btn = (t, cls, on) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + (cls || ''); b.textContent = t; b.disabled = gBusy || closed; b.onclick = on; return b; };
+	function gDraw() {
+		const me = gMe(), cols = (G.c || ['ff2a2a', 'ffd23f']).map(c => '#' + c), b = G.b || '0'.repeat(42);
+		const myTurn = G.st === 'playing' && me === G.turn && gSentN !== G.n;
+		gCells.forEach((el, i) => { const v = +b[i]; el.style.background = v ? cols[v - 1] : ''; el.classList.toggle('win', (G.win || []).includes(i) && G.st === 'over'); el.classList.toggle('last', i === G.last && G.st === 'playing'); });
+		$('gBoard').className = 'c4 ' + (myTurn ? 'mine' : 'off');
+		const you = me >= 0 ? 'You are <span style="color:' + cols[me] + '">●</span>' : '';
+		let s = '', bt = [];
+		if (G.st === 'idle') {
+			s = 'Start a game!';
+			bt = [btn('🤖 Play against the computer', 'primary', () => gAct({ a: 'new', mode: 'cpu', z: face }, 'Starting… look at the lights!')),
+				btn('👫 Play against a friend', '', () => gAct({ a: 'new', mode: 'pvp', z: face }, 'Starting…'))];
+		} else if (G.st === 'waiting') {
+			if (me === 0) { s = 'Waiting for your friend… ' + you; bt = [btn('Cancel', '', () => gAct({ a: 'quit', id: G.id }))]; $('gHow').textContent = 'Your friend opens this page on their phone (scan the same QR code), goes to 🎮 Game and taps "Join the game".'; }
+			else { s = 'Someone is waiting for a friend to play!'; bt = [btn('🙋 Join the game', 'primary', () => gAct({ a: 'join', id: G.id }, 'Joining…'))]; }
+		} else if (G.st === 'playing') {
+			if (me < 0) s = 'A game is being played. Watch it on the lights!';
+			else if (myTurn) s = 'Your turn! Tap a column. ' + you;
+			else if (G.turn === me) s = 'Sending…';
+			else s = (G.mode === 'cpu' ? 'The computer is thinking… ' : 'Your friend\'s turn… ') + you;
+			if (me >= 0) bt = [btn('Give up', '', () => { if (confirmGiveUp()) gAct({ a: 'quit', id: G.id }); })];
+		} else if (G.st === 'over') {
+			const w = G.winner;
+			if (w === 3) s = 'It\'s a draw!';
+			else if (!w) s = G.why === 'nobody joined' ? 'Nobody joined this time.' : G.why === 'time ran out' ? 'Time ran out.' : 'Game over.';
+			else if (me < 0) s = (G.mode === 'cpu' ? (w === 2 ? 'The computer wins!' : 'The player wins! 🎉') : 'Player ' + w + ' wins!');
+			else s = w === me + 1 ? 'You win! 🎉🎉' : (G.mode === 'cpu' ? 'The computer wins this time!' : 'Your friend wins!');
+			if (G.why === 'gave up' && w && w !== me + 1 && me >= 0) s = 'You gave up.';
+		}
+		if (G.st !== 'waiting' || me !== 0) $('gHow').textContent = 'Drop your discs and get four in a row (across, up and down, or diagonally) before the other player. The board shows on the lights!';
+		$('gStat').innerHTML = s; $('gBtns').replaceChildren(...bt);
+		const left = Math.max(0, Math.round((G.left || 0) - (Date.now() - gGot) / 1000));
+		$('gTimer').textContent = (G.st === 'playing' && me >= 0) ? left + ' s left for this move' : G.st === 'waiting' ? left + ' s' : '';
+	}
+	// a bit friendlier than confirm() on a phone: the second tap within 3 s gives up
+	let giveUpAt = 0;
+	function confirmGiveUp() { if (Date.now() - giveUpAt < 3000) return true; giveUpAt = Date.now(); say('Tap "Give up" again to stop the game.', ''); return false; }
+	function gApply(st) {
+		if (!st || st.g !== 'c4' || (G.v && st.v < G.v && st.id === G.id)) return;
+		if (st.st !== 'idle' && Date.now() / 1000 - (st.at || 0) > 600) st = { st: 'idle' };   // an old board: the bridge is off
+		G = st; gGot = Date.now(); if (G.n !== gSentN) gSentN = -1; gDraw();
+	}
+	function gameOpen() {
+		gDraw();
+		if (gES || !TOPIC) return;
+		fetch(RELAY + TOPIC + '-game/json?poll=1&since=latest').then(r => r.text()).then(t => {
+			const ev = t.trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(e => e && e.event === 'message').pop();
+			if (ev) { try { gApply(JSON.parse(ev.message)); } catch (e) {} }
+		}).catch(() => {});
+		try {
+			gES = new EventSource(RELAY + TOPIC + '-game/sse');
+			gES.onmessage = e => { try { const ev = JSON.parse(e.data); if (ev.event === 'message') gApply(JSON.parse(ev.message)); } catch (er) {} };
+		} catch (e) {}
+		setInterval(() => { if (tab === 'game') gDraw(); }, 1000);
+	}
+
+	// ---- state of the lights (posted by the bridge on "<code>-status") ----
+	const apply = () => {
+		$('gameTab').hidden = !cfg.games; $('propTab').hidden = !(cfg.props && cfg.props.length);
+		const nt = 4 + (cfg.games ? 1 : 0) + (cfg.props && cfg.props.length ? 1 : 0);
+		$('tabs').classList.toggle('five', nt === 5); $('tabs').classList.toggle('six', nt === 6);
+		if (typeof drawProps === 'function') drawProps();
+		setKick(); drawFaces(); drawQuick(); drawGifs(); drawFx(); buildGrid(); if (txtS.draw) txtS.draw(); updPrev(); $('closed').hidden = !TOPIC || !closed; tick(); };
+	const checkOpen = () => fetch(RELAY + TOPIC + '-status/json?poll=1&since=all').then(r => r.text()).then(txt => {
+		const last = txt.trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(e => e && e.event === 'message').pop();
+		let st = null; try { st = last && JSON.parse(last.message); } catch (e) {}
+		closed = !st || !st.on || Date.now() / 1000 - (st.at || 0) > 7200;   // no news for 2 hours: the bridge is off
+		if (st && Array.isArray(st.faces) && st.faces.length) cfg.faces = st.faces.slice(0, 8).map(f => ({ n: String(f.n || '').slice(0, 20), w: Math.max(1, Math.min(128, f.w | 0)), h: Math.max(1, Math.min(128, f.h | 0)) }));
+		if (st) { cfg.theme = URL_THEME || (['hw', 'xm', 'ev', ''].includes(st.theme) ? st.theme : ''); cfg.free = !!st.free; cfg.title = String(st.title || '').slice(0, 40); cfg.games = !!st.games; cfg.props = Array.isArray(st.props) ? st.props.slice(0, 12).map(p => ({ n: String(p.n || '').slice(0, 24), e: String(p.e || '✨').slice(0, 4) })) : []; WAIT_MS = Math.max(0, Math.min(600, st.wait | 0)) * 1000; }
+		if (face >= cfg.faces.length) face = -1;
+		apply();
+	}).catch(() => {});
+
+	// ---- sending (with the wait set on the control page, if any) ----
+	const last = () => { try { return +localStorage.getItem('cubeSent') || 0; } catch (e) { return 0; } };
+	function say(t, k) { $('msg').textContent = t; $('msg').className = 'msg ' + (k || ''); }
+	let timer = 0;
+	function tick() {
+		clearTimeout(timer);
+		$('waitNote').hidden = !WAIT_MS; $('waitNote').textContent = 'You can send one request every ' + Math.round(WAIT_MS / 1000) + ' seconds.';
+		const left = Math.ceil((last() + WAIT_MS - Date.now()) / 1000);
+		if (left > 0) { $('send').disabled = true; $('send').textContent = 'You can send again in ' + left + ' s'; timer = setTimeout(tick, 1000); }
+		else { $('send').disabled = closed; $('send').textContent = 'Show it on the lights!'; }
+	}
+	$('send').onclick = async () => {
+		let body, anim = null, textGif = null;
+		if (tab === 'text') {
+			const t = chosenText().slice(0, 40);
+			if (!t) { say('Pick or write a message.', 'err'); return; }
+			if (isBad(t)) { say('That message can\'t be shown. Pick another one!', 'err'); return; }
+			body = cfg.free && $('txt').value.trim() ? { k: 'text', t, c: txtCol } : { k: 'quick', q: quick, c: txtCol };
+			if (txtS.style !== 'scroll') {
+				txtS.build();
+				if (!txtS.bytes) { say('The message could not be made. Pick another one or a shorter text.', 'err'); return; }
+				const [w, h] = sizeNow();
+				textGif = { meta: { k: 'gifx', z: face, w, h, fx: fxMeta(txtS.fx), t, t2: txtS.style === 'two' ? txtS.t2.trim().slice(0, 40) : '', src: 'text' }, bytes: txtS.bytes };
+			}
+		} else if (tab === 'gif') {
+			if (!gif) { say('Pick a picture first.', 'err'); return; }
+			body = { k: 'gif', f: gif };
+			if (gifA.made && gifA.made()) anim = gifA;
+		} else if (tab === 'prop') {
+			if (!(cfg.props || []).length) { say('Pick something to light up first.', 'err'); return; }
+			body = { k: 'prop', i: prop, e: pfx, pal: ppal, s: pspd };
+			if (ppal === 'custom') body.c = myCols.slice(0, 3);
+		} else if (tab === 'fx') {
+			if (!fx) { say('Pick an effect first.', 'err'); return; }
+			body = { k: 'fx', e: fx, c: [fxC1, fxC2] };
+		} else {
+			if (!pixels.some(v => v)) { say('Make a drawing first.', 'err'); return; }
+			body = { k: 'draw', w: gw, h: gh, p: pixels.join('') };
+			if (drawA.made && drawA.made()) anim = drawA;
+		}
+		body.z = face;
+		let req = { method: 'POST', body: JSON.stringify(body) }, url = RELAY + TOPIC;
+		if (textGif) {
+			url = RELAY + TOPIC + '?filename=showplay.gif&message=' + encodeURIComponent(JSON.stringify(textGif.meta));
+			req = { method: 'POST', body: new Blob([textGif.bytes]) };
+		} else if (anim) {
+			// an animated picture or drawing goes as a GIF attached to the message
+			if (anim.txt.trim() && isBad(anim.txt)) { say('That word can\'t be shown. Pick another one!', 'err'); return; }
+			anim.build();
+			if (!anim.bytes) { say('The animation could not be made. Pick another one or a shorter text.', 'err'); return; }
+			const [w, h] = sizeNow();
+			const meta = { k: 'gifx', z: face, w, h, fx: fxMeta(anim.fx), t: anim.txt.trim().slice(0, 20), src: tab === 'gif' ? gifs3.join(' + ') : 'drawing' };
+			url = RELAY + TOPIC + '?filename=showplay.gif&message=' + encodeURIComponent(JSON.stringify(meta));
+			req = { method: 'POST', body: new Blob([anim.bytes]) };
+		}
+		$('send').disabled = true;
+		try {
+			const r = await fetch(url, req);
+			if (!r.ok) throw new Error(r.status);
+			try { localStorage.setItem('cubeSent', String(Date.now())); } catch (e) {}
+			say('Sent! Watch the lights: it shows up in a moment.', 'ok');
+		} catch (e) { say('It could not be sent. Please try again.', 'err'); }
+		tick();
+	};
+
+	apply();
+	if (TOPIC) { checkOpen(); setInterval(checkOpen, 60000); }
+})();
+</script>
+</body>
+</html>
