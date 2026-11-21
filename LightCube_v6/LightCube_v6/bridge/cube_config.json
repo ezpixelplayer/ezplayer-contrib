@@ -1,0 +1,25 @@
+{
+ "on": false,
+ "topic": "cube-a263a4f05172",
+ "title": "MerryOnCherry",
+ "page": "",
+ "ezp": "http://127.0.0.1:3000",
+ "faces": [],
+ "end_dark": false,
+ "seconds": {
+  "text": 20,
+  "gif": 12,
+  "draw": 15,
+  "fx": 180,
+  "prop": 20
+ },
+ "theme": "hw",
+ "approve": false,
+ "props": [],
+ "wait": 0,
+ "hold": false,
+ "wait_turn": false,
+ "free": true,
+ "games": true,
+ "cpu_level": "normal"
+}
