@@ -1,10 +1,11 @@
 # ShowPlay — changelog
 
 Every update to ShowPlay (called Light Cube up to v9) is listed here, newest first, with what was added or changed and why. Each version also
-updates the installation guides (`Windows/INSTALL.md`, `arm64/INSTALL.md`) and the contents guides (`CONTENTS.md` in each folder) where they changed.
+updates the installation guide (`INSTALL.md`) and the contents guide (`CONTENTS.md`) of each platform folder where they changed.
 
 | Version | Date | In one line |
 | --- | --- | --- |
+| v11 | 2026-11-21 | New macOS and Linux x64 folders: ShowPlay now covers the same four platforms as EZPlayer |
 | v10 | 2026-11-21 | Renamed from Light Cube to ShowPlay, with settings, show codes and auto-start carried over |
 | v9 | 2026-11-21 | Package split into a Windows folder and an arm64 (Raspberry Pi) folder, each with its own complete installation and contents guides |
 | v8 | 2026-11-21 | Raspberry Pi: Linux start scripts, start-at-boot services for the bridge and EZPlayer, and a frames-per-second setting |
@@ -15,6 +16,64 @@ updates the installation guides (`Windows/INSTALL.md`, `arm64/INSTALL.md`) and t
 | v3 | 2026-11-20 | README: how to set up the controllers and the sides of the cube |
 | v2 | 2026-11-20 | Show name MerryOnCherry on the bridge and the visitors' page |
 | v1 | 2026-11-20 | First version in English: bridge, control page and visitors' page, through EZPlayer overlays |
+
+---
+
+## v11 — macOS and Linux x64 (2026-11-21)
+
+ShowPlay now has a folder for each platform that EZPlayer itself runs on: Windows, macOS (Apple Silicon and Intel),
+Linux x64, and Raspberry Pi (arm64). The bridge works exactly as in v10; only its version number and the platforms in
+its header changed.
+
+**New folder `macOS/`:**
+
+- **`start_bridge.command`** opens in Terminal with a double-click and starts the bridge. If Python 3 is missing, it
+  says how to install it.
+- **`install_autostart.command`** makes the bridge start by itself when you log in, with no window and no
+  administrator password.
+  - It installs a LaunchAgent (`~/Library/LaunchAgents/com.showplay.bridge.plist`) that restarts the bridge if it
+    stops and logs to `~/Library/Logs/ShowPlay/bridge.log`.
+  - The start file is written with Python's own property-list writer, so folder names with spaces, `&` or accents are
+    stored correctly.
+- **`remove_autostart.command`** stops it and removes the LaunchAgent. Settings are kept.
+- **`macOS/INSTALL.md`** is a complete guide for the Mac:
+  - installing Python 3, and allowing downloaded `.command` files to open;
+  - the network questions macOS asks: incoming connections and Local Network;
+  - keeping the Mac awake during the show, and running EZPlayer on the same Mac;
+  - Mac troubleshooting.
+- **`macOS/CONTENTS.md`** covers what every file does and where things are on the Mac.
+
+**New folder `linux-x64/`:**
+
+- **Files:** the same bridge and systemd scripts as `arm64/`, for Linux PCs with Intel or AMD processors (Ubuntu,
+  Debian, Linux Mint, Fedora…).
+- **`install_ezplayer_service.sh`** now also warns when EZPlayer is an AppImage and FUSE 2 seems to be missing, with the
+  command to install it.
+- **`linux-x64/INSTALL.md`** is a complete guide for Linux PCs:
+  - Python and systemd, `chmod`, and opening the firewall (`ufw`);
+  - the `showplay` service;
+  - EZPlayer as an AppImage, `.deb` or `.tar.gz`, on screen or headless;
+  - Linux troubleshooting.
+- **`linux-x64/CONTENTS.md`** covers what every file does.
+
+**Other changes:**
+
+- **README:** `README.md` lists the four folders, and the apps list links each platform's guide.
+- **Contents guides:** the `CONTENTS.md` files of `Windows/` and `arm64/` show the four folders.
+
+**Tested:**
+
+- **The bridge:** all four copies of `showplay_bridge.py` are the same file and pass a code check.
+- **macOS:**
+  - All `.command` files pass `bash -n` and ShellCheck.
+  - `install_autostart.command` was run with stand-in `launchctl`, `plutil` and `ipconfig`. The LaunchAgent it writes
+    is a valid property list with the right program, folder, restart and log settings, also in a folder named
+    "Show & Play".
+  - `remove_autostart.command` removes it, and `start_bridge.command` starts the bridge.
+- **Linux x64:** all `.sh` scripts pass ShellCheck, and the services were generated against a stand-in `systemctl`.
+- **Links:** every link between the documents points to a file that exists.
+- **Not tested yet on real Apple hardware or a real Linux PC.** The Mac scripts use standard macOS tools (`launchctl`,
+  `plutil`, LaunchAgents), but the first real run should be watched.
 
 ---
 

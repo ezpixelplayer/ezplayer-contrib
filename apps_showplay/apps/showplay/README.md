@@ -1,4 +1,4 @@
-# ShowPlay (v10)
+# ShowPlay (v11)
 
 ShowPlay lets visitors **play with the lights of a show** from their phone. They scan a QR code on the wall, and then
 they can:
@@ -20,12 +20,16 @@ sent through EZPlayer, need EZPlayer 0.7 or newer.
 | Folder | For | Start with |
 | --- | --- | --- |
 | [Windows/](Windows/) | A Windows 10 or 11 PC | [Windows/INSTALL.md](Windows/INSTALL.md) |
+| [macOS/](macOS/) | A Mac with Apple Silicon (M1 to M4) or Intel | [macOS/INSTALL.md](macOS/INSTALL.md) |
+| [linux-x64/](linux-x64/) | A Linux PC with an Intel or AMD 64-bit processor (Ubuntu, Debian, Mint, Fedora…) | [linux-x64/INSTALL.md](linux-x64/INSTALL.md) |
 | [arm64/](arm64/) | A Raspberry Pi 4 or 5 with 64-bit Raspberry Pi OS, alone or running EZPlayer too | [arm64/INSTALL.md](arm64/INSTALL.md) |
 
-Each folder has its own complete installation guide (`INSTALL.md`) and a guide to what each file is for
-(`CONTENTS.md`). The bridge (`showplay_bridge.py`) is the same in both. Only the start scripts differ.
+These are the same four platforms EZPlayer itself runs on.
 
-## Shared by both
+Each folder has its own complete installation guide (`INSTALL.md`) and a guide to what each file is for
+(`CONTENTS.md`). The bridge (`showplay_bridge.py`) is the same in every folder. Only the start files differ.
+
+## Shared by all folders
 
 | Where | What it is |
 | --- | --- |
