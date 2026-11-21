@@ -1,4 +1,4 @@
-# ShowPlay — Installation guide for Raspberry Pi (arm64) (v10)
+# ShowPlay — Installation guide for Raspberry Pi (arm64) (v11)
 
 Visitors scan a QR code on the wall, and from their phone they send a message, a picture, an effect or a drawing
 to a cube of LED matrices, play **Four in a Row** on it, or light up **props of the show** (the wings, the bats,

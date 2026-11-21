@@ -1,7 +1,7 @@
 # ShowPlay for Raspberry Pi (arm64) — What is in this folder
 
-Every file of the `arm64` folder of ShowPlay v10, what it is for, and whether you need to change it, plus the parts
-shared with the Windows version. To install and set it up, see [INSTALL.md](INSTALL.md).
+Every file of the `arm64` folder of ShowPlay v11, what it is for, and whether you need to change it, plus the parts
+shared with the other versions. To install and set it up, see [INSTALL.md](INSTALL.md).
 
 ```
 showplay/
@@ -14,6 +14,8 @@ showplay/
 │   ├── gifmaker.js
 │   └── gifs/               pack.json + 73 pictures
 ├── Windows/                for a Windows PC
+├── macOS/                  for a Mac (Apple Silicon or Intel)
+├── linux-x64/              for a Linux PC (Intel or AMD, 64-bit)
 └── arm64/                  for a Raspberry Pi with 64-bit Raspberry Pi OS
 ```
 
@@ -23,7 +25,7 @@ This folder (`arm64/`) holds:
 arm64/
 ├── INSTALL.md                  installation and setup guide for the Raspberry Pi
 ├── CONTENTS.md                 this document
-├── showplay_bridge.py              the bridge
+├── showplay_bridge.py          the bridge
 ├── start_bridge.sh             start the bridge in the terminal
 ├── install_service.sh          start the bridge by itself with the Pi (systemd service)
 ├── uninstall_service.sh        remove that service
@@ -49,7 +51,7 @@ bridge itself also runs on 32-bit Raspberry Pi OS and on any Linux computer with
 
 | File | What it is | Do you change it? |
 | --- | --- | --- |
-| `showplay_bridge.py` | The bridge itself, one Python file (standard library only). The same file as in `Windows/`. See the parts below. | No |
+| `showplay_bridge.py` | The bridge itself, one Python file (standard library only). The same file in every platform folder. See the parts below. | No |
 | `start_bridge.sh` | Starts the bridge in the terminal with `python3`. Ctrl-C stops it. Good for testing. | No |
 | `install_service.sh` | Run with `sudo` from your normal user. Writes `/etc/systemd/system/showplay.service`, which runs the bridge as that user (never root), starts it with the Pi, restarts it 5 s after any stop, and starts it now. | No |
 | `uninstall_service.sh` | Run with `sudo`. Stops and removes the `showplay` service. Your settings stay. | No |

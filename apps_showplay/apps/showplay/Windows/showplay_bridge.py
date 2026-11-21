@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ShowPlay — v10 (MerryOnCherry)   (called Light Cube up to v9)
+# ShowPlay — v11 (MerryOnCherry)   (called Light Cube up to v9)
 #
 # Visitors play with the lights of a show from their phone: they scan a QR code on the wall and send a message, a
 # picture, an effect or a drawing to a cube of LED matrices, play Four in a Row on it, or light up props of an EZPlayer
@@ -13,7 +13,7 @@
 # overlay API and the request shows on top of the sequence that is playing.
 #
 # Control page, on the home network:  http://<this-computer's-ip>:8099
-# Uses only the Python 3 standard library (nothing to install). Runs on Windows and on Linux, Raspberry Pi included.
+# Uses only the Python 3 standard library (nothing to install). Runs on Windows, macOS and Linux (x64 and arm64).
 # Start:  python showplay_bridge.py  (Windows)   or   python3 showplay_bridge.py  (Linux / Raspberry Pi)
 # Settings are kept in showplay_config.json, next to this file (a cube_config.json from Light Cube is taken over).
 
@@ -21,7 +21,7 @@ import json, os, time, threading, queue, unicodedata, re, socket, secrets, struc
 import urllib.request, urllib.parse, urllib.error
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
-VERSION = "v10"
+VERSION = "v11"
 PORT = 8099
 RELAY = "https://ntfy.sh/"
 CFG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "showplay_config.json")
