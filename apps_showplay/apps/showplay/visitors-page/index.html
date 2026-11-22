@@ -94,6 +94,16 @@ h1 { margin: 4px 0 0; font-size: 30px; line-height: 1.15; }
 .pcols { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .pcols button { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; font-size: 18px; }
 .pcols button[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 10px #fff8; }
+.advc { text-align: center; font-size: 17px; font-weight: 800; }
+.doors { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.doors button { aspect-ratio: 1; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--fg); font: 800 16px/1.1 system-ui, sans-serif; cursor: pointer; padding: 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.doors button .e { font-size: 20px; }
+.doors button.shut { color: var(--muted); background: repeating-linear-gradient(45deg, #ffffff08 0 6px, transparent 6px 12px), var(--card); cursor: default; }
+.doors button.today { border-color: #ffc83c; box-shadow: 0 0 14px #ffc83c88; animation: glow 1.4s ease-in-out infinite alternate; }
+@keyframes glow { from { box-shadow: 0 0 6px #ffc83c55; } to { box-shadow: 0 0 18px #ffc83ccc; } }
+.treebox { display: flex; justify-content: center; }
+.treebox svg { width: 100%; max-width: 330px; height: auto; background: radial-gradient(circle at 50% 30%, #0c2a18, #050f09); border-radius: 16px; touch-action: manipulation; }
+.treebox circle { cursor: pointer; }
 .gstat { font-size: 18px; font-weight: 700; text-align: center; min-height: 27px; }
 .gbtns { display: flex; flex-direction: column; gap: 8px; }
 .tabs button { min-height: 52px; border: 0; border-radius: 14px; background: none; color: var(--muted); font: inherit; font-weight: 700; font-size: 15px; padding: 0 2px; cursor: pointer; }
@@ -153,6 +163,8 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
     <button type="button" role="tab" aria-selected="false" data-tab="prop" id="propTab" hidden>✨ Props</button>
     <button type="button" role="tab" aria-selected="false" data-tab="play" id="playTab" hidden>🎹 Play</button>
     <button type="button" role="tab" aria-selected="false" data-tab="sing" id="singTab" hidden>🎤 Sing</button>
+    <button type="button" role="tab" aria-selected="false" data-tab="adv" id="advTab" hidden>📅 Advent</button>
+    <button type="button" role="tab" aria-selected="false" data-tab="tree" id="treeTab" hidden>🎄 Tree</button>
   </div>
 
   <section class="card" id="pText">
@@ -257,11 +269,27 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
     <p class="note" style="text-align:center">Your recording is played out loud at the show and then deleted.</p>
   </section>
 
+  <section class="card" id="pAdv" hidden>
+    <div class="lab">📅 Advent calendar</div>
+    <div class="advc" id="aCount"></div>
+    <p class="note">One more door opens every day. Tap an open door to see its surprise on the lights!</p>
+    <div class="doors" id="aDoors"></div>
+  </section>
+
+  <section class="card" id="pTree" hidden>
+    <div class="lab">🎄 Decorate the tree</div>
+    <p class="note">Tap a free spot on the tree, pick a colour and hang your bauble: it lights up on the real tree!</p>
+    <div class="treebox"><svg id="tSvg" viewBox="0 0 100 120" role="img" aria-label="The tree and its baubles"></svg></div>
+    <div class="swatches" id="tCols"></div>
+    <div class="gstat" id="tStat" role="status"></div>
+    <button class="btn primary" type="button" id="tHang">Hang my bauble</button>
+  </section>
+
   <button class="btn primary" type="button" id="send">Show it on the lights!</button>
   <p class="msg" id="msg" role="status"></p>
   <p class="note" id="waitNote" hidden></p>
 </main>
-<script src="gifmaker.js?v=22"></script>
+<script src="gifmaker.js?v=23"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -326,15 +354,17 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 
 	// ---- tabs ----
 	let tab = 'text';
-	const panes = { text: $('pText'), gif: $('pGif'), fx: $('pFx'), draw: $('pDraw'), game: $('pGame'), prop: $('pProp'), play: $('pPlay'), sing: $('pSing') };
+	const panes = { text: $('pText'), gif: $('pGif'), fx: $('pFx'), draw: $('pDraw'), game: $('pGame'), prop: $('pProp'), play: $('pPlay'), sing: $('pSing'), adv: $('pAdv'), tree: $('pTree') };
 	$('tabs').querySelectorAll('button').forEach(b => b.onclick = () => {
 		tab = b.dataset.tab;
 		$('tabs').querySelectorAll('button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
 		Object.entries(panes).forEach(([k, p]) => p.hidden = k !== tab);
-		$('send').hidden = ['game', 'play', 'sing'].includes(tab); $('waitNote').hidden = ['game', 'play', 'sing'].includes(tab) || !WAIT_MS;
+		$('send').hidden = ['game', 'play', 'sing', 'adv', 'tree'].includes(tab); $('waitNote').hidden = ['game', 'play', 'sing', 'adv', 'tree'].includes(tab) || !WAIT_MS;
 		if (tab === 'game') gameOpen();
 		if (tab === 'play') playOpen();
 		if (tab === 'sing') singOpen();
+		if (tab === 'adv') advDraw();
+		if (tab === 'tree') treeOpen();
 		say('');
 	});
 
@@ -1262,11 +1292,98 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		} catch (e) {}
 	}
 
+	// ---- advent calendar (v23): the doors open so far come with the status; a tap shows the door's surprise ----
+	function advDraw() {
+		const A = cfg.adv; if (!A) return;
+		const now = new Date(), y = now.getMonth() === 11 && now.getDate() > 25 ? now.getFullYear() + 1 : now.getFullYear();
+		const xmas = new Date(y, 11, 25), days = Math.ceil((xmas - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+		$('aCount').textContent = A.d === 0 ? '📅 The calendar opens on ' + A.f + '/' + A.m + '. ' + days + ' days to Christmas!' :
+			days === 0 ? '🎄 Merry Christmas! 🎄' : days === 1 ? '🎄 Tomorrow is Christmas!' : '🎄 ' + days + ' days to Christmas';
+		$('aDoors').replaceChildren(...Array.from({ length: A.n }, (_, i) => {
+			const b = document.createElement('button'); b.type = 'button'; const d = i + 1, dr = A.doors[i];
+			if (!dr) { b.className = 'shut'; b.textContent = d; b.setAttribute('aria-label', 'Door ' + d + ', not open yet'); b.onclick = () => say('Door ' + d + ' is still closed. Come back on that day!'); return b; }
+			if (d === A.d) b.className = 'today';
+			const name = dr[0] === '🎮' ? (GAMES[dr[1]] ? GAMES[dr[1]].n : 'A game') : dr[1];
+			const e = document.createElement('span'); e.className = 'e'; e.textContent = dr[0]; b.append(e, String(d)); b.title = name; b.setAttribute('aria-label', 'Door ' + d + ': ' + name);
+			b.onclick = () => advOpen(d, dr, name); return b;
+		}));
+	}
+	async function advOpen(d, dr, name) {
+		if (dr[0] === '🎮') {                                  // a game door: open that game
+			if (!cfg.games || !(cfg.gl || []).includes(dr[1])) { say('Door ' + d + ': ' + name + '! Games are closed right now.', 'err'); return; }
+			gPick = dr[1]; $('gameTab').click(); say('Door ' + d + ': ' + name + '! Press New game to play.', 'ok'); return;
+		}
+		if (closed) { say('The lights are not taking requests right now.', 'err'); return; }
+		try {
+			await relayPost(RELAY + TOPIC, { method: 'POST', body: JSON.stringify({ k: 'advent', d, z: face, p: PID, tag: TAG }) });
+			say('Door ' + d + ': ' + name + '! Watch the lights ✨', 'ok');
+		} catch (e) { sayErr(e); }
+	}
+
+	// ---- decorate the tree (v23): the bridge posts the tree on "<code>-tree"; each phone hangs one bauble at a time ----
+	let TR = { on: false }, tES = null, tSel = -1, tCol = 0, tNoteAt = Math.floor(Date.now() / 1000) - 5, tNext = 0, tMine = -1;
+	const TWHY = { taken: 'Someone was faster! Pick another spot.', party: 'The tree is full: party time! Wait a moment.', 'the tree is closed': 'The tree is closed right now.', 'the tree is not ready': 'The tree is not ready yet. Try again later.' };
+	function treeDraw() {
+		const svg = $('tSvg'), ns = 'http://www.w3.org/2000/svg';
+		svg.replaceChildren();
+		if (!TR.on) { $('tStat').textContent = 'The tree is closed right now.'; $('tHang').disabled = true; $('tCols').replaceChildren(); return; }
+		const P = (u, v) => [10 + u * 80, 112 - v * 104];
+		const poly = document.createElementNS(ns, 'polygon'); poly.setAttribute('points', TR.ol.map(([u, v]) => P(u, v).join(',')).join(' ')); poly.setAttribute('fill', '#14522b'); poly.setAttribute('stroke', '#2c8a4c'); poly.setAttribute('stroke-width', '0.8'); svg.append(poly);
+		const top = TR.ol.reduce((a, p) => p[1] > a[1] ? p : a, [0.5, 0]); const st = document.createElementNS(ns, 'text'); const [sx, sy] = P(0.5, Math.min(1, top[1] + 0.06));
+		st.setAttribute('x', sx); st.setAttribute('y', sy); st.setAttribute('text-anchor', 'middle'); st.setAttribute('font-size', '10'); st.textContent = '⭐'; svg.append(st);
+		TR.sp.forEach(([u, v], i) => {
+			const [x, y] = P(u, v), o = TR.o[i], c = document.createElementNS(ns, 'circle');
+			c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', i === tSel ? 4.2 : 3.4);
+			if (o === '0') { c.setAttribute('fill', i === tSel ? '#' + TR.cols[tCol] : '#ffffff14'); c.setAttribute('stroke', i === tSel ? '#fff' : '#ffffff88'); c.setAttribute('stroke-dasharray', i === tSel ? '' : '1.2 1'); }
+			else { c.setAttribute('fill', '#' + TR.cols[+o - 1]); c.setAttribute('stroke', i === tMine ? '#fff' : '#0006'); }
+			c.setAttribute('stroke-width', '0.7');
+			c.onclick = () => { if (TR.o[i] !== '0') { say(i === tMine ? 'That is your bauble! ✨' : 'This spot already has a bauble. Pick a free one.'); return; } tSel = i; say(''); treeDraw(); };
+			svg.append(c);
+		});
+		$('tCols').replaceChildren(...TR.cols.map((h, k) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'sw'; b.style.background = '#' + h; b.setAttribute('aria-label', 'Colour ' + (k + 1)); b.setAttribute('aria-pressed', String(k === tCol)); b.onclick = () => { tCol = k; treeDraw(); }; return b; }));
+		const n = TR.sp.length, used = n - [...TR.o].filter(c => c === '0').length, left = Math.ceil((tNext - Date.now()) / 1000);
+		$('tStat').textContent = TR.party ? '🎉 The tree is full! Party on the lights!' : left > 0 ? 'You can hang another bauble in ' + left + ' s. (' + used + ' of ' + n + ')' : tSel < 0 ? 'Tap a free spot on the tree. (' + used + ' of ' + n + ' baubles)' : 'Now pick a colour and press Hang my bauble!';
+		$('tHang').disabled = tSel < 0 || left > 0 || TR.party || closed;
+	}
+	function tApply(st) {
+		if (!st || (TR.v && st.v < TR.v && st.on)) return;
+		TR = st; if (tSel >= 0 && (!TR.on || TR.o[tSel] !== '0')) tSel = -1;
+		if (st.note && st.note.tag === TAG && st.note.at > tNoteAt) {
+			tNoteAt = st.note.at; const w = st.note.why;
+			if (w.startsWith('wait ')) { tNext = Date.now() + (+w.slice(5)) * 1000; say('You can hang another bauble in ' + w.slice(5) + ' s.', 'err'); }
+			else say(TWHY[w] || 'The bauble could not be hung (' + w + ').', 'err');
+		}
+		treeDraw();
+	}
+	$('tHang').onclick = async () => {
+		if (tSel < 0 || !TR.on) return;
+		const i = tSel;
+		try {
+			await relayPost(RELAY + TOPIC, { method: 'POST', body: JSON.stringify({ k: 'tree', i, c: tCol + 1, p: PID, tag: TAG }) });
+			tMine = i; tSel = -1; tNext = Date.now() + (TR.every || 0) * 1000;
+			say('Your bauble is on the tree! Watch the lights ✨', 'ok'); treeDraw();
+		} catch (e) { sayErr(e); }
+	};
+	function treeOpen() {
+		treeDraw();
+		if (tES || !TOPIC) return;
+		fetch(RELAY + TOPIC + '-tree/json?poll=1&since=latest').then(r => r.text()).then(t => {
+			const ev = t.trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(e => e && e.event === 'message').pop();
+			if (ev) { try { tApply(JSON.parse(ev.message)); } catch (e) {} }
+		}).catch(() => {});
+		try {
+			tES = new EventSource(RELAY + TOPIC + '-tree/sse');
+			tES.onmessage = e => { try { const ev = JSON.parse(e.data); if (ev.event === 'message') tApply(JSON.parse(ev.message)); } catch (er) {} };
+		} catch (e) {}
+		setInterval(() => { if (tab === 'tree') treeDraw(); }, 1000);
+	}
+
 	// ---- state of the lights (posted by the bridge on "<code>-status") ----
 	const apply = () => {
-		$('gameTab').hidden = !cfg.games; $('propTab').hidden = !(cfg.props && cfg.props.length); $('playTab').hidden = !cfg.play; $('singTab').hidden = !cfg.sing;
-		const nt = 4 + (cfg.games ? 1 : 0) + (cfg.props && cfg.props.length ? 1 : 0) + (cfg.play ? 1 : 0) + (cfg.sing ? 1 : 0);
-		$('tabs').classList.toggle('five', nt === 5); $('tabs').classList.toggle('six', nt === 6);
+		$('gameTab').hidden = !cfg.games; $('propTab').hidden = !(cfg.props && cfg.props.length); $('playTab').hidden = !cfg.play; $('singTab').hidden = !cfg.sing; $('advTab').hidden = !cfg.adv; $('treeTab').hidden = !cfg.tree;
+		const nt = 4 + (cfg.games ? 1 : 0) + (cfg.props && cfg.props.length ? 1 : 0) + (cfg.play ? 1 : 0) + (cfg.sing ? 1 : 0) + (cfg.adv ? 1 : 0) + (cfg.tree ? 1 : 0);
+		$('tabs').classList.toggle('five', nt === 5); $('tabs').classList.toggle('six', nt === 6 || nt === 7 || nt === 9);
+		if (tab === 'adv') advDraw();
 		if (typeof drawProps === 'function') drawProps();
 		setKick(); drawFaces(); drawQuick(); drawGifs(); drawFx(); buildGrid(); if (txtS.draw) txtS.draw(); updPrev(); $('closed').hidden = !TOPIC || !closed; tick(); };
 	const checkOpen = () => fetch(RELAY + TOPIC + '-status/json?poll=1&since=all').then(r => r.text()).then(txt => {
@@ -1275,7 +1392,8 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		closed = !st || !st.on || Date.now() / 1000 - (st.at || 0) > 7200;   // no news for 2 hours: the bridge is off
 		if (st && Array.isArray(st.faces) && st.faces.length) cfg.faces = st.faces.slice(0, 8).map(f => ({ n: String(f.n || '').slice(0, 20), w: Math.max(1, Math.min(128, f.w | 0)), h: Math.max(1, Math.min(128, f.h | 0)) }));
 		if (st) { cfg.theme = URL_THEME || (['hw', 'xm', 'ev', ''].includes(st.theme) ? st.theme : ''); cfg.free = !!st.free; cfg.title = String(st.title || '').slice(0, 40); cfg.games = !!st.games; cfg.play = !!st.play; cfg.race = st.race && typeof st.race === 'object' ? st.race : null; cfg.sing = !!st.sing && Array.isArray(st.singers) && st.singers.length > 0;
-			cfg.singers = Array.isArray(st.singers) ? st.singers.slice(0, 30).map(x => ({ k: String(x.k || '').slice(0, 130), n: String(x.n || '').slice(0, 28), e: String(x.e || '🎤').slice(0, 4) })) : []; cfg.gl = Array.isArray(st.gl) ? st.gl.filter(g => GAMES[g]) : ['c4']; cfg.props = Array.isArray(st.props) ? st.props.slice(0, 12).map(p => ({ n: String(p.n || '').slice(0, 24), e: String(p.e || '✨').slice(0, 4) })) : []; WAIT_MS = Math.max(0, Math.min(600, st.wait | 0)) * 1000; }
+			cfg.singers = Array.isArray(st.singers) ? st.singers.slice(0, 30).map(x => ({ k: String(x.k || '').slice(0, 130), n: String(x.n || '').slice(0, 28), e: String(x.e || '🎤').slice(0, 4) })) : []; cfg.gl = Array.isArray(st.gl) ? st.gl.filter(g => GAMES[g]) : ['c4']; cfg.props = Array.isArray(st.props) ? st.props.slice(0, 12).map(p => ({ n: String(p.n || '').slice(0, 24), e: String(p.e || '✨').slice(0, 4) })) : []; WAIT_MS = Math.max(0, Math.min(600, st.wait | 0)) * 1000;
+			cfg.adv = st.adv && typeof st.adv === 'object' && Array.isArray(st.adv.doors) ? st.adv : null; cfg.tree = !!st.tree; }
 		if (face >= cfg.faces.length) face = -1;
 		apply();
 	}).catch(() => {});
