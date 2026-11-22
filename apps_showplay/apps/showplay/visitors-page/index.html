@@ -261,7 +261,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   <p class="msg" id="msg" role="status"></p>
   <p class="note" id="waitNote" hidden></p>
 </main>
-<script src="gifmaker.js?v=18"></script>
+<script src="gifmaker.js?v=19"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -269,6 +269,32 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	// ?t=<show code> (from the QR on the wall); sides, sizes, theme and free text come from the bridge's status
 	const TOPIC = (q.get('t') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
 	const RELAY = 'https://ntfy.sh/';
+	// ntfy.sh lets each internet address send about 60 messages, then about one every 5-10 s, and answers 429 when
+	// that is used up. At home the phones and the bridge share one address, so each phone keeps to its own budget:
+	// steady messages (joystick, taps, race effort) are skipped when the budget runs low, so moves still go through.
+	const NB = { t: 30, at: Date.now(), block: 0 };
+	function relayPost(url, req, low) {
+		const now = Date.now();
+		NB.t = Math.min(30, NB.t + (now - NB.at) / 8000); NB.at = now;
+		if (now < NB.block) return Promise.reject(new Error('busy'));
+		if (low && NB.t < low) return Promise.reject(new Error('skip'));
+		if (NB.t < 1) return Promise.reject(new Error('busy'));
+		NB.t -= 1;
+		return fetch(url, req).then(r => {
+			if (r.status === 429) { NB.block = Date.now() + 60000; NB.t = 0; throw new Error('busy'); }
+			if (!r.ok) throw new Error('http ' + r.status);
+			return r;
+		});
+	}
+	const LOW = { go: 12, dir: 12, tap: 12, e: 4 };   // steady messages and the budget they leave for the others
+	function sayErr(e) {
+		if (e && e.message === 'skip') return;
+		say(e && e.message === 'busy' ? 'Too many messages right now. Wait a minute and try again.' : 'It could not be sent. Please try again.', 'err');
+	}
+	const WHY = { 'no track set up': "The race isn't set up yet. Ask the show to set up the race track.", 'no tracks set up': "The race isn't set up yet. Ask the show to set up the race track.",
+		'EZPlayer is not answering': 'The lights are not ready for the race right now. Try again in a moment.', 'a race is already on': 'A race is already on. Wait for it to end.',
+		'another game is being played': 'Another game is being played. Wait for it to end.', 'a game is already being played': 'A game is already being played. Wait for it to end.', 'games are off': 'Games are closed right now.', 'game not on the list': 'This game is closed right now.',
+		'cannot join': 'You cannot join this game now.', 'no sides': 'The lights are not ready for games right now.' };
 	let WAIT_MS = 0;   // time between two requests from this phone (set on the control page; 0 = no wait)
 	// the same 9 colours and ready messages as the bridge (showplay_bridge.py)
 	const PAL = ['000000', 'ffffff', 'ff2a2a', 'ff7a1a', 'ffd23f', '39d353', '2bb7ff', '9b5cff', 'ff4fd8'];
@@ -662,7 +688,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	const PID = keep('cubePid', 16, /^[a-z0-9]{16}$/);   // secret: only this phone and the bridge know it
 	const TAG = keep('cubeTag', 6, /^[a-z0-9]{6}$/);     // public: in the posted board, so this phone knows which player it is
 	let G = { st: 'idle' }, gGot = 0, gBusy = false, gES = null, gSentN = -1, gPick = '', sIn = [], sInN = -1;
-	const gSend = o => fetch(RELAY + TOPIC, { method: 'POST', body: JSON.stringify(Object.assign({ k: 'game', g: G.st === 'idle' || o.a === 'new' ? gPick : G.g, p: PID, tag: TAG }, o)) });
+	const gSend = o => relayPost(RELAY + TOPIC, { method: 'POST', body: JSON.stringify(Object.assign({ k: 'game', g: G.st === 'idle' || o.a === 'new' ? gPick : G.g, p: PID, tag: TAG }, o)) }, LOW[o.a] || 0);
 	// Four in a Row board
 	const gCells = [];
 	for (let i = 0; i < 42; i++) { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', 'Column ' + (i % 7 + 1)); b.onclick = () => gMove(i % 7); gCells.push(b); }
@@ -689,7 +715,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	async function cAnswer(n) {
 		if (G.g !== 'count' || !['show', 'answer'].includes(G.st) || gMe() < 0 || cPickedR === G.round) return;
 		cPicked = n; cPickedR = G.round; gDraw();
-		try { await gSend({ a: 'answer', id: G.id, n: G.round, v: n }); } catch (e) { cPickedR = -1; say('It could not be sent. Please try again.', 'err'); }
+		try { await gSend({ a: 'answer', id: G.id, n: G.round, v: n }); } catch (e) { cPickedR = -1; sayErr(e); }
 		gDraw();
 	}
 	// Snake: arrows and swipes
@@ -711,7 +737,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		clearTimeout(iTm);
 		if (wait > 0 && !force) { iTm = setTimeout(() => iSend(true), wait); return; }
 		iSentAt = Date.now();
-		gSend({ a: 'go', id: G.id, x: Math.round(iGoalX * 1000) / 1000 }).catch(() => say('It could not be sent. Please try again.', 'err'));
+		gSend({ a: 'go', id: G.id, x: Math.round(iGoalX * 1000) / 1000 }).catch(sayErr);
 	}
 	function iShow() { const r = $('iStrip').getBoundingClientRect(); $('iGoal').style.left = (20 + iGoalX * (r.width - 40)) + 'px'; }
 	$('iStrip').addEventListener('pointerdown', e => { if ($('iStrip').classList.contains('off')) return; e.preventDefault(); $('iStrip').setPointerCapture(e.pointerId); iDrag = true; iGoalX = iPos(e); iShow(); iSend(); });
@@ -728,7 +754,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		clearTimeout(pgTm);
 		if (wait > 0 && !force) { pgTm = setTimeout(() => pgSend(true), wait); return; }
 		pgSentAt = Date.now();
-		gSend({ a: 'go', id: G.id, y: Math.round(pgGoal * 1000) / 1000 }).catch(() => say('It could not be sent. Please try again.', 'err'));
+		gSend({ a: 'go', id: G.id, y: Math.round(pgGoal * 1000) / 1000 }).catch(sayErr);
 	}
 	function pgShow() { const r = $('pStrip').getBoundingClientRect(); $('pGoal').style.top = (20 + pgGoal * (r.height - 40)) + 'px'; }
 	$('pStrip').addEventListener('pointerdown', e => { if ($('pStrip').classList.contains('off')) return; e.preventDefault(); $('pStrip').setPointerCapture(e.pointerId); pgDrag = true; pgGoal = pgPos(e); pgShow(); pgSend(); });
@@ -832,7 +858,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 			gSend({ a: 'e', id: G.id, e: vals }).catch(() => {});
 			$('rPlay').querySelectorAll('.rmeter div').forEach((d, k) => d.style.width = Math.round((Array.isArray(vals) ? vals[k] : vals) * 100) + '%');
 		};
-		rSendT = setInterval(() => { tick(); if (Date.now() - rStartAt > 30000 && !rSendT.slow) { clearInterval(rSendT); rSendT = setInterval(tick, 1500); rSendT.slow = true; } }, 1000);
+		rSendT = setInterval(() => { tick(); if (Date.now() - rStartAt > 30000 && !rSendT.slow) { clearInterval(rSendT); rSendT = setInterval(tick, 2500); rSendT.slow = true; } }, 2000);   // the bridge keeps each effort for 4 s
 	}
 	function rDrawPlay(mine) {
 		const box = [];
@@ -853,14 +879,14 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	function kDir(d) {
 		if (G.g !== 'snake' || !['ready', 'playing'].includes(G.st) || gMe() !== 0 || Date.now() - kLast < 150) return;
 		kLast = Date.now(); if (navigator.vibrate) navigator.vibrate(15);
-		gSend({ a: 'dir', id: G.id, d }).catch(() => say('It could not be sent. Please try again.', 'err'));
+		gSend({ a: 'dir', id: G.id, d }).catch(sayErr);
 	}
 	const gMe = () => (G.tags || []).indexOf(TAG);
 	async function gMove(c) {
 		if (G.st !== 'playing' || gMe() !== G.turn || gBusy || (G.b || '')[c] !== '0' || gSentN === G.n) return;
 		if (G.g === 'c4' && (G.b || '')[c] !== '0') return;
 		gBusy = true; gSentN = G.n; gDraw();
-		try { await gSend({ a: 'move', id: G.id, n: G.n, c }); } catch (e) { gSentN = -1; say('It could not be sent. Please try again.', 'err'); }
+		try { await gSend({ a: 'move', id: G.id, n: G.n, c }); } catch (e) { gSentN = -1; sayErr(e); }
 		gBusy = false; gDraw();
 	}
 	async function sTap(q) {
@@ -870,13 +896,13 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		sPads[q].classList.add('lit'); setTimeout(() => sPads[q].classList.remove('lit'), 180);
 		if (sIn.length >= G.n) {
 			gSentN = G.n; gDraw();
-			try { await gSend({ a: 'move', id: G.id, n: G.n, s: sIn }); } catch (e) { gSentN = -1; sIn = []; say('It could not be sent. Please try again.', 'err'); }
+			try { await gSend({ a: 'move', id: G.id, n: G.n, s: sIn }); } catch (e) { gSentN = -1; sIn = []; sayErr(e); }
 		}
 		gDraw();
 	}
 	async function gAct(o, okMsg) {
 		if (gBusy) return; gBusy = true; gDraw();
-		try { const r = await gSend(o); if (!r.ok) throw 0; if (okMsg) $('gStat').textContent = okMsg; } catch (e) { say('It could not be sent. Please try again.', 'err'); }
+		try { const r = await gSend(o); if (okMsg) $('gStat').textContent = okMsg; } catch (e) { sayErr(e); }
 		setTimeout(() => { gBusy = false; gDraw(); }, 1500);
 	}
 	const btn = (t, cls, on) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + (cls || ''); b.textContent = t; b.disabled = gBusy || closed; b.onclick = on; return b; };
@@ -1037,10 +1063,14 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	// a bit friendlier than confirm() on a phone: the second tap within 3 s gives up
 	let giveUpAt = 0;
 	function confirmGiveUp() { if (Date.now() - giveUpAt < 3000) return true; giveUpAt = Date.now(); say('Tap again to stop the game.', ''); return false; }
+	let gNoteAt = Math.floor(Date.now() / 1000) - 5;
 	function gApply(st) {
 		if (!st || !GAMES[st.g] || (G.v && st.v < G.v && st.id === G.id && st.g === G.g)) return;
 		if (st.st !== 'idle' && Date.now() / 1000 - (st.at || 0) > 600) st = { st: 'idle', best: st.best };   // an old board: the bridge is off
 		const newRound = st.n !== G.n || st.id !== G.id;
+		if (st.note && st.note.tag === TAG && st.note.at > gNoteAt && Date.now() / 1000 - st.note.at < 60) {   // the bridge said no (v19)
+			gNoteAt = st.note.at; say(WHY[st.note.why] || 'The game could not start (' + st.note.why + ').', 'err');
+		}
 		G = st; gGot = Date.now(); if (newRound || G.st !== 'input') { if (G.n !== gSentN || G.st === 'idle') gSentN = -1; } gDraw();
 	}
 	function gameOpen() {
@@ -1059,7 +1089,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 
 	// ---- play the lights: turns posted by the bridge on "<code>-play"; taps go to the show channel ----
 	let PL = { on: false, holder: '', queue: [], keys: [], cols: [] }, plGot = 0, plES = null, plCol = 0, plBuf = [], plTm = null, plBusy = false;
-	const plSend = o => fetch(RELAY + TOPIC, { method: 'POST', body: JSON.stringify(Object.assign({ k: 'play', p: PID, tag: TAG }, o)) });
+	const plSend = o => relayPost(RELAY + TOPIC, { method: 'POST', body: JSON.stringify(Object.assign({ k: 'play', p: PID, tag: TAG }, o)) }, LOW[o.a] || 0);
 	function plTap(i, el) {
 		if (PL.holder !== TAG) return;
 		el.classList.add('hit'); setTimeout(() => el.classList.remove('hit'), 120);
@@ -1073,11 +1103,11 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		clearTimeout(plTm); plTm = null;
 		if (!plBuf.length) return;
 		const m = plBuf.splice(0, 8);
-		plSend({ a: 'tap', m, c: plCol < PL.cols.length ? plCol : -1 }).catch(() => say('It could not be sent. Please try again.', 'err'));
+		plSend({ a: 'tap', m, c: plCol < PL.cols.length ? plCol : -1 }).catch(sayErr);
 	}
 	async function plAct(o, okMsg) {
 		if (plBusy) return; plBusy = true; plDraw();
-		try { const r = await plSend(o); if (!r.ok) throw 0; if (okMsg) $('plStat').textContent = okMsg; } catch (e) { say('It could not be sent. Please try again.', 'err'); }
+		try { const r = await plSend(o); if (okMsg) $('plStat').textContent = okMsg; } catch (e) { sayErr(e); }
 		setTimeout(() => { plBusy = false; plDraw(); }, 1500);
 	}
 	let plSig = '';
@@ -1190,11 +1220,10 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		sgBusy = true; sgDraw();
 		try {
 			const meta = { k: 'sing', s: sgWho, p: PID, tag: TAG };
-			const r = await fetch(RELAY + TOPIC + '?filename=sing.wav&message=' + encodeURIComponent(JSON.stringify(meta)), { method: 'POST', body: sgWav });
-			if (!r.ok) throw 0;
+			await relayPost(RELAY + TOPIC + '?filename=sing.wav&message=' + encodeURIComponent(JSON.stringify(meta)), { method: 'POST', body: sgWav });
 			say('Sent! Listen and watch the lights: your song plays in a moment.', 'ok');
 			sgWav = null; $('sgTime').textContent = 'Sent! You can record another song in a little while.';
-		} catch (e) { say('It could not be sent. Please try again.', 'err'); }
+		} catch (e) { sayErr(e); }
 		setTimeout(() => { sgBusy = false; sgDraw(); }, 2000);
 		sgDraw();
 	}
@@ -1301,16 +1330,15 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		}
 		$('send').disabled = true;
 		try {
-			const r = await fetch(url, req);
-			if (!r.ok) throw new Error(r.status);
+			await relayPost(url, req);
 			try { localStorage.setItem('cubeSent', String(Date.now())); } catch (e) {}
 			say('Sent! Watch the lights: it shows up in a moment.', 'ok');
-		} catch (e) { say('It could not be sent. Please try again.', 'err'); }
+		} catch (e) { sayErr(e); }
 		tick();
 	};
 
 	apply();
-	if (TOPIC) { checkOpen(); setInterval(checkOpen, 60000); }
+	if (TOPIC) { checkOpen(); setInterval(checkOpen, 90000); }
 })();
 </script>
 </body>
