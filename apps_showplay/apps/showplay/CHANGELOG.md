@@ -5,6 +5,12 @@ updates the installation guide (`INSTALL.md`) and the contents guide (`CONTENTS.
 
 | Version | Date | In one line |
 | --- | --- | --- |
+| v18 | 2026-11-22 | Race to the Star: up to 8 players climb a track of lights by tapping, singing, shaking or running (two can share a phone); the winner lights the star; its own settings page |
+| v17 | 2026-11-22 | Sing: visitors record a song on their phone and it plays at the show while a singing prop moves its mouth (or a prop glows, or the cube shows a face) |
+| v16 | 2026-11-22 | Pong for visitors: one visitor against the computer, with a slower ball and a paddle that glides to where they slide |
+| v15 | 2026-11-22 | Space Invaders (a slower one for visitors, a fast one for the crew) and "Play the lights": visitors take turns to play the props like a keyboard |
+| v14 | 2026-11-22 | Count the colours (up to 8 players), Snake, and Pong on the Mixer page (finger, keyboard or MIDI knob paddles) |
+| v13 | 2026-11-22 | Two new games: Tic-tac-toe (against the computer or a friend) and Simon (repeat the colours on the lights) |
 | v12 | 2026-11-22 | Mixer page (pads, faders, scenes), Keys (one key per model, with velocity and aftertouch) and real MIDI controllers, with an Alesis VI25 preset |
 | v11 | 2026-11-21 | New macOS and Linux x64 folders: ShowPlay now covers the same four platforms as EZPlayer |
 | v10 | 2026-11-21 | Renamed from Light Cube to ShowPlay, with settings, show codes and auto-start carried over |
@@ -17,6 +23,547 @@ updates the installation guide (`INSTALL.md`) and the contents guide (`CONTENTS.
 | v3 | 2026-11-20 | README: how to set up the controllers and the sides of the cube |
 | v2 | 2026-11-20 | Show name MerryOnCherry on the bridge and the visitors' page |
 | v1 | 2026-11-20 | First version in English: bridge, control page and visitors' page, through EZPlayer overlays |
+
+---
+
+## v18 — Race to the Star (2026-11-22)
+
+A new game for 1 to 8 phones at once: **🌟 Race to the Star**. Players climb a track of lights by tapping, singing,
+shaking the phone or running on the spot, and the first to the top lights the star in their colour. It has its own
+settings page, `/race`. The full guide is [docs/race.md](docs/race.md).
+
+**New: the race** (🎮 Games on the visitors' page):
+
+| Variant | How to play | What the phone measures | Who it suits | Notes |
+| --- | --- | --- | --- | --- |
+| 1 · 👆 Tap | Tap a big button as fast as you can | Taps per second | Everyone; works on any phone | The simplest. The climber slides down if you stop tapping |
+| 2 · 🎤 Voice | Sing or hold an "aaaa" loudly and without stopping | Microphone loudness, measured **on the phone** | Children and anyone who likes singing | The sound is **not sent**, only the number. A steady voice counts more than shouting |
+| 3 · 🤳 Shake (default) | Shake the phone hard and fast | Accelerometer: strength and rhythm of the shaking | Everyone, even sitting down | Capped strength (shaking violently gives no extra speed). A notice reminds players to hold the phone tight |
+| 3b · 🏃 Run on the spot | Run or march on the spot with the phone in your hand | Accelerometer: steps per second | The sportier players | Needs some free space and standing up |
+
+- **Two players on one phone** with 👆 Tap: the screen splits into two buttons, each with its own colour and level.
+- **Choices:** each player picks a colour (taken colours are locked), their way to play and a level (🧒 child, 🧑 adult,
+  🏃 sporty).
+- **Waiting room:** the first player can start sooner. Each lane blinks in its colour when its player joins, and
+  **📍 Where am I?** blinks it again.
+- **Countdown:** 3-2-1 on the lights, and a vibration.
+- **During the race:** the phone shows big tap buttons or a hint, an effort meter, everybody's height and your place.
+- **The end:** the star flashes in the winner's colour, with a rainbow party.
+- **Effort:** the phone measures it and sends it about once a second (every 1.5 s after 30 s), so a race costs each
+  phone about 35 messages. The bridge climbs 20 times a second with the latest effort and slides a stopped climber
+  down.
+- **Permissions:** the microphone and (on iPhones) motion are asked while tapping **New race** or **Join**, because
+  phones allow them only during a tap.
+
+**New: the race panel** (`http://<bridge-ip>:8099/race`, with links on the control page):
+
+1. **Track:**
+   - one shared track (any models or groups), split into stripes, side by side (with the front of the tree) or rings;
+   - a track per player (track + star pairs, with **Pair automatically**);
+   - the cube;
+   - star models, several, or none (the top of the track becomes the star);
+   - climb direction: up, down, right, left, along the string.
+2. **Ways to play:** each one on or off, mixed or the same for everyone, two players on one phone.
+3. **Players:** at least and at most (1–8), the colours, the waiting room's length, early start.
+4. **Levels:** child, adult and sporty multipliers, and help for whoever is behind (up to 60 % faster).
+5. **Difficulty:** Easy, Normal, Hard or Custom (race length, slide speed, wait before sliding, longest race).
+6. **Star and effects:** leader's colour on the star, countdown, rainbow party, party length, brightness, background.
+7. **Test and profiles:** test race with 2–8 pretend players, test the finish in a colour, stop, and save, load or
+   delete profiles.
+
+**Changed:**
+
+- **Control page:** **Games** has an eighth tick box (🌟 Race to the Star) and links to the race page. Settings saved
+  by v13 to v17 with every game on get it on too.
+- **Bridge:**
+  - the reading of models' pixel positions is now shared by props, singers and the race (any list of models), and
+    cached until the show changes;
+  - the bridge now watches EZPlayer whenever Sing is on or the race uses EZPlayer models, not only when there are
+    props, so singing models are found even without props;
+  - the status for the phones has the race's ways, colours and limits.
+- **Visitors' page:** `gifmaker.js?v=18` makes phones load the new page.
+- **Settings:** new settings `race` and `race_profiles`.
+- **Documents:**
+  - new guide `docs/race.md`;
+  - every `INSTALL.md` has the race in "Games";
+  - every `CONTENTS.md` and the READMEs describe it.
+
+**Updating:**
+
+- **The bridge:** replace `showplay_bridge.py` and restart it.
+- **The visitors' page:** publish `visitors-page/index.html` again. The QR codes stay the same.
+- **Then:** set up the track on the race page.
+
+**Tested** (a v18 bridge with a stand-in EZPlayer serving the 2026_Base layout plus a 32-string mega tree and a star,
+a stand-in DDP board and a stand-in ntfy.sh; the pages in Chromium with a simulated microphone and simulated motion):
+
+- **Joining:**
+  - four players joined, two of them on one shared phone;
+  - a colour already taken moved to the next free one;
+  - joining twice, joining a full race and "start" from anyone but the first player were refused.
+- **Levels and sliding:**
+  - a child at effort 0.6 (150 %) climbed exactly as fast as an adult at 0.9;
+  - the help for whoever is behind raised a slower player;
+  - a player who stopped after 3 s slid down slowly (Easy).
+- **The finish:** the first player reached the star after 17 s (Easy), and the star flashed in their colour (red).
+  The tree's overlay got 436 frames.
+- **Panel and cube:**
+  - the panel's test race ran with 3 pretend players;
+  - the cube track drew lanes and the star (232 lit pixels);
+  - "everyone left" ended a race.
+- **Splits:** stripes gave 3 lanes for 3 players, side by side 2 lanes for 2, rings used every pixel for everyone.
+- **The phones, ways to play:**
+  - with 👥 two players and 👆 Tap, 12 and 6 taps sent `[0.75, 0.63]`;
+  - simulated shaking sent 1.0 (capped);
+  - simulated running sent 0.86–1.0;
+  - the simulated microphone (a quiet beep) sent 0.06–0.15.
+  - The "new race" message carried both players' colours and levels.
+- **A fix from testing:** the first version asked for motion permission when the race started, outside a tap, and
+  the browser refused it (iPhones do the same). Permissions are now asked when tapping New race or Join.
+- **Race page:**
+  - **Pair automatically** paired 3 trees with their stars;
+  - the test race ran;
+  - a "Children" profile was saved;
+  - no script errors.
+- **Not tested yet on real trees and real phones** (iPhone and Android motion sensors and microphones) over the real
+  ntfy.sh.
+
+---
+
+## v17 — Sing (2026-11-22)
+
+A new **🎤 Sing** tab: visitors record a song on their phone, pick who sings it, and it plays on the speaker of the
+bridge's computer while a singing model of the show moves its mouth, a prop glows with the voice, or a side of the
+cube shows a singing face. The full guide is [docs/sing.md](docs/sing.md).
+
+**New: 🎤 Sing on the visitors' page:**
+
+- **Who sings:** a list of the singers you allow (up to 30), with your names and emoji.
+- **Recording:**
+  - a big red record button, a live level meter and a 10-second limit;
+  - the silence at both ends is cut off;
+  - **Listen**, **Record again** and **Send it to the lights!**
+- **The recording:** made on the phone as a small mono 16-bit 11 kHz WAV (about 22 KB a second), so every platform
+  can play it with nothing installed. It is sent to ntfy.sh as an attachment, like the animated pictures.
+- **Feedback:** the queue and "your song is playing now" are shown, from the new channel `<code>-sing`.
+- **Limits and notice:** one recording per phone every 20 seconds. A note says the recording plays out loud and is
+  deleted afterwards.
+
+**New: singing in the bridge:**
+
+- **Singing models:** the bridge reads the models with "node range" faces from EZPlayer's copy of
+  `xlights_rgbeffects.xml`, by itself at start and whenever the show changes. It picks the face that defines the
+  most, and uses the face's own colours when it has them.
+- **The mouth:** the recording is measured 20 times a second (loudness and how hissy it is) and turned into the xLights
+  mouth shapes: rest, E, MBP, AI, O, etc. Single-frame flicker is smoothed out. Outline and eyes stay on, with a blink
+  now and then.
+- **Props and the cube:**
+  - other props glow with the voice, their colour turning slowly;
+  - a side of the cube shows a drawn face (outline, eyes, a mouth that widens and opens), with no EZPlayer needed.
+- **Playing the sound** on this computer:
+  - Windows: `winsound`;
+  - macOS: `afplay`;
+  - Linux and Raspberry Pi: `aplay`, with `paplay` / `pw-play` as fallbacks and a choice of output.
+  The volume is applied to the samples. A **Mouth timing** setting lines the mouth up with the speaker.
+- **Queue and clean-up:** one recording at a time, up to 6 waiting. The bridge downloads, plays and then deletes each
+  recording.
+- **Checks:** only ntfy.sh files up to 400 KB, only short mono 16-bit WAV up to 12 s, and a known singer.
+
+**New: control page card "Sing (visitors)"** (with its own Save button):
+
+- **Options:**
+  - on/off;
+  - **Approve each recording before it plays**: off by default, as asked, so recordings play straight away;
+  - volume;
+  - sound output (Linux and Raspberry Pi);
+  - mouth timing;
+  - whether props and the cube can sing.
+- **Singers:** **Find the singing models in EZPlayer**, and the list of singers with a tick box, name and emoji for
+  each.
+- **Checking:** **🔊 Test sound** (a three-note chime). With approval on, each waiting recording has a player,
+  **▶ Play** and **✕**.
+
+**Changed:**
+
+- **Visitors' page:**
+  - up to 8 tabs, in two rows of four;
+  - the status for the phones has `sing` and `singers`;
+  - `gifmaker.js?v=17` makes phones load the new page.
+- **Settings:** new settings `sing`, `sing_approve`, `sing_volume`, `sing_device`, `sing_delay`, `sing_props`,
+  `sing_cube`, `sing_off` and `sing_names`.
+- **Documents:**
+  - new guide `docs/sing.md`;
+  - every `INSTALL.md` has a "Sing (visitors)" section with that platform's speaker notes;
+  - every `CONTENTS.md` and the READMEs describe Sing.
+
+**Updating:**
+
+- **The bridge:** replace `showplay_bridge.py` and restart it.
+- **The visitors' page:** publish `visitors-page/index.html` again. The QR codes stay the same.
+
+**Tested** (a v17 bridge with a stand-in EZPlayer serving the real MerryOnCherry 2026_Base layout, a stand-in DDP
+board, a stand-in `aplay` and a stand-in ntfy.sh; the page in Chromium with a simulated microphone):
+
+- **Finding the singers:** 42 singing models were found in the layout in 0.5 s, for example the Boscoyo singing
+  pumpkin (250 nodes, face "0 Pumpkin Delux" with outline, eyes and 10 mouth shapes). With a prop and a cube side
+  there were 44 singers.
+- **The mouth:** a test voice of four syllables (soft, loud, hissy, long) gave the mouth track
+  `.......mAAAAm.....mAOOOOOOAm....eeee......mAAOOOOOOOOAAm.......`.
+- **Two recordings in a row:** the pumpkin sang first (66 frames to its overlay, 5 different mouth states), then the
+  cube's face (76 lit pixels).
+  - Each recording was played by `aplay` at its full length (3.1 s).
+  - The overlay closed after the song, and no temporary files were left.
+- **Refused:**
+  - a second recording from the same phone within 20 s;
+  - an unknown singer;
+  - a file from another website;
+  - a file that was not a WAV.
+- **Approval on:** the recording waited until approved.
+- **The phones:** the queue posted on `-sing` showed "now singing" for each phone while its song played. This needed a
+  fix: at first the queue was not posted during a song.
+- **Visitors' page:** with a simulated microphone, 1.8 s were recorded, trimmed and sent as
+  `?filename=sing.wav&message={"k":"sing","s":"f:Snoman_6ft_EFL",…}` with a valid WAV (mono, 16-bit, 11025 Hz,
+  1.77 s, 39 KB), with no script errors.
+- **Control page:** the Sing card listed the 42 singing models, and **🔊 Test sound** played the chime.
+- **Not tested yet:** with a real speaker on Windows, macOS and the Raspberry Pi, and with real phones over the real
+  ntfy.sh.
+
+---
+
+## v16 — Pong for visitors (2026-11-22)
+
+Pong is now also on the visitors' page: one visitor against the computer, made for the relay's delay. The crew's fast
+Pong stays on the Mixer page.
+
+**New: 🏓 Pong for visitors** (🎮 Games tab):
+
+- **Playing:** the visitor is red on the left and the computer is blue on the right. First to 5 points.
+- **The paddle:** the visitor slides a finger up and down on a strip (or uses ↑ / ↓ on a computer). The phone sends
+  where the paddle should go, at most one message every half second, and it glides there. The phone shows the paddle
+  moving to where the finger was.
+- **Made for the delay:**
+  - the ball starts at 0.26 sides a second and speeds up only to 0.6 (the crew's goes from 0.45 to 1.4);
+  - the paddles are longer (just over half the side, against a third in the crew's game);
+  - there is a 1.6 s pause before each serve;
+  - the computer reacts only once the ball is past the middle, moves at 0.27 sides a second, and aims up to a third
+    of the side off.
+- **The end:** a game lasts at most 5 minutes, and stops after 1 minute with nobody moving the paddle.
+- **Messages:** the bridge posts only when the score or the state changes.
+
+**Changed:**
+
+- **Control page:** **Games** has a seventh tick box (🏓 Pong). Settings saved by v13 to v15 with every game on get it
+  on too.
+- **Mixer page:**
+  - the crew cannot start Pong while a visitor is playing it ("a visitor is playing Pong");
+  - the crew's paddle controls and MIDI paddles do nothing during a visitor's game;
+  - **⏹ Stop** still ends it.
+- **Visitors' page:**
+  - Pong is in the game picker;
+  - while the crew plays, the phones still say so;
+  - `gifmaker.js?v=16` makes phones load the new page.
+- **Documents:**
+  - every `INSTALL.md` has Pong in the games table and a "Pong for visitors" part in "Games";
+  - `CONTENTS.md`, `docs/mixer.md` and the READMEs are updated.
+
+**Updating:**
+
+- **The bridge:** replace `showplay_bridge.py` and restart it.
+- **The visitors' page:** publish `visitors-page/index.html` again. The QR codes stay the same.
+
+**Tested:**
+
+- **Starting and controls:**
+  - a visitor's Pong started from the relay;
+  - the Mixer refused to start Pong over it;
+  - a crew paddle move was ignored;
+  - the visitor's slide moved the paddle's goal;
+  - a message from another phone was refused.
+- **Balance**, simulated players whose moves arrive 1 second late, 8 games each:
+  - the first setting was too hard: the computer never missed, so a good player drew 0–0 for 400 s and an average one
+    lost 0–5;
+  - the second was too easy: 5–0 almost every game;
+  - with the final setting, a good player won 7 of 8 (one long game hit the limit), an average player won 8 of 8 (5–0
+    to 5–4), and a weak player won 2 of 8 (most lost 0–5 or 1–5).
+- **Page:** the picker with Pong and the Pong screen (score "You 2 : 1 Computer") were checked in Chromium at phone
+  width, with no script errors. A slide sent `{"a":"go","y":0.167}`.
+- **Not tested yet on the real cube and phones over the real ntfy.sh.**
+
+---
+
+## v15 — Space Invaders and "Play the lights" (2026-11-22)
+
+Two additions:
+
+- **Space Invaders:** a slower version for visitors, made for the relay's delay, and a full-speed version for the crew
+  on the Mixer page.
+- **🎹 Play the lights:** visitors take turns to play the models of the props like a keyboard. It is a safe, public
+  version of the Mixer's Keys.
+
+**New: 👾 Space Invaders for visitors** (🎮 Games tab):
+
+- **The game:**
+  - three rows of invaders march across the side and come down;
+  - shields, a mystery ship at the top (50–150 points), three lives, an extra life per wave cleared (up to 5);
+  - each wave starts lower and moves faster.
+- **Made for the delay:**
+  - the visitor slides a finger on a strip and the phone sends where the ship should go, at most one message every
+    half second (one per slide); the ship glides there;
+  - the ship fires by itself every 0.55 s;
+  - invaders step every 1.5 s at first (down to 0.45 s), and bombs fall at 3 squares a second, one at a time in the
+    first two waves.
+- **Messages:** the bridge posts only when the score, lives, wave or state change.
+
+**New: 👾 Space Invaders for the crew** (Mixer page, new **👾 Invaders** tab):
+
+- **Speed:** the same game at full speed, with no delay on the home network.
+- **Moving and firing:**
+  - slider, ◀ / ▶ (held) or ← / → / A / D to move;
+  - 🔥 (held for repeated fire) or Space to fire;
+  - new learnable MIDI controls: `game:ship` (knob or fader), `game:left`, `game:right` and `game:fire` (pads or
+    keys).
+- **Visitors:** phones show "the crew is playing" while it is on.
+
+**New: 🎹 Play the lights** (visitors' page, new **🎹 Play** tab; control page, new card "Play the lights (visitors)"):
+
+- **Pads and colours:** a pad for each model of the props ticked on the control page (up to 32). The visitor picks one
+  of 9 colours or 🌈, and each tap lights that model in that colour for 0.45 s, then it fades with the Keys' release.
+- **Turns:** one visitor at a time, 20 s, 30 s (default), 45 s or 1 min each, with a queue of up to 20. A turn passes
+  on when it ends, when the visitor taps "I'm done", or after 10 s without a tap.
+- **Messages:** the phone gathers taps for half a second into one message (at most 8 pads per message). The turn and
+  the queue are posted on the new channel `<code>-play`.
+- **Safety:** no strobe, no blackout, nothing else in the show changes. The crew can play the same models from the
+  Mixer's Keys at the same time; their keys keep their own colours.
+- **Settings and status:**
+  - new settings `play`, `play_secs` and `play_props` in `showplay_config.json`, set on the control page;
+  - the status for the phones has a new `play` flag, so the tab shows only when it can be used.
+
+**Changed:**
+
+- **Control page:** **Games** has a sixth tick box (👾 Space Invaders). Settings saved by v13 or v14 with every game
+  on get it on too.
+- **Visitors' page:**
+  - up to 7 tabs, shown in two rows;
+  - `gifmaker.js?v=15` makes phones load the new page.
+- **Bridge:** the Keys engine takes a colour per key for visitors' taps, and a tap lasts a set time on its own (no
+  "still held" messages needed).
+- **Documents:**
+  - every `INSTALL.md` has Space Invaders in "Games", "Space Invaders for the crew", and a new "Play the lights
+    (visitors)" section;
+  - `docs/mixer.md` has an "Invaders tab" section, the new controls and the `/api/invaders` calls;
+  - the `CONTENTS.md` files and the READMEs describe both additions.
+
+**Updating:**
+
+- **The bridge:** replace `showplay_bridge.py` and restart it.
+- **The visitors' page:** publish `visitors-page/index.html` again. The QR codes stay the same.
+
+**Tested** (a v15 bridge with a stand-in EZPlayer with the real 2026_Base layout, a stand-in DDP board and a stand-in
+ntfy.sh, and the pages in Chromium at phone width):
+
+- **Space Invaders, visitors' version:**
+  - it started with 18 invaders and 6 shield blocks;
+  - the ship glided to where the phone sent it, and a message from another phone was refused;
+  - in a 40-second game the player cleared 17 of 18 invaders with all lives left.
+- **Balance:**
+  - simulated games with a simple player whose moves arrive 1 second late lasted 50–85 s and reached wave 2;
+  - an earlier, faster setting ended in 25–35 s, so the visitors' version was slowed down.
+- **Space Invaders, crew version:**
+  - it started from the Mixer;
+  - the keyboard moved the ship and fired;
+  - a MIDI CC learned as `game:ship` moved it, and a note learned as `game:fire` fired;
+  - a simulated player scored 120–330 points before losing.
+- **Hits:** shots are checked on every square they cross. At first, fast shots could skip a row of invaders at 20
+  frames a second; this is fixed.
+- **Explosions:** they could make a colour value out of range for a moment, and are now clamped.
+- **Play the lights:**
+  - two phones joined: the first got the turn and the second was queued;
+  - a tap from the second was refused;
+  - a tap on two pads lit those two models (and not their neighbours) in the colour picked (orange: 249, 135, 25);
+  - their overlays closed after the fade;
+  - "I'm done" and 10 s without a tap passed the turn on;
+  - unticking props limited the pads, and switching it off emptied the queue;
+  - posts on `-play` went out once per change.
+- **Pages:**
+  - the 7 tabs, the Invaders strip (sent `{"a":"go","x":0.899}` after a slide), and the Play tab (waiting with the
+    queue, then a turn) were checked with no script errors;
+  - a turn with a colour and two taps sent `{"a":"tap","m":[0,2],"c":3}`;
+  - the Mixer's Invaders tab and the control page's new card were checked too.
+- **Not tested yet on the real cube and phones over the real ntfy.sh.**
+
+---
+
+## v14 — Count the colours, Snake and Pong (2026-11-22)
+
+Three more games, which completes the games planned. The relay between the phones and the bridge takes up to a second,
+so each game is made to work with that delay:
+
+- **Count the colours:** a party game whose answers are numbers, so speed never matters.
+- **Snake:** slow on purpose, with turns remembered in advance.
+- **Pong:** played from the Mixer page on the home network, where there is no delay.
+
+**New: 🔢 Count the colours** (visitors, 1 to 8 phones at once):
+
+- **Joining:** one visitor starts a game, and others join within 25 seconds (or the first player taps **Start now**).
+  Each player gets an animal, and the side shows a dot for each one.
+- **5 rounds.** In each round:
+  - the side shows a frame in the colour to count;
+  - it flashes red, green, blue and yellow quickly, never the same colour twice in a row;
+  - everyone taps how many times the colour flashed (0–15) within 12 s;
+  - the side shows the right number as dots, and the phones show ✅ or ❌ for everyone.
+- **Harder each round:** each round has more flashes and is faster. The most right answers wins (ties are shared).
+- **Messages:** one message per player per round. The bridge posts only when the round changes or someone answers.
+
+**New: 🐍 Snake** (visitors, one player):
+
+- **Playing:** an 8 × 8 board on the side, a red square to eat, walls and its own tail to avoid, and 3 seconds to get
+  ready.
+- **Speed:** it starts at about one square a second and speeds up a little with each square eaten (down to 0.45 s).
+  Up to 3 turns are remembered in advance.
+- **Steering:** big arrow buttons on the phone (with a short vibration), swipes on them, or the arrow keys.
+- **The end:** a game lasts at most 5 minutes. The score and best score since the bridge started are shown.
+- **Messages:** one message per turn from the phone. The bridge posts only when the score or the state changes, never
+  every step.
+
+**New: 🏓 Pong** (Mixer page, new **🏓 Pong** tab):
+
+- **Players:** one player against the computer, or two players, on one side or all sides. First to 5 points.
+- **Paddles:** a finger dragging in a strip, W / S and ↑ / ↓ on a keyboard, or a MIDI fader or knob (new learnable
+  controls `game:p1` and `game:p2`).
+- **The computer:** it reacts late and aims a little off, so a good player can beat it.
+- **Visitors:** Pong cannot be started from the visitors' page. While it is on, the phones show that the crew is
+  playing, with the score.
+
+**Changed:**
+
+- **Control page:** **Games** has five tick boxes. Settings saved by v13 with all three games on get the two new ones
+  on as well.
+- **Visitors' page:** the picker shows the five games. The new screens are:
+  - lobby with the players' animals;
+  - answer buttons 0–15 and a scoreboard;
+  - arrow pad;
+  - a "watch the crew play Pong" view.
+  `gifmaker.js?v=14` makes phones load the new page.
+- **Bridge:** "Snake" and "Pong" move every frame inside the drawing, so they stay smooth at 10, 15 or 20 frames a
+  second. A message for a game that is not on the visitors' list (such as Pong) is ignored without changing the game.
+- **Documents:**
+  - the "Games" section of every `INSTALL.md` now covers all six games, with a table;
+  - `docs/mixer.md` has a new "Pong tab" section, the paddle controls and the `/api/pong` calls;
+  - the `CONTENTS.md` files and the READMEs list the new games.
+
+**Updating:**
+
+- **The bridge:** replace `showplay_bridge.py` and restart it.
+- **The visitors' page:** publish `visitors-page/index.html` again (on GitHub, upload it over the old one). The QR
+  codes stay the same.
+
+**Tested** (a v14 bridge with a stand-in DDP board and a stand-in ntfy.sh, and the pages in Chromium at phone width):
+
+- **Count the colours:**
+  - 3 players joined, and a start from a non-first player was refused;
+  - the sequence never repeated a colour, and the flashes counted on the side matched the right answer (5 of 13);
+  - a second answer in the same round was refused;
+  - the result scored ✅ and ❌ correctly, and the dots showed on the side;
+  - all 5 rounds played to the end (final 5, 4, 1).
+- **Snake:**
+  - it started after 3 s, refused a turn back on itself and a turn from another phone, moved, and ate (score 2);
+  - Stop ended it, with the best score kept.
+- **Pong:**
+  - a visitor's "pong" message was refused and left the game unchanged;
+  - it started from the Mixer, refused visitors' games while on, followed a MIDI CC learned as `game:p1`, and
+    stopped;
+  - a simulated good human player against the computer finished 4–5 after about 3 minutes.
+- **Pages:** the visitors' picker, Count lobby, answer and result, the Snake arrows (sent `{"a":"dir","d":1}`) and the
+  Mixer's Pong tab (dragging moved the paddle on the bridge) were checked with no script errors.
+- **Cube pictures:** all three new games were checked at 16 × 16.
+- **Not tested yet on the real cube and phones over the real ntfy.sh.**
+
+---
+
+## v13 — Tic-tac-toe and Simon (2026-11-22)
+
+Two new games for visitors, next to Four in a Row: **Tic-tac-toe** (noughts and crosses) and **Simon** (memory of
+colours). The 🎮 tab is now called **🎮 Games** and starts with a game picker.
+
+**New: Tic-tac-toe:**
+
+- **Players:** two visitors play each other from their phones, or one plays the computer. There are the same turns,
+  timers (45 s per move, 90 s for a friend to join) and Join button as Four in a Row.
+- **The computer:** Easy (half its moves are random), Normal (a fifth) or Hard (perfect play: it never loses). It uses
+  the same "The computer plays" setting as Four in a Row.
+- **On the cube:**
+  - a 3 × 3 grid that glows in the colour of whose turn it is;
+  - crosses for player 1 and rings for player 2, in the theme's colours;
+  - the last mark grows in;
+  - at the end, the winning line blinks white and the grid turns rainbow.
+- **On the phone:** a big 3 × 3 board with ✕ and ◯.
+
+**New: Simon:**
+
+- **How it plays:** the side shows the four colours (green, red, yellow, blue) as quarters, and lights them up one by
+  one in a sequence. The visitor repeats it on four big buttons on their phone, each with its own note (played on
+  the phone).
+- **Each round:**
+  - a right answer flashes the side green and adds a colour;
+  - each colour is shown a little shorter every round (0.72 s down to 0.32 s);
+  - the time to answer is 6 s plus 1.2 s per colour.
+- **The end:**
+  - a wrong colour ends the game, and the side blinks the colour that was right;
+  - 30 rounds wins;
+  - the phone shows the score and the best score since the bridge started.
+- **One message per round:** the phone sends the whole answer in one message, so a round costs one message from the
+  phone and about two from the bridge, well inside ntfy.sh's free limits.
+
+**Changed:**
+
+- **Bridge:**
+  - the games share one engine; Four in a Row plays exactly as before;
+  - only one game at a time, and a different game can start as soon as the last one ends;
+  - the log and the "now showing" line name the game being played.
+- **Control page:** **Games** now has one tick box per game (Four in a Row, Tic-tac-toe, Simon) under "Let visitors
+  play games on the cube". The new setting `game_list` in `showplay_config.json` keeps the choice. Existing settings
+  files get all three games.
+- **Status for the phones:** the status now lists the games switched on (`gl`), so the phones show only those.
+- **Visitors' page:**
+  - the 🎮 Games tab has a picker (shown when more than one game is on), then the board of the chosen game;
+  - visitors watching see which game is being played;
+  - `gifmaker.js?v=13` makes phones load the new page files instead of a cached copy.
+- **Documents:**
+  - every `INSTALL.md` has a new "Games: Four in a Row, Tic-tac-toe and Simon" section, in place of "Game: Four in a
+    Row";
+  - every `CONTENTS.md` and the READMEs describe the three games.
+
+**Updating:**
+
+- **The bridge:** replace `showplay_bridge.py` and restart it. All settings and the show code stay.
+- **The visitors' page:** publish `visitors-page/index.html` again (on GitHub, upload it over the old one). The QR
+  codes stay the same.
+- **Mixing versions:** a v13 page with an older bridge shows only Four in a Row; a v12 page with a v13 bridge still
+  plays Four in a Row.
+
+**Tested** (a v13 bridge with a stand-in DDP board and a stand-in ntfy.sh, and the page in Chromium at phone width):
+
+- **Tic-tac-toe:**
+  - the computer on Hard against itself always draws;
+  - it blocked a threat and took a win when it had one;
+  - in 300 games against a random player it never lost;
+  - a full game against the computer reached "three in a row" and drew 100 lit pixels on the side;
+  - each move of the computer took under 20 ms.
+- **Simon:**
+  - the sequence lit the right quarter (one bright, three at 8 %);
+  - a right answer flashed the side green and added a colour;
+  - a wrong answer ended the game with the right colour blinking, score 1, best 1;
+  - an answer of the wrong length and an answer from another phone were refused.
+- **Settings:** a game switched off on the control page was ignored.
+- **Four in a Row:** it still started, and the computer answered.
+- **Posts to ntfy.sh:** they went out once per change, for all three games (14 posts for the whole test).
+- **Visitors' page:**
+  - picker, Tic-tac-toe board (your turn, win), Simon (taps, progress "2 / 3", game over with best score) were
+    checked with no script errors;
+  - the phone sent `{"a":"new","g":"ttt",…}` and, for Simon, the whole answer `{"s":[0,3,1]}` in one message.
+- **The cube pictures** of both new games were checked at 16 × 16.
+- **Not tested yet on the real cube and phones over the real ntfy.sh.** The posting and the moves use the same paths as
+  Four in a Row, which already works on the live page.
 
 ---
 

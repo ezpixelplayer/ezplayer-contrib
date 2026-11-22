@@ -1,6 +1,6 @@
 # ShowPlay for Windows — What is in this folder
 
-Every file of the `Windows` folder of ShowPlay v12, what it is for, and whether you need to change it, plus the parts
+Every file of the `Windows` folder of ShowPlay v18, what it is for, and whether you need to change it, plus the parts
 shared with the other versions. To install and set it up, see [INSTALL.md](INSTALL.md).
 
 ```
@@ -40,6 +40,8 @@ Windows/
 | `../README.md` | A short introduction to ShowPlay and which folder to use. |
 | `../CHANGELOG.md` | Every version of ShowPlay, newest first, with what was added, what changed, what was fixed and how it was tested. |
 | `../docs/props.md` | How the Props feature works, step by step: what visitors pick, setting up props, how the effects are drawn and sent to EZPlayer, effects and palettes, troubleshooting. |
+| `../docs/race.md` | Race to the Star (new in v18): the ways to play, the phone, the race panel, tracks and stars, how climbing works, messages, settings, troubleshooting. |
+| `../docs/sing.md` | Sing (new in v17): the 🎤 tab, setting up the singers, the speaker on each platform, how the mouth moves, privacy and limits, settings, troubleshooting. |
 | `../docs/mixer.md` | The Mixer, Keys and MIDI controllers (new in v12): every tab, the Alesis VI25 preset, how the Mixer works with the visitors, the settings, the controls and the API, troubleshooting. |
 
 ## The bridge — the program that runs on the PC
@@ -72,17 +74,30 @@ python.exe to PATH" ticked) and nothing else.
   - free text goes through a bad-word filter;
   - at most 20 requests a minute.
 - **Drawing:** scrolling text (two built-in pixel fonts), GIF pictures (its own GIF decoder), drawings, 18 theme
-  effects for the cube, the Four in a Row board, and 12 effects for props.
+  effects for the cube, the pictures of the eight games (Four in a Row, Tic-tac-toe, Simon, Count the colours, Snake, Pong, Space Invaders, Race to
+  the Star), and 12 effects for props.
 - **Frames per second:** 20, 15 or 10, set on the control page. Lower it if the PC is slow or busy.
 - **Sending to the cube:** straight to the cube's controller over DDP (WLED, ESPixelStick or any DDP board), or
   through EZPlayer overlays.
 - **Props:** reads the pixel positions and model groups of an EZPlayer show and lights up chosen models (wings,
   bats, spinners…) through EZPlayer overlays.
-- **Four in a Row:** keeps the game, plays as the computer (Easy, Normal or Hard) and posts the board for the phones.
+- **Games:** keeps the game being played (one at a time): Four in a Row, Tic-tac-toe, Simon, Count the colours
+  (up to 8 phones), Snake, Space Invaders (a slower one for visitors, a fast one for the crew), and Pong (a slower one for
+  visitors, a fast one for the crew on the Mixer page). Plays as the computer (Easy, Normal or Hard; it never
+  loses Tic-tac-toe on Hard), checks the answers and posts the game for the phones only when something changes.
+- **Play the lights** (new in v15): visitors' turns and queue (posted on "<code>-play"); their taps light the models
+  through the Keys engine, in the colour they pick, for a moment.
+- **Sing** (new in v17): reads the singing models (faces) of the show, downloads each recording (a small WAV),
+  works out the mouth shapes from the voice, plays it on this computer's speaker (Windows' own sound) and makes the singer sing; deletes
+  the recording after. The queue is posted on "<code>-sing".
+- **Race to the Star** (new in v18): the race itself (waiting room, countdown, climbing, sliding, levels, help for
+  whoever is behind, the finish), its tracks and stars on any models, groups or the cube, and its own settings page
+  at `/race` with a test race and saved profiles.
 - **Status:** tells the visitors' page what is available (sides, sizes, theme, games, props), using the show code.
 - **Mixer and Keys** (new in v12): a second page, `/mixer`, for whoever runs the show.
   - pads, palettes, faders, hold buttons and 8 scenes drive sides and props live;
   - Keys play each model like a note, with velocity, aftertouch, attack and release;
+  - a Pong tab (new in v14) and an Invaders tab (new in v15): the crew's games, with fingers, the keyboard or MIDI controls;
   - while the Mixer drives a target, visitors' requests for it wait; it gives everything back after a set time
     untouched.
 - **MIDI** (new in v12): reads MIDI devices itself (winmm).
@@ -108,7 +123,9 @@ control page makes. The QR address carries the show code (`?t=showplay-…`) and
 | Picture | Pick up to 3 pictures from the pack and bring them to life | Always |
 | Effect | Pick one of the 6 effects of the theme and two colours | Always |
 | Draw | Draw with a finger in 9 colours, at the size of the chosen side | Always |
-| 🎮 Game | Play Four in a Row against the computer or a friend | When games are on |
+| 🎮 Games | Pick a game: Four in a Row or Tic-tac-toe against the computer or a friend, Simon (repeat the colours, one more each round), Count the colours (up to 8 players count the flashes), Snake (arrows), Space Invaders (slide; the ship fires by itself) or Pong against the computer (slide the paddle) or Race to the Star (tap, voice, shake or run; up to 8 players, two can share a phone). Shows the score while the crew plays | When games are on (only the games switched on show) |
+| 🎤 Sing | Pick who sings, record up to 10 seconds, send it: it plays at the show while a singing model moves its mouth, a prop glows or the cube shows a face | When Sing is on and at least one singer is ticked |
+| 🎹 Play | Take a turn (30 s by default) to play the lights of the props like a keyboard: pick a colour, tap the pads; the others wait in a queue | When "Play the lights" is on, EZPlayer answers and there are props |
 | ✨ Props | Light up a prop of the show with an effect, a palette or their own colours, and a speed | When props are set up and EZPlayer answers |
 
 The page talks only to ntfy.sh. It never connects to the home network.
@@ -137,7 +154,7 @@ visitor's phone ──► visitors-page (on the web) ──► ntfy.sh ──►
 
 - **The visitors' page** sends requests to ntfy.sh, under the show code in the QR address.
 - **The bridge** fetches them, checks them, draws them and sends them to the lights.
-- **Phone updates:** the bridge posts a status (and the Four in a Row board) back to ntfy.sh, so the phones know what
+- **Phone updates:** the bridge posts a status (and the game being played) back to ntfy.sh, so the phones know what
   is available.
 - **Nothing on the web can reach the home network:** the bridge, at home, makes all the connections.
 

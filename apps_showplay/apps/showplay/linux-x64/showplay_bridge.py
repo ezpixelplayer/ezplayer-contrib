@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-# ShowPlay — v12 (MerryOnCherry)   (called Light Cube up to v9)
+# ShowPlay — v18 (MerryOnCherry)   (called Light Cube up to v9)
 #
 # Visitors play with the lights of a show from their phone: they scan a QR code on the wall and send a message, a
-# picture, an effect or a drawing to a cube of LED matrices, play Four in a Row on it, or light up props of an EZPlayer
+# picture, an effect or a drawing to a cube of LED matrices, play games on it (Four in a Row, Tic-tac-toe, Simon, Count the colours, Snake, Space Invaders, Pong, Race to the
+# Star),
+# take turns to play the lights of the props, sing into the phone and make a singing prop sing it, or light up props of an EZPlayer
 # show. The cube is independent: no xLights and no show player needed. This bridge draws each request and
 # sends the pixels straight to the cube's controller over DDP (WLED, ESPixelStick or any DDP board). Each side of the
 # cube is set up on the bridge's own control page (board IP, first LED, size and wiring).
@@ -23,7 +25,7 @@ import json, os, sys, time, threading, queue, unicodedata, re, socket, secrets, 
 import urllib.request, urllib.parse, urllib.error
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
-VERSION = "v12"
+VERSION = "v18"
 PORT = 8099
 RELAY = "https://ntfy.sh/"
 CFG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "showplay_config.json")
@@ -56,13 +58,28 @@ S = {   # settings (kept in showplay_config.json)
     "hold": False,        # True = the last request stays on the lights until another arrives (time for photos)
     "wait_turn": False,   # False = a new request replaces what is on that side; True = it waits for the one before to end
     "free": True,         # True = free text (with a bad-word filter); False = ready messages only
-    "games": True,        # True = visitors can play four in a row on the cube
-    "cpu_level": "normal",   # the computer in four in a row: easy, normal or hard
+    "games": True,        # True = visitors can play games on the cube
+    "game_list": ["c4", "ttt", "simon", "count", "snake", "invaders", "pong", "race"],
+    "race": {},           # Race to the Star: track, star, ways to play, players, levels, difficulty, effects (race panel)
+    "race_profiles": {},  # Race to the Star: saved settings by name   # visitors' games: c4 Four in a Row, ttt Tic-tac-toe, simon, count (Count the colours), snake
+    "cpu_level": "normal",   # the computer in Four in a Row and Tic-tac-toe: easy, normal or hard
     "fps": FPS,           # frames per second sent to the lights: 20, or 15 / 10 on a slower computer such as a Raspberry Pi
     "mixer_idle": 15,     # Mixer: minutes untouched before the lights go back to the visitors and the show (0 = never)
     "mixer_scenes": [],   # Mixer: 8 saved scenes
     "keys_set": {},       # Keys: each key's colour, effect and level
     "keys_glob": {},      # Keys: attack, release and colour of all keys
+    "sing": True,         # visitors can record a song and make a singing model (or a prop, or the cube) sing it
+    "sing_approve": False,   # True = each recording waits on the control page until you press Play
+    "sing_volume": 100,   # volume of the recordings on this computer's speaker (%)
+    "sing_device": "",    # Linux / Raspberry Pi: the sound output (from aplay -L); "" = the default
+    "sing_delay": 0.15,   # seconds the mouth waits for the speaker to start (adjust if the mouth is early or late)
+    "sing_props": True,   # props can be picked to sing (they glow with the voice)
+    "sing_cube": True,    # the sides of the cube can be picked to sing (a drawn face)
+    "sing_off": [],       # singers visitors cannot pick
+    "sing_names": {},     # names and emoji you gave to the singers
+    "play": True,         # visitors can take turns to play the lights (the models of the props below)
+    "play_secs": 30,      # seconds of each visitor's turn
+    "play_props": None,   # which props visitors can play (list of numbers); None = all
     "midi_native": True,  # MIDI: the bridge reads the MIDI devices itself (Windows, Linux, Raspberry Pi)
     "midi_base": 36,      # MIDI: the note that plays the first key (36 = C2, the first pad of most pad controllers)
     "midi_map": {},       # MIDI: learned notes and CCs -> controls of the Mixer and Keys pages
@@ -130,6 +147,10 @@ def load():
         save()
     elif took_over:
         save()
+    if isinstance(S.get("game_list"), list) and set(S["game_list"]) in ({"c4", "ttt", "simon"}, {"c4", "ttt", "simon", "count", "snake"},
+                                                                         {"c4", "ttt", "simon", "count", "snake", "invaders"},
+                                                                         {"c4", "ttt", "simon", "count", "snake", "invaders", "pong"}):
+        S["game_list"] = list(GAMES)   # settings saved by v13 to v17 had every game of that time on: the new ones too
     if isinstance(S.get("keys_set"), dict):
         KEYS["set"].update({k: v for k, v in S["keys_set"].items() if isinstance(v, dict)})
     if isinstance(S.get("keys_glob"), dict):
@@ -210,7 +231,9 @@ def ezp_targets():
 
 
 def uses_ezp():
-    return bool(S.get("props")) or any(f.get("out") == "ezp" for f in S["faces"])
+    rc = S.get("race") or {}
+    return (bool(S.get("props")) or any(f.get("out") == "ezp" for f in S["faces"]) or bool(S.get("sing")) or
+            bool(rc.get("models") or rc.get("pairs")))
 
 
 def ezp_watch():
@@ -930,6 +953,8 @@ def c4_cpu_move(b, me, level):
 
 
 class FourInARow:
+    CODE, NAME, NCELLS, NMOVES = "c4", "four in a row", C4_ROWS * C4_COLS, C4_COLS
+
     def __init__(self):
         self.lock = threading.RLock()
         self.v = 0                 # changes every time the game changes
@@ -941,7 +966,7 @@ class FourInARow:
         self.mode = ""             # "cpu" or "pvp"
         self.pids = ["", ""]       # each player's secret (only the bridge and that phone know it)
         self.tags = ["", ""]       # each player's public tag (in the posted board, so a phone knows which player it is)
-        self.b = [0] * (C4_ROWS * C4_COLS)
+        self.b = [0] * self.NCELLS
         self.turn = 0
         self.n = 0                 # number of moves
         self.last = -1
@@ -963,7 +988,7 @@ class FourInARow:
 
     def state(self):
         with self.lock:
-            return {"g": "c4", "st": self.st, "id": self.id, "mode": self.mode, "tags": self.tags, "turn": self.turn, "n": self.n,
+            return {"g": self.CODE, "st": self.st, "id": self.id, "mode": self.mode, "tags": self.tags, "turn": self.turn, "n": self.n,
                     "b": "".join(str(v) for v in self.b), "last": self.last, "win": self.win, "winner": self.winner, "why": self.why,
                     "z": self.z, "c": list(self.colours), "left": max(0, int(self.until - time.time())), "v": self.v, "at": int(time.time())}
 
@@ -987,7 +1012,7 @@ class FourInARow:
                     self.st, self.until = "playing", time.time() + C4_TURN
                 else:
                     self.st, self.until = "waiting", time.time() + C4_WAIT_JOIN
-                log("game: four in a row against", "the computer" if mode == "cpu" else "a friend (waiting for them to join)")
+                log("game: %s against" % self.NAME, "the computer" if mode == "cpu" else "a friend (waiting for them to join)")
                 self.v += 1
                 return ""
             if m.get("id") != self.id:
@@ -1011,7 +1036,7 @@ class FourInARow:
                 return ""
             if a == "move":
                 c, n = m.get("c"), m.get("n")
-                if self.st != "playing" or self.turn != me or n != self.n or not isint(c) or not 0 <= c < C4_COLS:
+                if self.st != "playing" or self.turn != me or n != self.n or not isint(c) or not 0 <= c < self.NMOVES:
                     return "not your turn"
                 return self.play(c)
         return "?"
@@ -1037,6 +1062,9 @@ class FourInARow:
         self.v += 1
         return ""
 
+    def cpu_move(self):
+        return c4_cpu_move(list(self.b), 2, S.get("cpu_level", "normal"))
+
     def finish(self, winner, why):
         self.st, self.winner, self.why = "over", winner, why
         self.until = time.time() + C4_SHOW_END
@@ -1051,7 +1079,7 @@ class FourInARow:
                 return
             if self.st == "playing" and self.mode == "cpu" and self.turn == 1 and self.cpu_at and now >= self.cpu_at:
                 self.cpu_at = 0
-                self.play(c4_cpu_move(list(self.b), 2, S.get("cpu_level", "normal")))
+                self.play(self.cpu_move())
             elif self.st == "waiting" and now > self.until:
                 self.finish(0, "nobody joined")
             elif self.st == "playing" and now > self.until:
@@ -1060,7 +1088,1859 @@ class FourInARow:
                 self.reset()
 
 
-game = FourInARow()
+# ------------------------------------------------------------------------------- game: tic-tac-toe ----
+# Noughts and crosses (Jogo do Galo) on a 3 x 3 board: the same players, turns, timers and messages as Four in a
+# Row, only the board and the computer change. The computer never loses on Hard.
+TTT_LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]]
+
+
+def ttt_winner(b):
+    for ln in TTT_LINES:
+        v = b[ln[0]]
+        if v and b[ln[1]] == v and b[ln[2]] == v:
+            return v, ln
+    return 0, None
+
+
+TTT_MEMO = {}
+
+
+def ttt_minimax(b, me, turn):
+    """best score for `me` with `turn` to play: +10 win, -10 loss, 0 draw (sooner wins score more; positions are remembered)"""
+    key = (tuple(b), me, turn)
+    if key in TTT_MEMO:
+        return TTT_MEMO[key]
+    w, _ = ttt_winner(b)
+    free = [i for i in range(9) if not b[i]]
+    if w:
+        v = 10 if w == me else -10
+    elif not free:
+        v = 0
+    else:
+        scores = []
+        for i in free:
+            b[i] = turn
+            scores.append(ttt_minimax(b, me, 3 - turn) * 0.9)
+            b[i] = 0
+        v = max(scores) if turn == me else min(scores)
+    TTT_MEMO[key] = v
+    return v
+
+
+def ttt_cpu_move(b, me, level):
+    free = [i for i in range(9) if not b[i]]
+    if not free:
+        return -1
+    if random.random() < {"easy": 0.5, "normal": 0.2}.get(level, 0.0):   # mistakes on purpose, except on Hard
+        return random.choice(free)
+    scores = {}
+    for i in free:
+        bb = list(b)
+        bb[i] = me
+        scores[i] = ttt_minimax(bb, me, 3 - me)
+    top = max(scores.values())
+    return random.choice([i for i, v in scores.items() if v >= top - 1e-9])
+
+
+class TicTacToe(FourInARow):
+    CODE, NAME, NCELLS, NMOVES = "ttt", "tic-tac-toe", 9, 9
+
+    def play(self, c):
+        if self.b[c]:
+            return "taken"
+        self.b[c] = self.turn + 1
+        self.last, self.last_at = c, time.time()
+        self.n += 1
+        w, ln = ttt_winner(self.b)
+        if w:
+            self.win = ln
+            self.finish(w, "three in a row")
+        elif all(self.b):
+            self.finish(3, "board full")
+        else:
+            self.turn = 1 - self.turn
+            self.until = time.time() + C4_TURN
+            if self.mode == "cpu" and self.turn == 1:
+                self.cpu_at = time.time() + random.uniform(0.8, 1.4)
+        self.v += 1
+        return ""
+
+    def cpu_move(self):
+        return ttt_cpu_move(list(self.b), 2, S.get("cpu_level", "normal"))
+
+
+class TTTAnim(Anim):
+    """the 3 x 3 board on a side: crosses for player 1, rings for player 2; the grid shows whose turn it is"""
+    def frame(self, t):
+        w, h = self.w, self.h
+        st = game.all["ttt"]
+        with st.lock:
+            b, stt, turn, last, last_at, win, winner, cols = list(st.b), st.st, st.turn, st.last, st.last_at, list(st.win), st.winner, st.colours
+        c1, c2 = hexrgb(cols[0]), hexrgb(cols[1])
+        self.buf[:] = bytes(len(self.buf))
+        size = min(w, h)
+        cell = max(1, (size - 2) // 3)
+        ox, oy = (w - (cell * 3 + 2)) // 2, (h - (cell * 3 + 2)) // 2
+        if stt == "over" and winner in (1, 2):
+            gc = hsv((t * 0.4) % 1, 1, 0.7)
+        elif stt == "playing":
+            k = 0.35 + 0.25 * math.sin(t * 5)
+            gc = tuple(int(v * k) for v in (c1, c2)[turn])
+        elif stt == "waiting":
+            gc = c1 if int(t * 2) % 2 else c2
+        else:
+            gc = (70, 70, 70)
+        for k in (1, 2):   # the grid
+            gx, gy = ox + k * cell + (k - 1), oy + k * cell + (k - 1)
+            for d in range(cell * 3 + 2):
+                self.px(gx, oy + d, gc)
+                self.px(ox + d, gy, gc)
+        now = time.time()
+        for i, v in enumerate(b):
+            if not v:
+                continue
+            x0, y0 = ox + (i % 3) * (cell + 1), oy + (i // 3) * (cell + 1)
+            col = (c1, c2)[v - 1]
+            if stt == "over" and i in win and int(t * 3) % 2:
+                col = (255, 255, 255)
+            grow = min(1.0, (now - last_at) / 0.3) if i == last else 1.0   # the last mark grows in
+            m = max(0, cell // 6)
+            n = cell - 2 * m
+            if v == 1:   # a cross
+                for d in range(int(n * grow)):
+                    self.px(x0 + m + d, y0 + m + d, col)
+                    self.px(x0 + m + n - 1 - d, y0 + m + d, col)
+            else:        # a ring
+                r = n / 2
+                for dy in range(n):
+                    for dx in range(n):
+                        dd = math.hypot(dx + 0.5 - r, dy + 0.5 - r)
+                        if r - max(1.0, cell / 6) <= dd <= r * grow:
+                            self.px(x0 + m + dx, y0 + m + dy, col)
+        return self.buf
+
+
+# ------------------------------------------------------------------------------------- game: Simon ----
+# Simon (memory of colours): the cube shows a sequence of the four colours, the visitor repeats it on the four pads
+# of their phone. Each round adds a colour and goes a little faster. The phone sends the whole answer in one message
+# (one post a round), so the free relay's limits are never a problem. One player; anyone can watch.
+SIMON_COLS = ("39d353", "ff2a2a", "ffd23f", "2a7bff")   # green, red, yellow, blue: top-left, top-right, bottom-left, bottom-right
+SIMON_MAX = 30         # rounds to win
+SIMON_SHOW_END = 8
+
+
+class Simon:
+    CODE, NAME = "simon", "Simon"
+
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.v = 0
+        self.best = 0          # best score since the bridge started
+        self.reset()
+
+    def reset(self):
+        self.st, self.id, self.mode = "idle", "", "solo"
+        self.pids, self.tags = ["", ""], ["", ""]
+        self.seq, self.score, self.miss, self.exp = [], 0, -1, -1
+        self.t0 = self.until = 0.0
+        self.winner, self.why, self.z, self.ok = 0, "", -1, False
+        self.v += 1
+
+    def step(self):
+        return max(0.32, 0.72 - 0.025 * len(self.seq))   # each colour: shorter every round
+
+    def sides(self):
+        with self.lock:
+            if self.st == "idle" or not S["faces"]:
+                return []
+            return list(range(len(S["faces"]))) if self.z == -1 else [self.z] if self.z < len(S["faces"]) else []
+
+    def state(self):
+        with self.lock:
+            return {"g": self.CODE, "st": self.st, "id": self.id, "mode": "solo", "tags": self.tags, "turn": 0, "n": len(self.seq),
+                    "score": self.score, "best": self.best, "winner": self.winner, "why": self.why, "miss": self.miss, "exp": self.exp,
+                    "z": self.z, "c": list(SIMON_COLS), "left": max(0, int(self.until - time.time())), "v": self.v, "at": int(time.time())}
+
+    def show(self, ok):
+        """starts showing the sequence (after a green flash when the last answer was right)"""
+        self.st, self.ok = "showing", ok
+        self.t0 = time.time() + (1.3 if ok else 1.0)
+        self.until = self.t0 + self.step() * len(self.seq) + 0.3
+        self.v += 1
+
+    def msg(self, m):
+        a, pid, tag = m.get("a"), str(m.get("p", "")), str(m.get("tag", ""))
+        if not PID_RE.fullmatch(pid):
+            return "bad player"
+        with self.lock:
+            if a == "new":
+                if self.st in ("showing", "input"):
+                    return "a game is already being played"
+                z = m.get("z", -1)
+                if not isint(z) or z < -1 or z >= len(S["faces"]) or not TAG_RE.fullmatch(tag):
+                    return "bad request"
+                self.reset()
+                self.id, self.z = secrets.token_hex(3), z
+                self.pids, self.tags = [pid, ""], [tag, ""]
+                self.seq = [random.randrange(4)]
+                self.show(False)
+                log("game: Simon started")
+                return ""
+            if m.get("id") != self.id:
+                return "old game"
+            if pid != self.pids[0]:
+                return "not the player"
+            if a == "quit":
+                if self.st in ("showing", "input"):
+                    self.finish(0, "gave up")
+                return ""
+            if a == "move":
+                s, n = m.get("s"), m.get("n")
+                if self.st != "input" or n != len(self.seq) or not isinstance(s, list) or len(s) != len(self.seq):
+                    return "not now"
+                if not all(isint(x) and 0 <= x < 4 for x in s):
+                    return "bad answer"
+                for i, (x, y) in enumerate(zip(s, self.seq)):
+                    if x != y:
+                        self.miss, self.exp = i, y
+                        self.finish(0, "wrong colour")
+                        return ""
+                self.score = len(self.seq)
+                self.best = max(self.best, self.score)
+                if self.score >= SIMON_MAX:
+                    self.finish(1, "all rounds")
+                    return ""
+                self.seq.append(random.randrange(4))
+                self.show(True)
+                return ""
+        return "?"
+
+    def finish(self, winner, why):
+        self.st, self.winner, self.why = "over", winner, why
+        self.t0, self.until = time.time(), time.time() + SIMON_SHOW_END
+        log("game over: Simon,", why, "- score", self.score, "(best %d)" % self.best)
+        self.v += 1
+
+    def tick(self):
+        with self.lock:
+            now = time.time()
+            if self.st != "idle" and not S["on"]:
+                self.reset()
+                return
+            if self.st == "showing" and now > self.until:
+                self.st, self.until = "input", now + 6 + 1.2 * len(self.seq)
+                self.v += 1
+            elif self.st == "input" and now > self.until:
+                self.finish(0, "time ran out")
+            elif self.st == "over" and now > self.until:
+                self.reset()
+
+    def lit(self, now):
+        """which colour the cube shows now (-1 = none), and what is around it"""
+        if self.st != "showing" or now < self.t0:
+            return -1
+        k = (now - self.t0) / self.step()
+        i = int(k)
+        return self.seq[i] if i < len(self.seq) and k - i < 0.72 else -1
+
+
+class SimonAnim(Anim):
+    """the four colours on a side; the one being shown lights up; a green flash for a right answer, red for a wrong one"""
+    def frame(self, t):
+        w, h = self.w, self.h
+        st = game.all["simon"]
+        now = time.time()
+        with st.lock:
+            stt, ok, t0, exp, lit, score = st.st, st.ok, st.t0, st.exp, st.lit(now), st.score
+        self.buf[:] = bytes(len(self.buf))
+        hw, hh = w // 2, h // 2
+        gap = 1 if min(w, h) >= 8 else 0
+        if stt == "showing" and ok and now < t0:          # right answer: the whole side flashes green
+            f = (0, 255, 60) if int((now - t0) * 6) % 2 else (0, 60, 15)
+            for y in range(h):
+                for x in range(w):
+                    self.px(x, y, f)
+            return self.buf
+        for q, c in enumerate(SIMON_COLS):
+            rgb = hexrgb(c)
+            if stt == "over":
+                on = (q == exp and int((now - t0) * 4) % 2) if exp >= 0 else bool(int((now - t0) * 2) % 2)
+                k = 1.0 if on else (0.12 if exp >= 0 else 0.25)
+                if self.why_red(st) and exp >= 0 and q != exp:
+                    rgb, k = (255, 0, 0), 0.25 if int((now - t0) * 4) % 2 else 0.05
+            elif stt == "input":
+                k = 0.3 + 0.15 * math.sin(t * 4)              # their turn: the colours breathe
+            else:
+                k = 1.0 if q == lit else 0.08
+            col = tuple(int(v * k) for v in rgb)
+            x0, y0 = (q % 2) * hw, (q // 2) * hh
+            for y in range(y0 + (gap if q // 2 else 0), y0 + hh - (0 if q // 2 else gap)):
+                for x in range(x0 + (gap if q % 2 else 0), x0 + hw - (0 if q % 2 else gap)):
+                    self.px(x, y, col)
+        return self.buf
+
+    @staticmethod
+    def why_red(st):
+        return st.why == "wrong colour"
+
+
+# ------------------------------------------------------------------------------ game: count the colours ----
+# A party game for up to 8 phones at once: the cube flashes colours quickly, then everyone answers how many times one
+# of them flashed. The answer does not depend on how fast it arrives, so the relay's delay is fair to everybody.
+COUNT_COLS = (("red", "ff2a2a"), ("green", "39d353"), ("blue", "2a7bff"), ("yellow", "ffd23f"))
+COUNT_AVATARS = ("🦊", "🐼", "🐸", "🐧", "🦁", "🐯", "🐨", "🐵")
+COUNT_ROUNDS, COUNT_LOBBY, COUNT_ANSWER, COUNT_RESULT, COUNT_END = 5, 25, 12, 4, 12
+
+
+class CountColours:
+    CODE, NAME = "count", "Count the colours"
+
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.v = 0
+        self.reset()
+
+    def reset(self):
+        self.st, self.id, self.z = "idle", "", -1
+        self.players = []          # [{"p": secret, "t": tag, "a": avatar, "s": score, "ans": answer or None}]
+        self.round, self.seq, self.target, self.right = 0, [], 0, 0
+        self.t0 = self.until = 0.0
+        self.why = ""
+        self.v += 1
+
+    def sides(self):
+        with self.lock:
+            if self.st == "idle" or not S["faces"]:
+                return []
+            return list(range(len(S["faces"]))) if self.z == -1 else [self.z] if self.z < len(S["faces"]) else []
+
+    def state(self):
+        with self.lock:
+            show_right = self.st in ("result", "over")
+            return {"g": self.CODE, "st": self.st, "id": self.id, "tags": [p["t"] for p in self.players],
+                    "players": [{"t": p["t"], "a": p["a"], "s": p["s"], "ok": (p["ans"] == self.right) if show_right and p["ans"] is not None else None,
+                                 "in": p["ans"] is not None} for p in self.players],
+                    "round": self.round, "rounds": COUNT_ROUNDS, "n": self.round, "target": self.target,
+                    "tname": COUNT_COLS[self.target][0], "tcol": COUNT_COLS[self.target][1],
+                    "right": self.right if show_right else -1, "why": self.why, "z": self.z,
+                    "left": max(0, int(self.until - time.time())), "v": self.v, "at": int(time.time())}
+
+    def new_round(self):
+        self.round += 1
+        self.target = random.randrange(4)
+        self.right = random.randint(2, 4 + self.round)                       # how many times the target flashes
+        others = random.randint(5 + self.round, 7 + 2 * self.round)          # other colours in between
+        seq = [self.target] * self.right + [random.choice([c for c in range(4) if c != self.target]) for _ in range(others)]
+        random.shuffle(seq)
+        for i in range(1, len(seq)):     # never the same colour twice in a row, so every flash can be counted
+            if seq[i] == seq[i - 1]:
+                for j in range(i + 1, len(seq)):
+                    if seq[j] != seq[i - 1] and (j + 1 >= len(seq) or seq[j + 1] != seq[i]) and seq[j - 1] != seq[i]:
+                        seq[i], seq[j] = seq[j], seq[i]
+                        break
+        self.right = seq.count(self.target)
+        self.seq = seq
+        for p in self.players:
+            p["ans"] = None
+        self.st, self.t0 = "show", time.time() + 2.0      # 2 s: the side shows which colour to count
+        self.until = self.t0 + self.step() * len(seq) + 0.4
+        self.v += 1
+
+    def step(self):
+        return max(0.38, 0.62 - 0.05 * self.round)
+
+    def msg(self, m):
+        a, pid, tag = m.get("a"), str(m.get("p", "")), str(m.get("tag", ""))
+        if not PID_RE.fullmatch(pid):
+            return "bad player"
+        with self.lock:
+            if a == "new":
+                if self.st not in ("idle", "over"):
+                    return "a game is already being played"
+                z = m.get("z", -1)
+                if not isint(z) or z < -1 or z >= len(S["faces"]) or not TAG_RE.fullmatch(tag):
+                    return "bad request"
+                self.reset()
+                self.id, self.z = secrets.token_hex(3), z
+                self.players = [{"p": pid, "t": tag, "a": COUNT_AVATARS[0], "s": 0, "ans": None}]
+                self.st, self.until = "lobby", time.time() + COUNT_LOBBY
+                log("game: Count the colours, waiting for players")
+                self.v += 1
+                return ""
+            if m.get("id") != self.id:
+                return "old game"
+            me = next((i for i, p in enumerate(self.players) if p["p"] == pid), -1)
+            if a == "join":
+                if self.st != "lobby" or me >= 0 or len(self.players) >= len(COUNT_AVATARS) or not TAG_RE.fullmatch(tag):
+                    return "cannot join"
+                self.players.append({"p": pid, "t": tag, "a": COUNT_AVATARS[len(self.players)], "s": 0, "ans": None})
+                self.v += 1
+                return ""
+            if me < 0:
+                return "not a player"
+            if a == "start":
+                if self.st != "lobby" or me != 0:
+                    return "not now"
+                log("game: Count the colours starts with %d player(s)" % len(self.players))
+                self.new_round()
+                return ""
+            if a == "answer":
+                v, n = m.get("v"), m.get("n")
+                if self.st not in ("show", "answer") or n != self.round or not isint(v) or not 0 <= v <= 30 or self.players[me]["ans"] is not None:
+                    return "not now"
+                self.players[me]["ans"] = v
+                self.v += 1
+                if self.st == "answer" and all(p["ans"] is not None for p in self.players if p["p"] != "-"):
+                    self.until = time.time()       # everyone answered: show the result now
+                return ""
+            if a == "quit":
+                if me == 0:
+                    self.finish("stopped")
+                else:
+                    self.players[me]["p"] = "-"   # leaves; the score stays on the board
+                    self.v += 1
+                return ""
+        return "?"
+
+    def finish(self, why):
+        self.st, self.why = "over", why
+        self.t0, self.until = time.time(), time.time() + COUNT_END
+        if self.players:
+            best = max(p["s"] for p in self.players)
+            log("game over: Count the colours,", why, "- top score %d of %d" % (best, self.round))
+        self.v += 1
+
+    def tick(self):
+        with self.lock:
+            now = time.time()
+            if self.st != "idle" and not S["on"]:
+                self.reset()
+                return
+            if now <= self.until:
+                return
+            if self.st == "lobby":
+                self.new_round()           # time is up: play with whoever joined
+            elif self.st == "show":
+                self.st, self.until = "answer", now + COUNT_ANSWER
+                if all(p["ans"] is not None for p in self.players if p["p"] != "-"):
+                    self.until = now + 1
+                self.v += 1
+            elif self.st == "answer":
+                for p in self.players:
+                    if p["ans"] == self.right:
+                        p["s"] += 1
+                self.st, self.t0, self.until = "result", now, now + COUNT_RESULT
+                self.v += 1
+            elif self.st == "result":
+                if self.round >= COUNT_ROUNDS:
+                    self.finish("all rounds")
+                else:
+                    self.new_round()
+            elif self.st == "over":
+                self.reset()
+
+    def lit(self, now):
+        if self.st != "show" or now < self.t0:
+            return -1
+        k = (now - self.t0) / self.step()
+        i = int(k)
+        return self.seq[i] if i < len(self.seq) and k - i < 0.7 else -1
+
+
+class CountAnim(Anim):
+    """lobby: the four colours turn; show: the colour to count, then the flashes; answer: '?' in that colour; result: the
+    right number as dots"""
+    def frame(self, t):
+        w, h = self.w, self.h
+        st = game.all["count"]
+        now = time.time()
+        with st.lock:
+            stt, t0, target, right, lit, nplayers = st.st, st.t0, st.target, st.right, st.lit(now), len(st.players)
+        self.buf[:] = bytes(len(self.buf))
+        tc = hexrgb(COUNT_COLS[target][1])
+        if stt == "lobby":     # waiting for players: one dot lights for each player, around four turning colours
+            for y in range(h):
+                for x in range(w):
+                    q = int(((math.atan2(y - h / 2 + .5, x - w / 2 + .5) / math.tau + t * 0.15) % 1) * 4)
+                    self.px(x, y, tuple(v // 6 for v in hexrgb(COUNT_COLS[q][1])))
+            for i in range(nplayers):
+                self.px(1 + 2 * i, h - 2, (255, 255, 255))
+        elif stt == "show" and now < t0:   # the colour to count: a frame in that colour, pulsing
+            k = 0.5 + 0.5 * math.sin(now * 8)
+            c = tuple(int(v * (0.3 + 0.7 * k)) for v in tc)
+            for x in range(w):
+                for d in range(max(1, min(w, h) // 8)):
+                    self.px(x, d, c); self.px(x, h - 1 - d, c)
+            for y in range(h):
+                for d in range(max(1, min(w, h) // 8)):
+                    self.px(d, y, c); self.px(w - 1 - d, y, c)
+        elif stt == "show":
+            if lit >= 0:
+                c = hexrgb(COUNT_COLS[lit][1])
+                for y in range(1, h - 1):
+                    for x in range(1, w - 1):
+                        self.px(x, y, c)
+        elif stt == "answer":  # a breathing frame in the colour asked: everyone answers on their phone
+            k = 0.35 + 0.25 * math.sin(t * 4)
+            c = tuple(int(v * k) for v in tc)
+            for x in range(w):
+                self.px(x, 0, c); self.px(x, h - 1, c)
+            for y in range(h):
+                self.px(0, y, c); self.px(w - 1, y, c)
+        elif stt == "result":  # the right number, as dots that appear one by one
+            n = min(right, int((now - t0) / 0.25) + 1)
+            cols = max(1, min(4, right))
+            rows = (right + cols - 1) // cols
+            cell = max(1, min((w - 2) // cols, (h - 2) // max(1, rows)))
+            ox, oy = (w - cell * cols) // 2, (h - cell * rows) // 2
+            for i in range(n):
+                cx, cy = ox + (i % cols) * cell, oy + (i // cols) * cell
+                for dy in range(max(1, cell - 1)):
+                    for dx in range(max(1, cell - 1)):
+                        self.px(cx + dx, cy + dy, tc)
+        elif stt == "over":
+            for y in range(h):
+                for x in range(w):
+                    if random.random() < 0.08:
+                        self.px(x, y, hexrgb(COUNT_COLS[random.randrange(4)][1]))
+        return self.buf
+
+
+# ------------------------------------------------------------------------------------- game: snake ----
+# Snake for one player, played slowly on purpose: the phone sends only the turns (one message per turn) and the relay
+# takes up to a second, so the snake moves about once a second at first and a little faster as it grows. The board is
+# 8 x 8 squares, scaled to the side.
+SNAKE_N = 8
+SNAKE_MAX_TIME = 300   # a game lasts at most 5 minutes
+DIRS = ((0, -1), (1, 0), (0, 1), (-1, 0))   # up, right, down, left
+
+
+class Snake:
+    CODE, NAME = "snake", "Snake"
+
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.v = 0
+        self.best = 0
+        self.reset()
+
+    def reset(self):
+        self.st, self.id, self.z = "idle", "", -1
+        self.pids, self.tags = ["", ""], ["", ""]
+        self.body, self.d, self.turns, self.food = [], 1, [], (0, 0)
+        self.score, self.why = 0, ""
+        self.t0 = self.until = self.next = self.died = 0.0
+        self.v += 1
+
+    def sides(self):
+        with self.lock:
+            if self.st == "idle" or not S["faces"]:
+                return []
+            return list(range(len(S["faces"]))) if self.z == -1 else [self.z] if self.z < len(S["faces"]) else []
+
+    def state(self):
+        with self.lock:
+            return {"g": self.CODE, "st": self.st, "id": self.id, "tags": self.tags, "n": self.score, "score": self.score,
+                    "best": self.best, "why": self.why, "z": self.z, "left": max(0, int(self.until - time.time())),
+                    "v": self.v, "at": int(time.time())}
+
+    def interval(self):
+        return max(0.45, 1.0 - 0.05 * self.score)
+
+    def place_food(self):
+        free = [(x, y) for y in range(SNAKE_N) for x in range(SNAKE_N) if (x, y) not in self.body]
+        self.food = random.choice(free) if free else (-1, -1)
+
+    def msg(self, m):
+        a, pid, tag = m.get("a"), str(m.get("p", "")), str(m.get("tag", ""))
+        if not PID_RE.fullmatch(pid):
+            return "bad player"
+        with self.lock:
+            if a == "new":
+                if self.st in ("ready", "playing"):
+                    return "a game is already being played"
+                z = m.get("z", -1)
+                if not isint(z) or z < -1 or z >= len(S["faces"]) or not TAG_RE.fullmatch(tag):
+                    return "bad request"
+                self.reset()
+                self.id, self.z = secrets.token_hex(3), z
+                self.pids, self.tags = [pid, ""], [tag, ""]
+                self.body = [(3, 4), (2, 4), (1, 4)]
+                self.d, self.turns = 1, []
+                self.place_food()
+                self.st, self.t0 = "ready", time.time()
+                self.next = self.t0 + 3.0          # 3 s to get ready
+                self.until = self.t0 + 3.0 + SNAKE_MAX_TIME
+                log("game: Snake started")
+                self.v += 1
+                return ""
+            if m.get("id") != self.id:
+                return "old game"
+            if pid != self.pids[0]:
+                return "not the player"
+            if a == "dir":
+                d = m.get("d")
+                if self.st not in ("ready", "playing") or not isint(d) or not 0 <= d < 4:
+                    return "not now"
+                last = self.turns[-1] if self.turns else self.d
+                if d != last and d != (last + 2) % 4 and len(self.turns) < 3:   # no turning back on itself
+                    self.turns.append(d)
+                return ""
+            if a == "quit":
+                if self.st in ("ready", "playing"):
+                    self.finish("gave up")
+                return ""
+        return "?"
+
+    def finish(self, why):
+        self.st, self.why = "over", why
+        self.died, self.until = time.time(), time.time() + 8
+        self.best = max(self.best, self.score)
+        log("game over: Snake,", why, "- score", self.score, "(best %d)" % self.best)
+        self.v += 1
+
+    def update(self, now):
+        """moves the snake when it is time (called by the drawing, every frame)"""
+        with self.lock:
+            if self.st not in ("ready", "playing") or now < self.next:
+                return
+            if self.st == "ready":
+                self.st = "playing"
+                self.v += 1
+            if self.turns:
+                self.d = self.turns.pop(0)
+            dx, dy = DIRS[self.d]
+            hx, hy = self.body[0][0] + dx, self.body[0][1] + dy
+            if not (0 <= hx < SNAKE_N and 0 <= hy < SNAKE_N) or (hx, hy) in self.body[:-1]:
+                self.finish("crashed")
+                return
+            self.body.insert(0, (hx, hy))
+            if (hx, hy) == self.food:
+                self.score += 1
+                self.v += 1
+                if len(self.body) >= SNAKE_N * SNAKE_N:
+                    self.finish("board full")
+                    return
+                self.place_food()
+            else:
+                self.body.pop()
+            self.next = now + self.interval()
+
+    def tick(self):
+        with self.lock:
+            now = time.time()
+            if self.st != "idle" and not S["on"]:
+                self.reset()
+                return
+            if self.st in ("ready", "playing") and now > self.until:
+                self.finish("time up")
+            elif self.st == "over" and now > self.until:
+                self.reset()
+
+
+class SnakeAnim(Anim):
+    def frame(self, t):
+        w, h = self.w, self.h
+        st = game.all["snake"]
+        now = time.time()
+        st.update(now)
+        with st.lock:
+            stt, body, food, t0, died = st.st, list(st.body), st.food, st.t0, st.died
+        self.buf[:] = bytes(len(self.buf))
+        cell = max(1, min(w, h) // SNAKE_N)
+        ox, oy = (w - cell * SNAKE_N) // 2, (h - cell * SNAKE_N) // 2
+        edge = (25, 25, 60)
+        for k in range(-1, cell * SNAKE_N + 1):   # the walls, faint
+            self.px(ox + k, oy - 1, edge); self.px(ox + k, oy + cell * SNAKE_N, edge)
+            self.px(ox - 1, oy + k, edge); self.px(ox + cell * SNAKE_N, oy + k, edge)
+
+        def sq(x, y, c):
+            for dy in range(cell):
+                for dx in range(cell):
+                    self.px(ox + x * cell + dx, oy + y * cell + dy, c)
+        if food[0] >= 0:
+            k = 0.6 + 0.4 * math.sin(t * 6)
+            sq(food[0], food[1], (int(255 * k), int(40 * k), int(40 * k)))
+        crashed = stt == "over" and int((now - died) * 4) % 2 == 0
+        for i, (x, y) in enumerate(body):
+            if crashed:
+                c = (255, 255, 255)
+            elif i == 0:
+                c = (180, 255, 120)
+            else:
+                g = max(60, 220 - i * 8)
+                c = (0, g, int(g * 0.35))
+            sq(x, y, c)
+        if stt == "ready":   # 3, 2, 1: the head blinks
+            if int((now - t0) * 3) % 2:
+                sq(body[0][0], body[0][1], (255, 255, 255))
+        return self.buf
+
+
+# -------------------------------------------------------------------------------------- game: Pong ----
+# Pong in two ways:
+#   - crew: from the Mixer page on the home network (no relay, so no delay): one or two players, paddles moved by a
+#     finger, the keyboard or a MIDI knob or fader (learnable as game:p1 and game:p2); the computer plays any side
+#     nobody controls;
+#   - visitor (new in v16): one visitor against the computer, made for the relay's delay: the phone sends where the
+#     red paddle should go (one message per slide) and it glides there; the ball is slower and the paddles longer.
+# First to 5 points wins.
+PONG_WIN = 5
+
+
+class Pong:
+    CODE, NAME = "pong", "Pong"
+
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.v = 0
+        self.reset()
+
+    def reset(self):
+        self.st, self.id, self.z, self.mode = "idle", "", -1, "cpu"
+        self.tags, self.pids = ["", ""], ["", ""]
+        self.goal = 0.5
+        self.pad = [0.5, 0.5]        # paddle centres, 0 = top, 1 = bottom
+        self.human = [True, False]
+        self.score = [0, 0]
+        self.ball = [0.5, 0.5]
+        self.vel = [0.0, 0.0]
+        self.serve_at = self.last = self.touched = self.until = 0.0
+        self.winner, self.why, self.flash, self.aim = 0, "", 0.0, 0.0
+        self.v += 1
+
+    def sides(self):
+        with self.lock:
+            if self.st == "idle" or not S["faces"]:
+                return []
+            return list(range(len(S["faces"]))) if self.z == -1 else [self.z] if self.z < len(S["faces"]) else []
+
+    def state(self):
+        with self.lock:
+            return {"g": self.CODE, "st": self.st, "id": self.id, "tags": self.tags, "n": sum(self.score), "score": list(self.score),
+                    "mode": self.mode, "winner": self.winner, "why": self.why, "z": self.z, "v": self.v, "at": int(time.time()),
+                    "pad": [round(p, 3) for p in self.pad]}
+
+    def start(self, mode, z):
+        with self.lock:
+            if not isint(z) or z < -1 or z >= len(S["faces"]):
+                return "bad side"
+            self.reset()
+            self.id, self.z, self.mode = secrets.token_hex(3), z, "pvp" if mode == "pvp" else "cpu"
+            self.human = [True, self.mode == "pvp"]
+            self.st = "playing"
+            self.touched = time.time()
+            self.serve(random.choice((-1, 1)))
+            log("game: Pong,", "two players" if self.mode == "pvp" else "against the computer")
+            self.v += 1
+            return ""
+
+    def serve(self, direction):
+        self.ball = [0.5, 0.5]
+        ang = random.uniform(-0.6, 0.6)
+        sp = 0.26 if self.mode == "visitor" else 0.45     # the visitors' ball is slower, for the relay's delay
+        self.vel = [direction * sp * math.cos(ang), sp * math.sin(ang)]
+        self.serve_at = time.time() + (1.6 if self.mode == "visitor" else 1.0)
+
+    def half(self, h):
+        """half the paddle's height, as a fraction of the side (longer for visitors)"""
+        return max(0.27 if self.mode == "visitor" else 0.16, 3.0 / max(3, h))
+
+    def set_pad(self, p, v):
+        with self.lock:
+            if self.st != "playing" or p not in (0, 1) or self.mode == "visitor":   # a visitor's game is theirs
+                return
+            self.pad[p] = max(0.0, min(1.0, float(v)))
+            self.human[p] = True
+            self.touched = time.time()
+
+    def stop(self):
+        with self.lock:
+            if self.st == "playing":
+                self.finish(0, "stopped")
+
+    def msg(self, m):
+        """a visitor's Pong, against the computer"""
+        a, pid, tag = m.get("a"), str(m.get("p", "")), str(m.get("tag", ""))
+        if not PID_RE.fullmatch(pid):
+            return "bad player"
+        with self.lock:
+            if a == "new":
+                if self.st == "playing":
+                    return "a game is already being played"
+                z = m.get("z", -1)
+                if not isint(z) or z < -1 or z >= len(S["faces"]) or not TAG_RE.fullmatch(tag) or not S["faces"]:
+                    return "bad request"
+                self.reset()
+                self.id, self.z, self.mode = secrets.token_hex(3), z, "visitor"
+                self.pids, self.tags = [pid, ""], [tag, "cpu"]
+                self.human = [True, False]
+                self.st = "playing"
+                self.touched = time.time()
+                self.until = self.touched + 300
+                self.serve(random.choice((-1, 1)))
+                log("game: Pong, a visitor against the computer")
+                self.v += 1
+                return ""
+            if m.get("id") != self.id or self.mode != "visitor":
+                return "old game"
+            if pid != self.pids[0]:
+                return "not the player"
+            if a == "go":
+                y = m.get("y")
+                if self.st == "playing" and isinstance(y, (int, float)) and not isinstance(y, bool):
+                    self.goal = max(0.0, min(1.0, float(y)))
+                    self.touched = time.time()
+                return ""
+            if a == "quit":
+                if self.st == "playing":
+                    self.finish(2, "gave up")
+                return ""
+        return "?"
+
+    def finish(self, winner, why):
+        self.st, self.winner, self.why = "over", winner, why
+        self.until = time.time() + 6
+        log("game over: Pong,", why, "%d - %d" % tuple(self.score))
+        self.v += 1
+
+    def update(self, now, w, h):
+        with self.lock:
+            if self.st != "playing":
+                self.last = now
+                return
+            dt = min(0.1, max(0.0, now - (self.last or now)))
+            self.last = now
+            ph = self.half(h)                           # paddle half-height (a fraction of the side)
+            if self.mode == "visitor":                  # the visitor's paddle glides to where the phone said
+                self.pad[0] += max(-1.1 * dt, min(1.1 * dt, self.goal - self.pad[0]))
+            for p in (0, 1):                            # the computer moves the paddles nobody holds
+                if not self.human[p]:
+                    coming = (self.vel[0] > 0) == (p == 1)
+                    vis = self.mode == "visitor"
+                    near = self.ball[0] > (0.45 if vis else 0.4) if p == 1 else self.ball[0] < 0.6
+                    goal = self.ball[1] + self.aim if coming and near else 0.5   # it reacts late and aims a little off
+                    speed = (0.27 if vis else 0.4) + (0.02 if vis else 0.03) * sum(self.score)
+                    self.pad[p] += max(-speed * dt, min(speed * dt, goal - self.pad[p]))
+            if now < self.serve_at:
+                return
+            bx, by = self.ball[0] + self.vel[0] * dt, self.ball[1] + self.vel[1] * dt
+            if by < 0 or by > 1:
+                by = -by if by < 0 else 2 - by
+                self.vel[1] = -self.vel[1]
+            edge = 1.0 / max(4, w)                      # the paddles are one pixel in from the sides
+            for p, x_hit in ((0, edge * 1.5), (1, 1 - edge * 1.5)):
+                coming = self.vel[0] < 0 if p == 0 else self.vel[0] > 0
+                crossed = bx <= x_hit if p == 0 else bx >= x_hit
+                if coming and crossed and abs(by - self.pad[p]) <= ph + 0.04:
+                    off = (by - self.pad[p]) / (ph + 0.04)
+                    sp = min(0.6 if self.mode == "visitor" else 1.4, math.hypot(*self.vel) * (1.05 if self.mode == "visitor" else 1.07))
+                    ang = off * 0.9
+                    self.vel = [(1 if p == 0 else -1) * sp * math.cos(ang), sp * math.sin(ang)]
+                    bx = x_hit
+                    self.flash = now
+                    self.aim = random.uniform(-0.33, 0.33) if self.mode == "visitor" else random.uniform(-0.22, 0.22)
+            if bx < 0 or bx > 1:
+                scorer = 1 if bx < 0 else 0
+                self.score[scorer] += 1
+                self.v += 1
+                if self.score[scorer] >= PONG_WIN:
+                    self.finish(scorer + 1, "five points")
+                    return
+                self.serve(1 if scorer == 0 else -1)
+                return
+            self.ball = [bx, by]
+
+    def tick(self):
+        with self.lock:
+            now = time.time()
+            if self.st == "playing" and self.mode == "visitor" and not S["on"]:
+                self.reset()
+            elif self.st == "playing" and self.mode == "visitor" and (now - self.touched > 60 or now > self.until):
+                self.finish(0, "nobody playing" if now - self.touched > 60 else "time up")
+            elif self.st == "playing" and self.mode == "pvp" and now - self.touched > 120:
+                self.finish(0, "nobody playing")
+            elif self.st == "over" and now > self.until:
+                self.reset()
+
+
+class PongAnim(Anim):
+    def frame(self, t):
+        w, h = self.w, self.h
+        st = game.all["pong"]
+        now = time.time()
+        st.update(now, w, h)
+        with st.lock:
+            stt, pad, ball, score, flash, winner, serve_at = st.st, list(st.pad), list(st.ball), list(st.score), st.flash, st.winner, st.serve_at
+        self.buf[:] = bytes(len(self.buf))
+        c1, c2 = (255, 60, 60), (60, 140, 255)
+        for y in range(0, h, 2):                         # the net
+            self.px(w // 2, y, (40, 40, 40))
+        for i in range(score[0]):                        # the score as dots at the top
+            self.px(w // 2 - 2 - i, 0, c1)
+        for i in range(score[1]):
+            self.px(w // 2 + 2 + i, 0, c2)
+        ph = max(1, int(round(st.half(h) * h)))
+        for p, x, c in ((0, 0, c1), (1, w - 1, c2)):
+            cy = int(pad[p] * (h - 1))
+            for y in range(cy - ph, cy + ph + 1):
+                self.px(x, y, c)
+        if stt == "over" and winner:
+            c = (c1, c2)[winner - 1]
+            k = 0.5 + 0.5 * math.sin(t * 8)
+            for y in range(h):
+                for x in range(w):
+                    if (x + y + int(t * 6)) % 4 == 0:
+                        self.px(x, y, tuple(int(v * k) for v in c))
+        elif stt == "playing" and (now >= serve_at or int(now * 6) % 2):
+            bc = (255, 255, 255) if now - flash > 0.12 else (255, 255, 120)
+            self.px(int(round(ball[0] * (w - 1))), int(round(ball[1] * (h - 1))), bc)
+        return self.buf
+
+
+# ------------------------------------------------------------------------------- game: space invaders ----
+# Space Invaders on a side of the cube, in two ways:
+#   - crew: from the Mixer page on the home network (no delay): move with a finger, the arrow keys or a MIDI knob, fire
+#     with a button, the space bar or a MIDI pad;
+#   - visitors: from the phone, made for the relay's delay: the phone sends where the ship should go (one message per
+#     slide), the ship glides there and fires by itself; invaders and bombs are slower.
+# Waves get faster, a mystery ship crosses the top now and then, three lives.
+INV_ROWS = (("ff3cff", 30), ("3cffff", 20), ("3cff5a", 10))   # colour and points of each row, top first
+INV_MAX_TIME = 420
+
+
+class Invaders:
+    CODE, NAME = "invaders", "Space Invaders"
+
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.v = 0
+        self.best = 0
+        self.reset()
+
+    def reset(self):
+        self.st, self.id, self.z, self.mode = "idle", "", -1, "visitor"
+        self.pids, self.tags = ["", ""], ["", ""]
+        self.w, self.h = 16, 16
+        self.aliens, self.shots, self.bombs, self.shields = [], [], [], set()
+        self.ship, self.target, self.dir = 8.0, 8.0, 0
+        self.lives, self.score, self.wave = 3, 0, 0
+        self.adx, self.next_step, self.next_fire, self.next_bomb = 1, 0.0, 0.0, 0.0
+        self.ufo, self.ufo_next, self.hit_at, self.boom = None, 0.0, 0.0, []
+        self.t0 = self.until = self.last = self.touched = self.died = 0.0
+        self.why = ""
+        self.v += 1
+
+    def sides(self):
+        with self.lock:
+            if self.st == "idle" or not S["faces"]:
+                return []
+            return list(range(len(S["faces"]))) if self.z == -1 else [self.z] if self.z < len(S["faces"]) else []
+
+    def state(self):
+        with self.lock:
+            return {"g": self.CODE, "st": self.st, "id": self.id, "tags": self.tags, "mode": self.mode, "n": self.score,
+                    "score": self.score, "best": self.best, "lives": self.lives, "wave": self.wave, "why": self.why, "z": self.z,
+                    "x": round(self.ship / max(1, self.w - 1), 3), "left": max(0, int(self.until - time.time())), "v": self.v, "at": int(time.time())}
+
+    # -- speeds: the visitors' game is slower, for the relay's delay
+    def k(self, crew, visitor):
+        return crew if self.mode == "crew" else visitor
+
+    def begin(self, mode, z, pid="", tag=""):
+        self.reset()
+        f = S["faces"][z if z >= 0 else 0]
+        self.w, self.h = max(8, f["w"]), max(8, f["h"])
+        self.id, self.z, self.mode = secrets.token_hex(3), z, mode
+        self.pids, self.tags = [pid, ""], [tag, ""]
+        self.ship = self.target = (self.w - 1) / 2
+        hy = self.h - 4
+        self.shields = {(x, hy) for c in range(1, 4) for x in (int(c * self.w / 4) - 1, int(c * self.w / 4))}
+        self.st, self.t0 = "ready", time.time()
+        self.until = self.t0 + 2.5 + INV_MAX_TIME
+        self.touched = self.t0
+        self.new_wave(self.t0 + 2.5)
+        log("game: Space Invaders,", "the crew" if mode == "crew" else "a visitor")
+        self.v += 1
+
+    def new_wave(self, at):
+        self.wave += 1
+        cols = max(3, min(8, (self.w - 4) // 2))
+        x0 = (self.w - (cols * 2 - 1)) // 2
+        top = 2 + min(3, self.wave - 1)                     # each wave starts a little lower
+        self.aliens = [[x0 + c * 2, top + r * 2, r] for r in range(len(INV_ROWS)) for c in range(cols)]
+        self.adx = 1
+        self.shots, self.bombs = [], []
+        self.next_step = at
+        self.next_fire = at + 0.5
+        self.next_bomb = at + self.k(1.5, 3.0)
+        self.ufo_next = at + random.uniform(12, 25)
+        self.n0 = len(self.aliens)
+
+    def step_time(self):
+        frac = len(self.aliens) / max(1, self.n0)
+        base = self.k(0.55, 1.5) * (0.92 ** (self.wave - 1))
+        return max(self.k(0.08, 0.45), base * (0.3 + 0.7 * frac))   # faster as they fall
+
+    def msg(self, m):
+        a, pid, tag = m.get("a"), str(m.get("p", "")), str(m.get("tag", ""))
+        if not PID_RE.fullmatch(pid):
+            return "bad player"
+        with self.lock:
+            if a == "new":
+                if self.st in ("ready", "playing"):
+                    return "a game is already being played"
+                z = m.get("z", -1)
+                if not isint(z) or z < -1 or z >= len(S["faces"]) or not TAG_RE.fullmatch(tag) or not S["faces"]:
+                    return "bad request"
+                self.begin("visitor", z, pid, tag)
+                return ""
+            if m.get("id") != self.id:
+                return "old game"
+            if pid != self.pids[0]:
+                return "not the player"
+            if a == "go":
+                x = m.get("x")
+                if self.st in ("ready", "playing") and isinstance(x, (int, float)) and not isinstance(x, bool):
+                    self.target = max(0.0, min(1.0, float(x))) * (self.w - 1)
+                    self.touched = time.time()
+                return ""
+            if a == "quit":
+                if self.st in ("ready", "playing"):
+                    self.finish("gave up")
+                return ""
+        return "?"
+
+    # -- the crew's controls (Mixer page and MIDI)
+    def crew_move(self, x=None, d=None):
+        with self.lock:
+            if self.st not in ("ready", "playing") or self.mode != "crew":
+                return
+            if x is not None:
+                self.target, self.dir = max(0.0, min(1.0, float(x))) * (self.w - 1), 0
+            if d is not None:
+                self.dir = max(-1, min(1, int(d)))
+            self.touched = time.time()
+
+    def crew_fire(self):
+        with self.lock:
+            if self.st == "playing" and self.mode == "crew" and len(self.shots) < 2:
+                self.shots.append([int(round(self.ship)), self.h - 3])
+                self.touched = time.time()
+
+    def stop(self):
+        with self.lock:
+            if self.st in ("ready", "playing"):
+                self.finish("stopped")
+
+    def finish(self, why):
+        self.st, self.why = "over", why
+        self.died, self.until = time.time(), time.time() + 8
+        self.best = max(self.best, self.score)
+        log("game over: Space Invaders,", why, "- score", self.score, "wave", self.wave, "(best %d)" % self.best)
+        self.v += 1
+
+    def update(self, now):
+        with self.lock:
+            if self.st not in ("ready", "playing"):
+                self.last = now
+                return
+            dt = min(0.1, max(0.0, now - (self.last or now)))
+            self.last = now
+            if self.st == "ready":
+                if now >= self.next_step:
+                    self.st = "playing"
+                    self.v += 1
+                return
+            w, h = self.w, self.h
+            # the ship: glides to its target, or keeps moving while the crew holds a direction
+            sp = self.k(14.0, 7.0)
+            if self.dir:
+                self.target = max(0.0, min(w - 1.0, self.ship + self.dir * sp * dt * 1.5))
+            self.ship += max(-sp * dt, min(sp * dt, self.target - self.ship))
+            self.ship = max(1.0, min(w - 2.0, self.ship))
+            # the visitor's ship fires by itself
+            if self.mode == "visitor" and now >= self.next_fire and not self.shots:
+                self.shots.append([int(round(self.ship)), h - 3])
+                self.next_fire = now + 0.55
+            # shots go up, bombs come down
+            for s in self.shots:
+                s.append(s[1])                     # where it was: every square it crosses is checked
+                s[1] -= self.k(22.0, 18.0) * dt
+            for b in self.bombs:
+                b.append(b[1])
+                b[1] += self.k(8.0, 3.0) * dt
+            # invaders march
+            if now >= self.next_step and self.aliens:
+                xs = [a[0] for a in self.aliens]
+                if (self.adx > 0 and max(xs) + 1 >= w) or (self.adx < 0 and min(xs) - 1 < 0):
+                    for a in self.aliens:
+                        a[1] += 1
+                    self.adx = -self.adx
+                else:
+                    for a in self.aliens:
+                        a[0] += self.adx
+                self.next_step = now + self.step_time()
+                if max(a[1] for a in self.aliens) >= h - 2:
+                    self.finish("invaded")
+                    return
+            # invaders drop bombs (from the lowest one of a random column)
+            if now >= self.next_bomb and self.aliens:
+                cols = {}
+                for a in self.aliens:
+                    if a[0] not in cols or a[1] > cols[a[0]][1]:
+                        cols[a[0]] = a
+                a = random.choice(list(cols.values()))
+                if len(self.bombs) < self.k(2, 1 if self.wave < 3 else 2):
+                    self.bombs.append([a[0], a[1] + 1.0])
+                self.next_bomb = now + self.k(random.uniform(1.0, 2.2), random.uniform(2.5, 4.5)) * (0.95 ** (self.wave - 1))
+            # the mystery ship
+            if self.ufo is None and now >= self.ufo_next:
+                d = random.choice((-1, 1))
+                self.ufo = [-1.0 if d > 0 else w * 1.0, d]
+            if self.ufo is not None:
+                self.ufo[0] += self.ufo[1] * self.k(5.0, 3.0) * dt
+                if self.ufo[0] < -2 or self.ufo[0] > w + 1:
+                    self.ufo, self.ufo_next = None, now + random.uniform(15, 30)
+            # hits
+            keep = []
+            for s in self.shots:
+                sx, old = s[0], (s.pop() if len(s) > 2 else s[1])
+                gone = False
+                for sy in range(int(round(old)), int(round(s[1])) - 1, -1):   # every square from where it was to where it is
+                    hit = next((a for a in self.aliens if a[0] == sx and a[1] == sy), None)
+                    if hit:
+                        self.aliens.remove(hit)
+                        self.score += INV_ROWS[hit[2]][1]
+                        self.boom.append([sx, sy, now])
+                        self.v += 1
+                        gone = True
+                    elif (sx, sy) in self.shields:
+                        self.shields.discard((sx, sy))
+                        gone = True
+                    elif self.ufo is not None and sy == 0 and abs(self.ufo[0] - sx) <= 1:
+                        self.score += random.choice((50, 100, 150))
+                        self.boom.append([sx, 0, now])
+                        self.ufo, self.ufo_next = None, now + random.uniform(15, 30)
+                        self.v += 1
+                        gone = True
+                    elif sy < 0:
+                        gone = True
+                    if gone:
+                        break
+                if not gone:
+                    keep.append(s)
+            self.shots = keep
+            keep = []
+            for b in self.bombs:
+                bx, old = b[0], (b.pop() if len(b) > 2 else b[1])
+                by = int(round(b[1]))
+                if by >= h:
+                    continue
+                crossed = [(bx, y) for y in range(int(round(old)), by + 1) if (bx, y) in self.shields]
+                if crossed:
+                    self.shields.discard(crossed[0])
+                    continue
+                if by >= h - 2 and abs(bx - self.ship) <= 1.0 and now - self.hit_at > 1.5:
+                    self.lives -= 1
+                    self.hit_at = now
+                    self.boom.append([int(round(self.ship)), h - 1, now])
+                    self.v += 1
+                    if self.lives <= 0:
+                        self.finish("no lives left")
+                        return
+                    continue
+                keep.append(b)
+            self.bombs = keep
+            self.boom = [x for x in self.boom if now - x[2] < 0.4]
+            if not self.aliens:
+                self.score += 100 * self.wave
+                self.lives = min(5, self.lives + 1)      # an extra life for each wave cleared
+                self.new_wave(now + 2.0)
+                self.st = "ready"
+                self.v += 1
+
+    def tick(self):
+        with self.lock:
+            now = time.time()
+            if self.st != "idle" and not S["on"] and self.mode == "visitor":
+                self.reset()
+                return
+            if self.st in ("ready", "playing") and (now > self.until or now - self.touched > self.k(120, 90)):
+                self.finish("time up" if now > self.until else "nobody playing")
+            elif self.st == "over" and now > self.until:
+                self.reset()
+
+
+class InvadersAnim(Anim):
+    def frame(self, t):
+        w, h = self.w, self.h
+        st = game.all["invaders"]
+        now = time.time()
+        st.update(now)
+        with st.lock:
+            stt, aliens, shots, bombs = st.st, [list(a) for a in st.aliens], [list(s) for s in st.shots], [list(b) for b in st.bombs]
+            shields, ship, ufo, boom, lives, hit_at, died, wave = set(st.shields), st.ship, st.ufo, list(st.boom), st.lives, st.hit_at, st.died, st.wave
+            sw, sh = st.w, st.h
+        self.buf[:] = bytes(len(self.buf))
+        ox, oy = (w - sw) // 2, (h - sh) // 2
+        P = lambda x, y, c: self.px(ox + int(x), oy + int(y), c)
+        legs = int(t * 2) % 2
+        for a in aliens:
+            c = hexrgb(INV_ROWS[a[2]][0])
+            P(a[0], a[1], c)
+            if legs and a[1] + 1 < sh - 4:                       # two frames of "walking" legs, very dim
+                P(a[0], a[1] + 1, tuple(v // 6 for v in c))
+        for x, y in shields:
+            P(x, y, (0, 90, 30))
+        for s in shots:
+            P(s[0], round(s[1]), (255, 255, 255))
+        for b in bombs:
+            P(b[0], round(b[1]), (255, 120, 0) if int(t * 8) % 2 else (255, 40, 0))
+        if ufo is not None:
+            for dx in (-1, 0, 1):
+                P(round(ufo[0]) + dx, 0, (255, 30, 30) if dx else (255, 200, 200))
+        flicker = now - hit_at < 1.5 and int(now * 8) % 2
+        if stt != "over" and not flicker:
+            sx = int(round(ship))
+            for dx in (-1, 0, 1):
+                P(sx + dx, sh - 1, (60, 255, 60))
+            P(sx, sh - 2, (160, 255, 160))
+        for i in range(max(0, lives)):                              # lives, top-left
+            P(i * 2, 0, (60, 255, 60)) if not ufo else None
+        for x, y, at in boom:
+            r = min(1.0, max(0.0, (now - at) / 0.4))
+            for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)):
+                P(x + dx, y + dy, (255, int(255 * (1 - r)), 0) if (dx, dy) == (0, 0) or r > 0.3 else (255, 200, 60))
+        if stt == "ready" and wave > 1 and int(now * 4) % 2:      # new wave: the border blinks
+            for x in range(sw):
+                P(x, sh - 1, (40, 40, 120))
+        if stt == "over" and int((now - died) * 3) % 2:
+            for x in range(sw):
+                P(x, sh - 1, (255, 0, 0))
+        return self.buf
+
+
+# ------------------------------------------------------------------------------- game: race to the star ----
+# Race to the Star (v18): 1 to 8 visitors race up a track (a mega tree, a matrix, any model or group of the show, or a
+# side of the cube); the first to the top lights the star in their colour. Each player climbs with their own effort,
+# measured on their phone and sent about once a second:
+#   tap   - taps per second on a big button (two players can share one phone, one button each)
+#   voice - how loud and how steady their voice is (measured on the phone: no sound is sent)
+#   shake - how hard and how fast they shake the phone (capped, so shaking harder than needed gives nothing)
+#   run   - steps per second running on the spot (from the phone's motion sensor)
+# The phone turns its measure into an effort from 0 to 1; the bridge climbs smoothly, 20 times a second, with the last
+# effort received, and the climber slides down when the effort stops. Players' levels (child, adult, sporty), help
+# for whoever is behind, the race's difficulty, the track, the star and the effects are set on the race panel
+# (http://<bridge-ip>:8099/race).
+RACE_MODES = ("tap", "voice", "shake", "run")
+RACE_LEVELS = ("kid", "adult", "sport")
+RACE_COLS = ["ff2a2a", "2a7bff", "39d353", "ffd23f", "a35cff", "ff8a1a", "2ad4ff", "ff5cc8"]
+RACE_PRESETS = {   # climb: average-effort race length (s); slide: how fast a stopped climber slides (track per s)
+    "easy": {"target": 25, "slide": 0.02, "delay": 2.0},
+    "normal": {"target": 35, "slide": 0.035, "delay": 1.2},
+    "hard": {"target": 45, "slide": 0.06, "delay": 0.6},
+}
+RACE_DEFAULT = {
+    "track": "split",            # split = one track shared; each = a track per player; cube = a side of the cube
+    "models": [],                # the shared track: models (a group is stored as its models)
+    "stars": [],                 # the star(s): any models; none = the top of the track is the star
+    "pairs": [],                 # track per player: [{"track": [models], "star": [models]}]
+    "split": "stripes",          # stripes, halves, rings
+    "front": 0.0,                # halves: turns where the front of the tree is (0..1)
+    "dir": "up",                 # up, down, right, left, order (along the string)
+    "side": 0,                   # cube track: which side (-1 = all)
+    "modes": ["tap", "voice", "shake", "run"],
+    "mix": True,                 # each player picks their own way to play
+    "shared": True,              # two players on one phone (tap)
+    "min": 2, "max": 4,
+    "colours": list(RACE_COLS),
+    "lobby": 30, "early": True,
+    "levels": {"kid": 1.5, "adult": 1.0, "sport": 0.8},
+    "catchup": True,
+    "difficulty": "normal", "target": 35, "slide": 0.035, "delay": 1.2, "max_time": 90,
+    "leader": True, "party": 8, "countdown": True, "rainbow": True, "bright": 100, "bg": "dim",
+}
+RACE_BASE = 970              # renderer numbers of the race's tracks and stars
+
+
+def race_cfg():
+    c = dict(RACE_DEFAULT)
+    c.update(S.get("race") or {})
+    return c
+
+
+def race_clean(b):
+    """checks a race configuration from the panel; returns a clean dict"""
+    c = race_cfg()
+    names = lambda v: [str(x)[:120] for x in v][:64] if isinstance(v, list) else []
+    if b.get("track") in ("split", "each", "cube"):
+        c["track"] = b["track"]
+    if "models" in b:
+        c["models"] = names(b["models"])
+    if "stars" in b:
+        c["stars"] = names(b["stars"])
+    if isinstance(b.get("pairs"), list):
+        c["pairs"] = [{"track": names(p.get("track")), "star": names(p.get("star"))} for p in b["pairs"][:8] if isinstance(p, dict)]
+    if b.get("split") in ("stripes", "halves", "rings"):
+        c["split"] = b["split"]
+    if b.get("dir") in ("up", "down", "right", "left", "order"):
+        c["dir"] = b["dir"]
+    if isinstance(b.get("modes"), list):
+        c["modes"] = [m for m in RACE_MODES if m in b["modes"]] or ["tap"]
+    if b.get("colours") and isinstance(b["colours"], list):
+        cs = [str(x).lower().lstrip("#") for x in b["colours"] if re.fullmatch(r"#?[0-9a-fA-F]{6}", str(x))][:8]
+        if len(cs) >= 2:
+            c["colours"] = cs
+    if isinstance(b.get("levels"), dict):
+        for k in RACE_LEVELS:
+            v = b["levels"].get(k)
+            if isinstance(v, (int, float)) and 0.3 <= v <= 3:
+                c["levels"][k] = float(v)
+    for k, lo, hi in (("front", 0, 1), ("target", 10, 120), ("slide", 0, 0.3), ("delay", 0, 5), ("max_time", 30, 300),
+                      ("party", 3, 20), ("bright", 10, 100), ("lobby", 10, 120), ("min", 1, 8), ("max", 1, 8), ("side", -1, 7)):
+        v = b.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and lo <= v <= hi:
+            c[k] = int(v) if k in ("max_time", "party", "bright", "lobby", "min", "max", "side", "target") else float(v)
+    if c["max"] < c["min"]:
+        c["max"] = c["min"]
+    if b.get("difficulty") in ("easy", "normal", "hard", "custom"):
+        c["difficulty"] = b["difficulty"]
+        if b["difficulty"] in RACE_PRESETS:
+            c.update(RACE_PRESETS[b["difficulty"]])
+    if b.get("bg") in ("dim", "off"):
+        c["bg"] = b["bg"]
+    for k in ("mix", "shared", "early", "catchup", "leader", "countdown", "rainbow"):
+        if k in b:
+            c[k] = bool(b[k])
+    return c
+
+
+def model_geoms(prop):
+    """[PropGeom] for any list of models (a prop, a race track, a star); cached until the show changes"""
+    key = (json.dumps(prop, sort_keys=True), ezp_state.get("layoutVersion"))
+    hit = model_geoms_cache.get(key)
+    if hit is not None:
+        return hit
+    tg = {t["model"]: t for t in (ezp_state["targets"] or ezp_targets())}
+    geoms, raw = [], None
+    for m in prop["models"]:
+        t = tg.get(m)
+        if not t:
+            log("%s: model %s is not in the EZPlayer show" % (prop["n"], m))
+            continue
+        if t.get("w") and t.get("h"):
+            w, h = t["w"], t["h"]
+            if w * h > 40000:
+                k = math.sqrt(40000 / (w * h))
+                w, h = max(1, int(w * k)), max(1, int(h * k))
+            geoms.append(["grid", m, w, h])
+            continue
+        raw = raw or coords_raw()
+        c = model_coords(raw, m)
+        nodes = (c or {}).get("nodes") or []
+        if not nodes or len(nodes) != t.get("nodes", len(nodes)):
+            log("%s: no pixel positions for %s" % (prop["n"], m))
+            continue
+        xs, ys = [], []
+        for nd in nodes:
+            k = (nd.get("coords") or [{}])[0]
+            if not prop.get("across") and "bufX" in k:
+                xs.append(float(k["bufX"])); ys.append(float(k["bufY"]))
+            else:
+                xs.append(float(k.get("wX", 0))); ys.append(float(k.get("wY", 0)))
+        geoms.append(["nodes", m, xs, ys])
+    allx = [x for g in geoms if g[0] == "nodes" for x in g[2]]
+    ally = [y for g in geoms if g[0] == "nodes" for y in g[3]]
+    out = []
+    for g in geoms:
+        if g[0] == "grid":
+            _, m, w, h = g
+            u = [x / max(1, w - 1) for y in range(h) for x in range(w)]
+            v = [1 - y / max(1, h - 1) for y in range(h) for x in range(w)]
+            out.append(PropGeom(m, "grid", w * h, u, v, w, h))
+            continue
+        _, m, xs, ys = g
+        bx, by = (allx, ally) if prop.get("across") else (xs, ys)
+        x0, x1, y0, y1 = min(bx), max(bx), min(by), max(by)
+        u = [(x - x0) / ((x1 - x0) or 1) for x in xs]
+        v = [(y - y0) / ((y1 - y0) or 1) for y in ys]
+        out.append(PropGeom(m, "nodes", len(xs), u, v))
+    if len(model_geoms_cache) > 64:
+        model_geoms_cache.clear()
+    model_geoms_cache[key] = out
+    return out
+
+
+model_geoms_cache = {}
+
+
+class RaceTrack:
+    """a track: for each pixel, its lane (which player) and how far up it is (0 = start, 1 = the top)"""
+    def __init__(self, geoms, nplayers, cfg, lane_fixed=None):
+        self.geoms, self.cfg = geoms, cfg
+        total = sum(g.n for g in geoms) or 1
+        self.prog, self.lane = [], []
+        k = 0
+        for g in geoms:
+            d = cfg["dir"]
+            if d == "order":
+                p = [(k + i) / max(1, total - 1) for i in range(g.n)]
+            else:
+                p = {"up": g.v, "down": [1 - y for y in g.v], "right": g.u, "left": [1 - x for x in g.u]}[d]
+                p = list(p)
+            k += g.n
+            across = g.v if d in ("right", "left") else g.u              # the other direction splits the lanes
+            if lane_fixed is not None:
+                ln = [lane_fixed] * g.n
+            elif cfg["split"] == "stripes":
+                cols = sorted({round(x, 3) for x in across})
+                idx = {c: i for i, c in enumerate(cols)}
+                ln = [idx[round(x, 3)] % max(1, nplayers) for x in across]
+            elif cfg["split"] == "halves":
+                ln = [min(nplayers - 1, int(((x + cfg["front"]) % 1.0) * nplayers)) for x in across]
+            else:
+                ln = [-1] * g.n                                          # rings: every pixel shows every player
+            self.prog.append(p)
+            self.lane.append(ln)
+
+    def frames(self, players, now, state, winner, cfg, t):
+        bright = cfg["bright"] / 100
+        out = []
+        for gi, g in enumerate(self.geoms):
+            buf = bytearray(g.n * 3)
+            prog, lane = self.prog[gi], self.lane[gi]
+            for i in range(g.n):
+                p, ln = prog[i], lane[i]
+                c = None
+                if state == "over" and winner is not None:            # the party: rainbow climbing, winner's colour
+                    c = hsv((p * 0.8 - t * 0.6) % 1, 1, 1) if cfg["rainbow"] else hexrgb(players[winner]["c"])
+                elif ln == -1:                                          # rings: a band at each climber's height
+                    near = [j for j, pl in enumerate(players) if abs(p - pl["h"]) < 0.05]
+                    if near:
+                        c = hexrgb(players[near[int(t * 4) % len(near)]]["c"])
+                elif 0 <= ln < len(players):
+                    pl = players[ln]
+                    col = hexrgb(pl["c"])
+                    if state == "lobby" and pl.get("blink", 0) > now:
+                        c = col if int(now * 6) % 2 else None
+                    elif state in ("race", "over") and p <= pl["h"]:
+                        c = col if pl["h"] - p > 0.04 else tuple(min(255, v + 90) for v in col)   # a bright head
+                    elif state == "countdown":
+                        c = col if p < (now % 1.0) else None
+                    elif cfg["bg"] == "dim":
+                        c = tuple(v // 14 for v in col)
+                if c:
+                    o = i * 3
+                    buf[o] = int(c[0] * bright); buf[o + 1] = int(c[1] * bright); buf[o + 2] = int(c[2] * bright)
+            out.append(bytes(buf))
+        return out
+
+
+class RaceAnim:
+    """all the race's tracks and stars, sent to EZPlayer as one item (one overlay per model)"""
+    def __init__(self, race):
+        self.race, self.geoms, self.tracks, self.stars, self.sig = race, [], [], [], None
+
+    def build(self, cfg, n):
+        sig = (json.dumps(cfg, sort_keys=True), n, ezp_state.get("layoutVersion"))
+        if sig == self.sig:
+            return
+        self.sig, self.tracks, self.stars = sig, [], []
+        if cfg["track"] == "each":
+            for j, pr in enumerate(cfg["pairs"][:n]):
+                tg = model_geoms({"n": "race track %d" % (j + 1), "models": pr["track"], "across": True}) if pr["track"] else []
+                sg = model_geoms({"n": "race star %d" % (j + 1), "models": pr["star"], "across": True}) if pr["star"] else []
+                if tg:
+                    self.tracks.append((RaceTrack(tg, n, cfg, lane_fixed=j), j))
+                if sg:
+                    self.stars.append((sg, j))
+        else:
+            tg = model_geoms({"n": "race track", "models": cfg["models"], "across": True}) if cfg["models"] else []
+            if tg:
+                self.tracks.append((RaceTrack(tg, n, cfg), None))
+            if cfg["stars"]:
+                self.stars.append((model_geoms({"n": "race star", "models": cfg["stars"], "across": True}), None))
+        self.geoms = [g for tr, _ in self.tracks for g in tr.geoms] + [g for sg, _ in self.stars for g in sg]
+
+    def frames(self, t):
+        r = self.race
+        with r.lock:
+            cfg, players, state, winner, now = r.cfg, [dict(p) for p in r.players], r.st, r.winner, time.time()
+        self.build(cfg, max(1, len(players)))
+        out = []
+        for tr, _ in self.tracks:
+            out += tr.frames(players, now, state, winner, cfg, t)
+        star_col = race_star_colour(players, state, winner, cfg, now)
+        for sg, owner in self.stars:
+            for g in sg:
+                c = star_col
+                if owner is not None and owner < len(players):          # a star per player: theirs glows with their height
+                    pl = players[owner]
+                    k = 1.0 if (state == "over" and winner == owner and int(now * 4) % 2) else (0.1 + 0.6 * pl["h"]) if state == "race" else 0.15
+                    c = tuple(int(v * k) for v in hexrgb(pl["c"])) if state != "over" or winner == owner else (0, 0, 0)
+                out.append(bytes(c or (0, 0, 0)) * g.n)
+        if not self.stars and self.tracks and star_col:                    # no star: the top of the track is the star
+            k = 0
+            for tr, _ in self.tracks:
+                for gi in range(len(tr.geoms)):
+                    buf = bytearray(out[k])
+                    for i, p in enumerate(tr.prog[gi]):
+                        if p > 0.94:
+                            buf[i * 3:i * 3 + 3] = bytes(star_col)
+                    out[k] = bytes(buf)
+                    k += 1
+        return out
+
+
+def race_star_colour(players, state, winner, cfg, now):
+    if state == "over" and winner is not None:
+        return hexrgb(players[winner]["c"]) if int(now * 4) % 2 else (40, 40, 40)
+    if state == "race" and cfg["leader"] and players:
+        lead = max(range(len(players)), key=lambda j: players[j]["h"])
+        return tuple(int(v * 0.5) for v in hexrgb(players[lead]["c"]))
+    if state == "countdown":
+        return (255, 255, 255) if now % 1.0 < 0.15 else None
+    return None
+
+
+class RaceSideAnim(Anim):
+    """the race on a side of the cube: a lane (columns) per player, the star at the top"""
+    def frame(self, t):
+        r = game.all["race"]
+        r.step(time.time())
+        with r.lock:
+            cfg, players, state, winner = r.cfg, [dict(p) for p in r.players], r.st, r.winner
+        now = time.time()
+        w, h = self.w, self.h
+        self.buf[:] = bytes(len(self.buf))
+        n = max(1, len(players))
+        top = 2
+        for x in range(w):
+            j = min(n - 1, x * n // w)
+            if j >= len(players):
+                continue
+            pl = players[j]
+            col = hexrgb(pl["c"])
+            for y in range(top, h):
+                p = (h - 1 - y) / max(1, h - 1 - top)
+                if state == "over" and winner is not None:
+                    c = hsv((p - t * 0.6) % 1, 1, 1)
+                elif state in ("race", "over") and p <= pl["h"]:
+                    c = col
+                elif state == "lobby" and pl.get("blink", 0) > now and int(now * 6) % 2:
+                    c = col
+                elif state == "countdown" and p < now % 1.0:
+                    c = col
+                else:
+                    c = tuple(v // 14 for v in col) if cfg["bg"] == "dim" else None
+                if c:
+                    self.px(x, y, c)
+        sc = race_star_colour(players, state, winner, cfg, now)
+        if sc:
+            for x in range(w // 2 - 2, w // 2 + 2):
+                for y in range(top):
+                    self.px(x, y, sc)
+        return self.buf
+
+
+class Race:
+    CODE, NAME = "race", "Race to the Star"
+
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.v = 0
+        self.reset()
+
+    def reset(self):
+        self.st, self.id, self.z = "idle", "", -1
+        self.players = []          # {"p": phone secret, "t": tag, "slot": 0 or 1 (shared phone), "c", "m", "l", "h", "e", "e_at", "seen"}
+        self.cfg = race_cfg()
+        self.winner = None
+        self.t0 = self.until = 0.0
+        self.last = 0.0
+        self.test = False
+        self.why = ""
+        self.posted_at = 0.0
+        self.v += 1
+
+    def sides(self):
+        with self.lock:
+            if self.st == "idle" or self.cfg["track"] != "cube" or not S["faces"]:
+                return []
+            z = self.cfg.get("side", 0)
+            return list(range(len(S["faces"]))) if z == -1 else [z] if 0 <= z < len(S["faces"]) else [0]
+
+    def state(self):
+        with self.lock:
+            return {"g": self.CODE, "st": self.st, "id": self.id, "tags": [p["t"] for p in self.players],
+                    "players": [{"t": p["t"], "s": p["slot"], "c": p["c"], "m": p["m"], "l": p["l"], "h": round(p["h"], 2)} for p in self.players],
+                    "n": len(self.players), "winner": self.winner, "why": self.why, "test": self.test,
+                    "modes": self.cfg["modes"], "mix": self.cfg["mix"], "shared": self.cfg["shared"], "colours": self.cfg["colours"],
+                    "max": self.cfg["max"], "min": self.cfg["min"], "early": self.cfg["early"],
+                    "left": max(0, int(self.until - time.time())), "v": self.v, "at": int(time.time())}
+
+    def ok_choice(self, c, m, l):
+        cfg = self.cfg
+        return c in cfg["colours"] and m in cfg["modes"] and l in RACE_LEVELS
+
+    def add_player(self, pid, tag, slot, c, m, l):
+        if c in [p["c"] for p in self.players]:      # colour taken: the next free one
+            free = [x for x in self.cfg["colours"] if x not in [p["c"] for p in self.players]]
+            if not free:
+                return False
+            c = free[0]
+        self.players.append({"p": pid, "t": tag, "slot": slot, "c": c, "m": m, "l": l, "h": 0.0, "e": 0.0, "e_at": 0.0,
+                             "seen": time.time(), "blink": time.time() + 2.5})
+        return True
+
+    def msg(self, m):
+        a, pid, tag = m.get("a"), str(m.get("p", "")), str(m.get("tag", ""))
+        if not PID_RE.fullmatch(pid):
+            return "bad player"
+        with self.lock:
+            if a == "new":
+                if self.st not in ("idle", "over"):
+                    return "a race is already on"
+                if not TAG_RE.fullmatch(tag):
+                    return "bad request"
+                self.reset()
+                cfg = self.cfg
+                if cfg["track"] != "cube" and not ezp_state["ok"]:
+                    return "EZPlayer is not answering"
+                if cfg["track"] == "split" and not cfg["models"]:
+                    return "no track set up"
+                if cfg["track"] == "each" and not cfg["pairs"]:
+                    return "no tracks set up"
+                c, md, lv = m.get("c"), m.get("m"), m.get("l")
+                if not self.ok_choice(c, md, lv):
+                    return "bad choice"
+                self.id = secrets.token_hex(3)
+                self.add_player(pid, tag, 0, c, md, lv)
+                if m.get("two") and cfg["shared"] and md == "tap" and cfg["max"] >= 2:
+                    self.add_player(pid, tag, 1, m.get("c2") if m.get("c2") in cfg["colours"] else c, "tap", m.get("l2") if m.get("l2") in RACE_LEVELS else lv)
+                self.st, self.until = "lobby", time.time() + cfg["lobby"]
+                log("game: Race to the Star, waiting for players")
+                self.v += 1
+                return ""
+            if m.get("id") != self.id:
+                return "old race"
+            mine = [p for p in self.players if p["p"] == pid]
+            if a == "join":
+                if self.st != "lobby" or mine or not TAG_RE.fullmatch(tag):
+                    return "cannot join"
+                c, md, lv = m.get("c"), m.get("m"), m.get("l")
+                if not self.ok_choice(c, md, lv) or len(self.players) >= self.cfg["max"]:
+                    return "cannot join"
+                if not self.cfg["mix"] and self.players and md != self.players[0]["m"]:
+                    md = self.players[0]["m"]
+                self.add_player(pid, tag, 0, c, md, lv)
+                if m.get("two") and self.cfg["shared"] and md == "tap" and len(self.players) < self.cfg["max"]:
+                    self.add_player(pid, tag, 1, m.get("c2") if m.get("c2") in self.cfg["colours"] else c, "tap",
+                                    m.get("l2") if m.get("l2") in RACE_LEVELS else lv)
+                self.v += 1
+                return ""
+            if not mine:
+                return "not a player"
+            if a == "blink":           # "where am I?": the player's lane flashes
+                for p in mine:
+                    p["blink"] = time.time() + 2.5
+                return ""
+            if a == "start":
+                if self.st != "lobby" or self.players[0]["p"] != pid or not self.cfg["early"] or len(self.players) < self.cfg["min"]:
+                    return "not now"
+                self.go()
+                return ""
+            if a == "e":                # effort, about once a second
+                e = m.get("e")
+                es = e if isinstance(e, list) else [e]
+                now = time.time()
+                for p in mine:
+                    v = es[p["slot"]] if p["slot"] < len(es) else None
+                    if isinstance(v, (int, float)) and not isinstance(v, bool) and now - p.get("e_rx", 0) > 0.3:
+                        p["e"], p["e_at"], p["e_rx"], p["seen"] = max(0.0, min(1.0, float(v))), now, now, now
+                return ""
+            if a == "quit":
+                self.players = [p for p in self.players if p["p"] != pid]
+                if self.st == "lobby" and not self.players:
+                    self.finish(None, "everyone left")
+                elif self.st in ("countdown", "race") and not self.players:
+                    self.finish(None, "everyone left")
+                self.v += 1
+                return ""
+        return "?"
+
+    def go(self):
+        self.st = "countdown" if self.cfg["countdown"] else "race"
+        self.t0 = time.time() + (3.0 if self.cfg["countdown"] else 0)
+        self.until = self.t0 + self.cfg["max_time"]
+        for p in self.players:
+            p["h"], p["e"], p["e_at"] = 0.0, 0.0, 0.0
+        log("game: Race to the Star starts with %d player(s)" % len(self.players))
+        self.v += 1
+
+    def finish(self, winner, why):
+        self.st, self.winner, self.why = "over", winner, why
+        self.until = time.time() + self.cfg["party"]
+        if winner is not None:
+            log("game over: Race to the Star, player %d wins" % (winner + 1))
+        else:
+            log("game over: Race to the Star,", why)
+        self.v += 1
+
+    def step(self, now):
+        """climbs and slides (called every frame by the drawing)"""
+        with self.lock:
+            dt = min(0.2, max(0.0, now - (self.last or now)))
+            self.last = now
+            if self.st == "countdown" and now >= self.t0:
+                self.st = "race"
+                self.v += 1
+            if self.st != "race":
+                return
+            cfg = self.cfg
+            k = 1.0 / (0.6 * cfg["target"])                     # an effort of 0.6 climbs the track in "target" seconds
+            lead = max((p["h"] for p in self.players), default=0)
+            for p in self.players:
+                if self.test:                                   # the panel's test race: pretend players
+                    p["e"], p["e_at"] = max(0.0, min(1.0, 0.55 + 0.35 * math.sin(now * (0.7 + p["slot"] * 0.3 + hash(p["c"]) % 7 * 0.11)))), now
+                fresh = now - p["e_at"] < max(1.6, cfg["delay"] + 0.4)
+                e = p["e"] if fresh else 0.0
+                if e > 0.05:
+                    help_ = 1.0 + (min(0.6, (lead - p["h"]) * 1.5) if cfg["catchup"] else 0.0)
+                    p["h"] = min(1.0, p["h"] + e * k * cfg["levels"].get(p["l"], 1.0) * help_ * dt)
+                elif now - p["e_at"] > cfg["delay"]:
+                    p["h"] = max(0.0, p["h"] - cfg["slide"] * dt)
+                if p["h"] >= 1.0:
+                    self.finish(self.players.index(p), "reached the star")
+                    return
+            if now - self.posted_at > 3:                          # the phones see the positions every 3 s
+                self.posted_at = now
+                self.v += 1
+
+    def tick(self):
+        with self.lock:
+            now = time.time()
+            if self.st != "idle" and not S["on"] and not self.test:
+                self.reset()
+                return
+            if self.st == "lobby" and now > self.until:
+                if len(self.players) >= self.cfg["min"]:
+                    self.go()
+                else:
+                    self.finish(None, "not enough players")
+            elif self.st == "race" and now > self.until:
+                best = max(range(len(self.players)), key=lambda j: self.players[j]["h"]) if self.players else None
+                self.finish(best, "time up")
+            elif self.st == "over" and now > self.until:
+                self.reset()
+
+    def start_test(self, n):
+        """the panel's test race: pretend players climb, to see the track, the lanes and the colours"""
+        with self.lock:
+            if self.st in ("lobby", "countdown", "race") and not self.test:
+                return "a race is on"
+            self.reset()
+            self.test = True
+            self.id = "test"
+            for j in range(max(1, min(self.cfg["max"], n))):
+                self.add_player("t" * 16, "test%02d" % j, j, self.cfg["colours"][j % len(self.cfg["colours"])], "tap", "adult")
+            self.go()
+            return ""
+
+
+race_anim = None
+
+
+def race_items(items):
+    """render_loop: the race's tracks and stars on EZPlayer models (the cube track goes through the games' sides)"""
+    global race_anim
+    r = game.all.get("race")
+    if r is None or game.cur is not r or r.st == "idle" or r.cfg["track"] == "cube":
+        return items
+    r.step(time.time())
+    if race_anim is None or race_anim.race is not r:
+        race_anim = RaceAnim(r)
+    return list(items) + [(RACE_BASE, {"anim": race_anim, "t0": 0.0})]
+
+
+class GameHub:
+    """the games visitors can play; one game at a time on the cube"""
+    def __init__(self):
+        self.all = {"c4": FourInARow(), "ttt": TicTacToe(), "simon": Simon(), "count": CountColours(), "snake": Snake(), "pong": Pong(), "invaders": Invaders(), "race": Race()}
+        self.cur = self.all["c4"]
+
+    @property
+    def v(self):
+        return (self.cur.CODE, self.cur.v)
+
+    @property
+    def st(self):
+        return self.cur.st
+
+    def sides(self):
+        return self.cur.sides()
+
+    def state(self):
+        return self.cur.state()
+
+    def tick(self):
+        self.cur.tick()
+
+    def msg(self, m):
+        g = self.all.get(m.get("g")) if m.get("g") in GAMES else None
+        if g is None:
+            return "unknown game"
+        if g is not self.cur:
+            if self.cur.st not in ("idle", "over"):
+                return "another game is being played"
+            if m.get("a") != "new":
+                return "old game"
+            with self.cur.lock:
+                self.cur.reset()
+            self.cur = g
+        return g.msg(m)
+
+    def anim(self, w, h):
+        return {"c4": C4Anim, "ttt": TTTAnim, "simon": SimonAnim, "count": CountAnim, "snake": SnakeAnim, "pong": PongAnim, "invaders": InvadersAnim, "race": RaceSideAnim}[self.cur.CODE](w, h)
+
+    def start_crew(self, code, mode, z):
+        """a game started from the Mixer page (Pong, Space Invaders), when no other game is being played"""
+        g = self.all[code]
+        if g is not self.cur:
+            if self.cur.st not in ("idle", "over"):
+                return "another game is being played"
+            with self.cur.lock:
+                self.cur.reset()
+            self.cur = g
+        if not S["faces"]:
+            return "no sides"
+        if g.st in ("ready", "playing") and getattr(g, "mode", "") == "visitor":
+            return "a visitor is playing " + g.NAME
+        if code == "invaders":
+            if not isint(z) or z < -1 or z >= len(S["faces"]):
+                return "bad side"
+            with g.lock:
+                g.begin("crew", z)
+            return ""
+        return g.start(mode, z)
+
+    def start_pong(self, mode, z):
+        """Pong starts from the Mixer page, when no other game is being played"""
+        g = self.all["pong"]
+        if g is self.cur and g.st == "playing" and g.mode == "visitor":
+            return "a visitor is playing Pong"
+        if g is not self.cur:
+            if self.cur.st not in ("idle", "over"):
+                return "another game is being played"
+            with self.cur.lock:
+                self.cur.reset()
+            self.cur = g
+        return g.start(mode, z)
+
+
+GAMES = ("c4", "ttt", "simon", "count", "snake", "invaders", "pong", "race")   # games visitors can play (Pong is played from the Mixer page)
+game = GameHub()
 
 
 def game_loop():
@@ -1068,12 +2948,13 @@ def game_loop():
     posted, fails = -1, 0
     while True:
         game.tick()
-        if game.v != posted and S["topic"]:
+        v = game.v
+        if v != posted and S["topic"]:
             st = game.state()
             try:
                 urllib.request.urlopen(urllib.request.Request(RELAY + S["topic"] + "-game", data=json.dumps(st).encode(),
                                                               headers={"Cache": "yes"}), timeout=10).read()
-                posted, fails = st["v"], 0
+                posted, fails = v, 0
             except Exception as e:
                 fails += 1
                 if fails in (1, 10):
@@ -1087,7 +2968,7 @@ class C4Anim(Anim):
     """the board on a side of the cube: 7 columns x 6 rows, a strip on top with the colour of whose turn it is"""
     def frame(self, t):
         w, h = self.w, self.h
-        st = game
+        st = game.all["c4"]
         with st.lock:
             b, stt, turn, last, last_at, win, winner, cols = list(st.b), st.st, st.turn, st.last, st.last_at, list(st.win), st.winner, st.colours
         c1, c2 = hexrgb(cols[0]), hexrgb(cols[1])
@@ -1267,56 +3148,7 @@ prop_geoms = {}       # prop number -> (settings it was made for, [PropGeom])
 
 def prop_geometry(pi):
     prop = S["props"][pi]
-    key = (json.dumps(prop, sort_keys=True), ezp_state.get("layoutVersion"))
-    if prop_geoms.get(pi, (None,))[0] == key:
-        return prop_geoms[pi][1]
-    tg = {t["model"]: t for t in (ezp_state["targets"] or ezp_targets())}
-    geoms, raw = [], None
-    for m in prop["models"]:
-        t = tg.get(m)
-        if not t:
-            log("prop %s: model %s is not in the EZPlayer show" % (prop["n"], m))
-            continue
-        if t.get("w") and t.get("h"):   # a grid (matrix, tree): the bridge draws the grid, EZPlayer maps it
-            w, h = t["w"], t["h"]
-            if w * h > 40000:            # very big matrices are drawn smaller and EZPlayer enlarges them
-                k = math.sqrt(40000 / (w * h))
-                w, h = max(1, int(w * k)), max(1, int(h * k))
-            u = [x / max(1, w - 1) for y in range(h) for x in range(w)]
-            v = [1 - y / max(1, h - 1) for y in range(h) for x in range(w)]
-            geoms.append(PropGeom(m, "grid", w * h, u, v, w, h))
-            continue
-        raw = raw or coords_raw()
-        c = model_coords(raw, m)
-        nodes = (c or {}).get("nodes") or []
-        if not nodes or len(nodes) != t.get("nodes", len(nodes)):
-            log("prop %s: no pixel positions for %s" % (prop["n"], m))
-            continue
-        xs, ys = [], []
-        across = prop.get("across")
-        for nd in nodes:
-            k = (nd.get("coords") or [{}])[0]
-            if not across and "bufX" in k:
-                xs.append(float(k["bufX"])); ys.append(float(k["bufY"]))
-            else:
-                xs.append(float(k.get("wX", 0))); ys.append(float(k.get("wY", 0)))
-        geoms.append([m, xs, ys])
-    # positions to 0..1: each model on its own grid, or the whole prop together ("across")
-    out = []
-    allx = [x for g in geoms if isinstance(g, list) for x in g[1]]
-    ally = [y for g in geoms if isinstance(g, list) for y in g[2]]
-    for g in geoms:
-        if not isinstance(g, list):
-            out.append(g)
-            continue
-        m, xs, ys = g
-        bx, by = (allx, ally) if prop.get("across") else (xs, ys)
-        x0, x1, y0, y1 = min(bx), max(bx), min(by), max(by)
-        u = [(x - x0) / ((x1 - x0) or 1) for x in xs]
-        v = [(y - y0) / ((y1 - y0) or 1) for y in ys]
-        out.append(PropGeom(m, "nodes", len(xs), u, v))
-    prop_geoms[pi] = (key, out)
-    return out
+    return model_geoms({"n": "prop " + prop["n"], "models": prop["models"], "across": bool(prop.get("across"))})
 
 
 class PropFx:
@@ -1552,8 +3384,18 @@ def add(msg, att=None):
         m = json.loads(msg)
     except Exception:
         m = None
+    if isinstance(m, dict) and m.get("k") == "sing":   # a recording to sing (WAV attached to the message)
+        why = sing_msg(m, att)
+        if why:
+            log("sing request refused:", why)
+        return
+    if isinstance(m, dict) and m.get("k") == "play":   # play the lights: taps, joining and leaving the queue
+        why = play_msg(m)
+        if why and m.get("a") != "tap":
+            log("play request refused:", why)
+        return
     if isinstance(m, dict) and m.get("k") == "game":   # game moves: checked by the game itself (whose turn, which game)
-        if not S.get("games") or m.get("g") != "c4":
+        if not S.get("games") or m.get("g") not in S.get("game_list", GAMES):
             return
         why = game.msg(m)
         if why and m.get("a") != "move":
@@ -1711,12 +3553,13 @@ def render_loop():
             items = [(i, a) for i, a in items if i not in gs]
             for i in gs:
                 f = S["faces"][i]
-                if i not in game_anims or (game_anims[i]["anim"].w, game_anims[i]["anim"].h) != (f["w"], f["h"]):
-                    game_anims[i] = {"anim": C4Anim(f["w"], f["h"]), "t0": t0}
+                ga = game_anims.get(i)
+                if ga is None or (ga["anim"].w, ga["anim"].h) != (f["w"], f["h"]) or ga.get("g") != game.cur.CODE:
+                    game_anims[i] = {"anim": game.anim(f["w"], f["h"]), "t0": t0, "g": game.cur.CODE}
                 items.append((i, game_anims[i]))
         else:
             game_anims.clear()
-        items = keys_items(mix_items(items), t0)   # the Mixer and the Keys go on top of everything else
+        items = sing_items(keys_items(mix_items(race_items(items)), t0))   # the Mixer, the Keys and a singer go on top of everything else
         live = {i for i, _ in items}
         live_models = set()
         for i, a in items:
@@ -1880,7 +3723,7 @@ def show_loop():
                 active.pop(i, None)     # the overlay closes and the side goes back to the show
             log("finished:", face_name(i))
         mx = sorted(mix_live_nums())
-        now_showing["what"] = " · ".join([shown[i] for i in sorted(shown)] + (["four in a row (%s)" % game.st] if game.sides() else []) +
+        now_showing["what"] = " · ".join([shown[i] for i in sorted(shown)] + (["%s (%s)" % (game.cur.NAME, game.st)] if game.sides() else []) +
                                          (["mixer: " + ", ".join(face_name(i) for i in mx)] if mx else []))
         if not started:
             time.sleep(0.2)
@@ -1893,7 +3736,10 @@ def publish_status():
         on = bool(S["on"] and (S["faces"] or (S.get("props") and ezp_state["ok"])) and
                   (ezp_state["ok"] or not any(f.get("out") == "ezp" for f in S["faces"])))
         body = json.dumps({"on": on, "faces": [{"n": f.get("n", ""), "w": f["w"], "h": f["h"]} for f in S["faces"]],
-                           "theme": S["theme"], "free": S["free"], "wait": S["wait"], "title": S.get("title", ""), "games": bool(S.get("games")),
+                           "theme": S["theme"], "free": S["free"], "wait": S["wait"], "title": S.get("title", ""), "games": bool(S.get("games")) and bool(S.get("game_list", GAMES)),
+                           "gl": [g for g in GAMES if g in S.get("game_list", GAMES)], "play": play_on(), "sing": sing_on(),
+                           "race": {k: race_cfg()[k] for k in ("modes", "colours", "shared", "mix", "max", "min", "early")},
+                           "singers": [{"k": k, "n": n, "e": e} for k, n, e, kind, on in sing_list() if on][:30],
                            "props": [{"n": p["n"], "e": p.get("e", "")} for p in S.get("props", [])] if ezp_state["ok"] else [],
                            "at": int(time.time())}).encode()
         urllib.request.urlopen(urllib.request.Request(RELAY + S["topic"] + "-status", data=body, headers={"Cache": "yes"}), timeout=10).read()
@@ -2209,7 +4055,7 @@ def mix_watch():
 KEYS_MAX = 128
 KEY_BASE = 900        # renderer number of the keys' models (one overlay for each model that is sounding)
 KEY_DEFAULT = {"fx": "solid", "pal": "", "hue": 0.0, "white": 0.0, "level": 1.0}
-KEYS = {"down": {}, "env": {}, "set": {}, "attack": 0.0, "release": 0.35, "hue": 0.0}
+KEYS = {"down": {}, "env": {}, "set": {}, "col": {}, "attack": 0.0, "release": 0.35, "hue": 0.0}   # col: a visitor's colour
 key_geoms = {}        # key id -> PropGeom (a model) — filled in the background
 key_objs = {}         # key id -> (signature, effect engine)
 keys_loading = [False]
@@ -2253,10 +4099,15 @@ def keys_reset():
 def key_setting(k, n):
     st = dict(KEY_DEFAULT, hue=(n * 0.13) % 1.0)   # keys start with different colours, like a rainbow keyboard
     st.update(KEYS["set"].get(k) or {})
+    if KEYS["col"].get(k):          # a visitor playing the lights picked this colour
+        st.update(fx="solid", pal="", fixcol=KEYS["col"][k])
     return st
 
 
 def key_cols(st):
+    if st.get("fixcol"):
+        c = hexrgb(st["fixcol"])
+        return [st["fixcol"]] + ["%02x%02x%02x" % tuple(int(v * k) for v in c) for k in (0.75, 0.5)]
     if st["pal"] in PALETTES:
         return mix_cols(dict(st, hue=(st["hue"] + KEYS["hue"]) % 1.0 if st["pal"] else st["hue"]))
     import colorsys
@@ -2269,7 +4120,7 @@ def key_cols(st):
 
 
 def key_engine(k, st, geom):
-    sig = (st["fx"], st["pal"], round(st["hue"], 3), round(st["white"], 3), round(KEYS["hue"], 3), geom.n)
+    sig = (st["fx"], st["pal"], round(st["hue"], 3), round(st["white"], 3), round(KEYS["hue"], 3), geom.n, st.get("fixcol"))
     cur = key_objs.get(k)
     if cur and cur[0][1:] == sig[1:] and cur[0][0] == sig[0]:
         return cur[1]
@@ -2287,8 +4138,8 @@ def keys_levels(now, dt):
     out = {}
     with lock:
         down, env = KEYS["down"], KEYS["env"]
-        for k in [k for k, d in down.items() if now - d["seen"] > 4]:   # the phone went away while holding a key
-            down.pop(k)
+        for k in [k for k, d in down.items() if now - d["seen"] > 4 or now > d.get("off_at", float("inf"))]:
+            down.pop(k)   # the phone went away while holding a key, or a visitor's tap is over
         a, r = KEYS["attack"], KEYS["release"]
         for k in set(down) | set(env):
             cur = env.get(k, 0.0)
@@ -2407,6 +4258,7 @@ def keys_action(b):
             if not isinstance(k, str) or k not in {x[0] for x in keys_list()}:
                 return False
         if a == "on":
+            KEYS["col"].pop(k, None)   # the crew plays it: its own colour again
             v = max(0.05, min(1.0, float(b["v"]))) if num(b.get("v")) else 0.8
             KEYS["down"][k] = {"vel": v, "after": None, "seen": float("inf") if b.get("midi") else now}
         elif a == "after":
@@ -2472,7 +4324,7 @@ def midi_controls():
     c = ["fader:bright", "fader:speed", "fader:hue", "fader:white", "keys:attack", "keys:release", "keys:hue",
          "hold:flash", "hold:strobe", "hold:black", "release", "off"]
     c += ["pad:" + k for k in PROP_FX] + ["cube:" + k for k in FX_NAMES] + ["pal:" + k for k in PALETTES]
-    c += ["scene:%d" % n for n in range(8)] + ["pals:all"] + ["target:" + k for k, _, _, _ in mix_targets()] + ["key:" + k for k, _, _ in keys_list()]
+    c += ["scene:%d" % n for n in range(8)] + ["pals:all", "game:p1", "game:p2", "game:ship", "game:fire", "game:left", "game:right"] + ["target:" + k for k, _, _, _ in mix_targets()] + ["key:" + k for k, _, _ in keys_list()]
     return set(c)
 
 
@@ -2489,6 +4341,17 @@ def midi_press(cid, down, v=1.0):
     kind, _, arg = cid.partition(":")
     if kind == "fader":
         mix_action({"a": "fader", "name": arg, "v": v})
+    elif kind == "game":   # Pong paddles and the Space Invaders ship, from knobs, faders and pads
+        inv = game.all["invaders"]
+        if arg in ("p1", "p2"):
+            game.all["pong"].set_pad(0 if arg == "p1" else 1, 1 - v)
+        elif arg == "ship":
+            inv.crew_move(x=v)
+        elif arg == "fire":
+            if down and v > 0:
+                inv.crew_fire()
+        elif arg in ("left", "right"):
+            inv.crew_move(d=(-1 if arg == "left" else 1) if down else 0)
     elif kind == "pals":   # a knob going through the palettes
         mix_action({"a": "pal", "pal": list(PALETTES)[min(len(PALETTES) - 1, int(v * len(PALETTES)))]})
     elif kind == "keys":
@@ -2574,7 +4437,7 @@ def midi_in(st, d1=0, d2=0):
         cid = maps.get("c%d:%d" % (ch, d1)) or (MIDI_CC_DEFAULT.get(d1) if not any(v == MIDI_CC_DEFAULT.get(d1) for v in maps.values()) else None)
         if cid:
             kind = cid.split(":")[0]
-            if kind in ("fader", "keys", "pals"):
+            if kind in ("fader", "keys", "pals") or cid in ("game:p1", "game:p2", "game:ship"):
                 midi_press(cid, True, d2 / 127)
             else:              # a button sending CC: pressed above the middle
                 midi_press(cid, d2 >= 64, 1.0)
@@ -2756,6 +4619,608 @@ def midi_action(b):
     return True
 
 
+# ---------------------------------------------------------------------------------- play the lights ----
+# "Play the lights": visitors take turns (30 s by default) to play the models of chosen props from their phone, like
+# the Keys of the Mixer page but safe for the public: taps only (each tap lights a model for a moment), a colour of
+# their choice, no strobe or blackout, one visitor at a time with a queue. The phone gathers its taps for half a
+# second into one message, so a turn stays well inside the relay's free limits. The turn and the queue are posted on
+# "<code>-play" for the phones.
+PLAY_COLS = ("ff2a2a", "ff8a1a", "ffd23f", "39d353", "2ad4ff", "2a7bff", "a35cff", "ff5cc8", "ffffff")
+PLAY_MAX_KEYS = 32
+PLAY_IDLE = 10        # seconds without a tap before the turn passes on
+PLAY = {"queue": [], "holder": None, "until": 0.0, "last_tap": 0.0, "v": 0, "taps": 0}
+PULSE = 0.45          # how long a tap keeps a model lit (then it fades with the Keys' release)
+
+
+def play_keys():
+    """the models visitors can play: the models of the props picked on the control page"""
+    if not ezp_state["ok"]:
+        return []
+    pick = S.get("play_props")
+    out, seen = [], set()
+    for i, p in enumerate(S.get("props", [])):
+        if isinstance(pick, list) and i not in pick:
+            continue
+        for m in p["models"]:
+            if m not in seen:
+                seen.add(m)
+                out.append(("m:" + m, m, p["n"]))
+    return out[:PLAY_MAX_KEYS]
+
+
+def play_on():
+    return bool(S.get("play") and S["on"] and play_keys())
+
+
+def play_state():
+    with lock:
+        h = PLAY["holder"]
+        return {"on": play_on(), "holder": h["t"] if h else "", "queue": [q["t"] for q in PLAY["queue"]],
+                "left": max(0, int(PLAY["until"] - time.time())) if h else 0, "secs": int(S.get("play_secs", 30)),
+                "keys": [{"n": n, "g": g} for _, n, g in play_keys()], "cols": list(PLAY_COLS), "v": PLAY["v"], "at": int(time.time())}
+
+
+def play_next():
+    """the next visitor in the queue gets the turn (called with the lock held)"""
+    PLAY["holder"] = PLAY["queue"].pop(0) if PLAY["queue"] else None
+    now = time.time()
+    PLAY["until"] = now + int(S.get("play_secs", 30)) if PLAY["holder"] else 0.0
+    PLAY["last_tap"] = now
+    PLAY["v"] += 1
+
+
+def play_msg(m):
+    a, pid, tag = m.get("a"), str(m.get("p", "")), str(m.get("tag", ""))
+    if not PID_RE.fullmatch(pid) or not TAG_RE.fullmatch(tag):
+        return "bad player"
+    if not play_on():
+        return "off"
+    with lock:
+        h = PLAY["holder"]
+        mine = bool(h and h["p"] == pid)
+        if a == "join":
+            if mine or any(q["p"] == pid for q in PLAY["queue"]):
+                return ""
+            if len(PLAY["queue"]) >= 20:
+                return "queue full"
+            PLAY["queue"].append({"p": pid, "t": tag})
+            if not h:
+                play_next()
+            PLAY["v"] += 1
+            return ""
+        if a == "leave":
+            if mine:
+                play_next()
+            else:
+                PLAY["queue"] = [q for q in PLAY["queue"] if q["p"] != pid]
+                PLAY["v"] += 1
+            return ""
+        if a == "tap":
+            if not mine:
+                return "not your turn"
+            ks, c = m.get("m"), m.get("c")
+            if not isinstance(ks, list) or not 1 <= len(ks) <= 8 or not all(isint(k) for k in ks):
+                return "bad tap"
+            col = PLAY_COLS[c] if isint(c) and 0 <= c < len(PLAY_COLS) else random.choice(PLAY_COLS)
+            lst = play_keys()
+            now = time.time()
+            PLAY["last_tap"] = now
+            PLAY["taps"] += len(ks)
+            for i in ks:
+                if 0 <= i < len(lst):
+                    k = lst[i][0]
+                    KEYS["col"][k] = col
+                    KEYS["down"][k] = {"vel": 1.0, "after": None, "seen": float("inf"), "off_at": now + PULSE}
+            return ""
+    return "?"
+
+
+def play_loop():
+    """passes the turn on when it ends, and posts the turn and the queue for the phones"""
+    posted, fails, last_post = -1, 0, 0.0
+    while True:
+        now = time.time()
+        if play_on() and not key_geoms and not keys_loading[0]:   # read the models' pixels before the first tap
+            threading.Thread(target=keys_prepare, daemon=True).start()
+        with lock:
+            h = PLAY["holder"]
+            if h and (now > PLAY["until"] or now - PLAY["last_tap"] > PLAY_IDLE or not play_on()):
+                play_next()
+            if not play_on() and (PLAY["queue"] or PLAY["holder"]):
+                PLAY["queue"], PLAY["holder"] = [], None
+                PLAY["v"] += 1
+            v = PLAY["v"]
+        if S["topic"] and (v != posted or (PLAY["holder"] and now - last_post > 10)) and (play_on() or posted != -2):
+            st = play_state()
+            try:
+                urllib.request.urlopen(urllib.request.Request(RELAY + S["topic"] + "-play", data=json.dumps(st).encode(),
+                                                              headers={"Cache": "yes"}), timeout=10).read()
+                posted, fails, last_post = (v if st["on"] else -2), 0, time.time()
+            except Exception as e:
+                fails += 1
+                if fails in (1, 10):
+                    log("could not post the play turn:", e)
+                time.sleep(min(10, 2 * fails))
+            time.sleep(0.8)
+        time.sleep(0.25)
+
+
+# ------------------------------------------------------------------------------------------ sing ----
+# Sing (v17): a visitor records up to 10 seconds on their phone (a 🎤 Sing tab), picks who sings it, and sends it.
+# The recording plays on the speaker of this computer while the chosen one "sings" it:
+#   - a singing model of the show (a model with a face in xLights: pumpkins, trees, skulls…) moves its mouth with the
+#     voice: quiet = rest, soft = E, louder = AI, loud and round = O / U (from the loudness and the kind of sound);
+#   - any other prop pulses and glows with the voice;
+#   - a side of the cube shows a drawn face whose mouth opens with the voice (no EZPlayer needed).
+# The phone sends the recording as a small WAV file attached to the message (no extra programs needed to play it):
+# Windows plays it itself, macOS with afplay, Linux and the Raspberry Pi with aplay (or paplay / pw-play). The bridge
+# deletes the file as soon as it has been played. One recording at a time, with a short queue.
+SING_MAX_BYTES = 400000      # a WAV of about 10 s at 11 kHz is 220 KB
+SING_MAX_SECS = 12
+SING_FPS = 20                # mouth positions per second
+SING_QUEUE = 6
+SING_GAP = 20                # seconds between two recordings from the same phone
+SING_BASE = 960              # renderer number of the singing models
+MOUTHS = ("rest", "E", "AI", "O", "U", "etc", "MBP", "FV", "L", "WQ")
+SING = {"faces": {}, "faces_ver": None, "loading": False, "queue": [], "pending": [], "cur": None, "v": 0,
+        "last_from": {}, "devices": None}
+SING_EMOJI = (("pumpkin", "🎃"), ("tree", "🌲"), ("snow", "⛄"), ("skull", "💀"), ("ghost", "👻"), ("bulb", "💡"),
+              ("gargoyle", "🦇"), ("firework", "🎆"), ("nut", "💂"), ("monster", "🧟"), ("kid", "🧒"), ("globe", "🔮"),
+              ("peacock", "🦚"), ("boogie", "👹"), ("chill", "😎"), ("santa", "🎅"), ("reindeer", "🦌"), ("star", "⭐"))
+
+
+def node_list(spec):
+    """'1-5,9,12-13' (xLights node numbers, from 1) -> [0, 1, 2, 3, 4, 8, 11, 12]"""
+    out = []
+    for part in str(spec or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            if "-" in part:
+                a, b = part.split("-", 1)
+                a, b = int(a), int(b)
+                if 0 < a <= b <= 100000:
+                    out += range(a - 1, b)
+            elif int(part) > 0:
+                out.append(int(part) - 1)
+        except ValueError:
+            pass
+    return out
+
+
+def face_pick(faces):
+    """the face to use when a model has several: the one that defines the most (colours count a little extra)"""
+    def score(f):
+        filled = sum(1 for k, v in f.attrib.items() if v and not k.endswith("-Color") and k not in ("Name", "Type", "Description", "CustomColors"))
+        cols = sum(1 for k, v in f.attrib.items() if k.endswith("-Color") and v)
+        return filled + (min(cols, 5) if f.get("CustomColors") == "1" else 0)
+    return max(faces, key=score)
+
+
+def faces_from_show():
+    """the singing models of the show: models with a node-range face in EZPlayer's copy of xlights_rgbeffects.xml"""
+    import xml.etree.ElementTree as ET
+    url = S["ezp"].rstrip("/") + "/api/file/uploads/xlights_rgbeffects.xml"
+    targets = {t["model"]: t for t in ezp_state["targets"]}
+    out = {}
+    with urllib.request.urlopen(url, timeout=120) as r:
+        for ev, el in ET.iterparse(r, events=("end",)):
+            if el.tag == "model":
+                name = el.get("name")
+                fs = [f for f in el.findall("faceInfo") if f.get("Type") == "NodeRange" and (f.get("Mouth-O") or f.get("Mouth-AI"))]
+                if fs and name in targets:
+                    f = face_pick(fs)
+                    colours = f.get("CustomColors") == "1"
+                    parts = {}
+                    for k, v in f.attrib.items():
+                        base = re.sub(r"\d+$", "", k)
+                        if k.endswith("-Color") or not v or base not in ["Mouth-" + m for m in MOUTHS] + ["Eyes-Open", "Eyes-Closed", "FaceOutline"]:
+                            continue
+                        col = f.get(k + "-Color") if colours else ""
+                        parts.setdefault(base, []).append((node_list(v), col if re.fullmatch(r"#[0-9a-fA-F]{6}", col or "") else ""))
+                    out[name] = {"face": f.get("Name"), "parts": parts, "n": targets[name].get("nodes", 0)}
+            if el.tag in ("model", "modelGroup", "effect", "Element"):
+                el.clear()
+    return out
+
+
+def sing_faces_load():
+    if SING["loading"] or not ezp_state["ok"]:
+        return
+    SING["loading"] = True
+    try:
+        f = faces_from_show()
+        SING["faces"], SING["faces_ver"] = f, ezp_state.get("layoutVersion")
+        log("sing: %d singing model(s) in the show" % len(f))
+        SING["v"] += 1
+    except Exception as e:
+        log("sing: could not read the singing models:", e)
+    finally:
+        SING["loading"] = False
+
+
+def nice_name(model):
+    n = re.sub(r"[_]+", " ", model)
+    n = re.sub(r"\b(Boscoyo|GE|PPD|EFL|HiRes|P2P|Hi Res)\b", "", n, flags=re.I)
+    n = re.sub(r"\s+", " ", n).strip() or model
+    return n[:28]
+
+
+def sing_emoji(name):
+    low = name.lower()
+    return next((e for k, e in SING_EMOJI if k in low), "🎤")
+
+
+def sing_list():
+    """who can sing: [(key, name, emoji, kind)]; kind = face (a singing model), prop (pulses), side (drawn face)"""
+    names, off = S.get("sing_names") or {}, set(S.get("sing_off") or [])
+    out = []
+    if ezp_state["ok"]:
+        for m in sorted(SING["faces"]):
+            out.append(("f:" + m, nice_name(m), sing_emoji(m), "face"))
+        if S.get("sing_props", True):
+            for i, p in enumerate(S.get("props", [])):
+                out.append(("p:%d" % i, p["n"], p.get("e") or "✨", "prop"))
+    if S.get("sing_cube", True):
+        for i in range(len(S["faces"])):
+            out.append(("s:%d" % i, "Cube: " + face_name(i), "🧊", "side"))
+    res = []
+    for k, n, e, kind in out:
+        custom = names.get(k) or {}
+        res.append((k, (custom.get("n") or n)[:28], (custom.get("e") or e)[:4], kind, k not in off))
+    return res
+
+
+def sing_on():
+    return bool(S.get("sing") and S["on"] and any(x[4] for x in sing_list()))
+
+
+def wav_read(data):
+    """a WAV from a phone -> (rate, [samples -1..1]); mono 16-bit PCM only"""
+    import io
+    import wave
+    import array
+    with wave.open(io.BytesIO(data)) as w:
+        ch, sw, rate, n = w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()
+        if ch != 1 or sw != 2 or not 6000 <= rate <= 48000 or n > rate * SING_MAX_SECS:
+            raise ValueError("not a short mono 16-bit WAV")
+        a = array.array("h", w.readframes(n))
+    if sys.byteorder == "big":
+        a.byteswap()
+    return rate, a
+
+
+def mouth_track(rate, a):
+    """loudness and kind of sound, SING_FPS times a second -> mouth shapes and glow levels"""
+    step = max(1, rate // SING_FPS)
+    rms, zcr = [], []
+    for i in range(0, len(a) - step + 1, step):
+        seg = a[i:i + step]
+        rms.append(math.sqrt(sum(x * x for x in seg) / len(seg)) / 32768)
+        zcr.append(sum(1 for j in range(1, len(seg)) if (seg[j] >= 0) != (seg[j - 1] >= 0)) / len(seg))
+    if not rms:
+        return [], []
+    top = sorted(rms)[int(len(rms) * 0.95)] or 1e-9          # loud parts of this recording = full
+    gate = max(0.008, top * 0.12)                              # below this: silence
+    shapes, levels = [], []
+    for r, z in zip(rms, zcr):
+        lv = 0.0 if r < gate else min(1.0, (r - gate) / max(1e-9, top - gate))
+        levels.append(lv)
+        if lv < 0.08:
+            shapes.append("rest")
+        elif z > 0.18:                                         # hissy sounds (s, sh, f, t): teeth
+            shapes.append("E" if lv < 0.5 else "etc")
+        elif lv < 0.35:
+            shapes.append("E" if z > 0.08 else "MBP")
+        elif lv < 0.7:
+            shapes.append("AI")
+        else:
+            shapes.append("O" if z < 0.05 else "AI")
+    smooth = []                                                # no shape for a single frame: less flicker
+    for i, s in enumerate(shapes):
+        if 0 < i < len(shapes) - 1 and shapes[i - 1] == shapes[i + 1] != s:
+            s = shapes[i - 1]
+        smooth.append(s)
+    return smooth, levels
+
+
+def wav_write(path, rate, a, volume):
+    import wave
+    import array
+    if volume < 0.999:
+        a = array.array("h", (int(x * volume) for x in a))
+    if sys.byteorder == "big":
+        a = array.array("h", a)
+        a.byteswap()
+    with wave.open(path, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(a.tobytes())
+
+
+def audio_devices():
+    """Linux: the ALSA outputs aplay knows (name, description); elsewhere only the default output"""
+    if os.name == "nt" or sys.platform == "darwin":
+        return []
+    if SING["devices"] is None:
+        import subprocess
+        devs = []
+        try:
+            out = subprocess.run(["aplay", "-L"], capture_output=True, text=True, timeout=5).stdout.splitlines()
+            for i, ln in enumerate(out):
+                if ln and not ln.startswith(" ") and ln not in ("null",) and not ln.startswith(("dsnoop", "surround", "iec958", "front:", "dmix:")):
+                    desc = out[i + 1].strip() if i + 1 < len(out) and out[i + 1].startswith(" ") else ""
+                    devs.append([ln, desc[:60]])
+        except Exception:
+            pass
+        SING["devices"] = devs[:24]
+    return SING["devices"]
+
+
+def play_audio(path):
+    """plays a WAV file on this computer's speaker and returns when it ends"""
+    import subprocess
+    if os.name == "nt":
+        import winsound
+        winsound.PlaySound(path, winsound.SND_FILENAME)
+        return
+    if sys.platform == "darwin":
+        subprocess.run(["afplay", path], timeout=SING_MAX_SECS + 10)
+        return
+    dev = S.get("sing_device") or ""
+    for cmd in (["aplay", "-q"] + (["-D", dev] if dev else []) + [path], ["paplay", path], ["pw-play", path]):
+        try:
+            r = subprocess.run(cmd, timeout=SING_MAX_SECS + 10, capture_output=True)
+            if r.returncode == 0:
+                return
+            err = (r.stderr or b"").decode(errors="ignore").strip().splitlines()
+            log("sing: %s could not play: %s" % (cmd[0], err[-1] if err else r.returncode))
+            if "busy" in " ".join(err).lower():
+                log("sing: the sound output is in use by another program (see 'Sing' in the guide to share it)")
+        except FileNotFoundError:
+            continue
+        except Exception as e:
+            log("sing: %s failed: %s" % (cmd[0], e))
+    log("sing: no program could play the sound here (install alsa-utils for aplay)")
+
+
+def sing_msg(m, att):
+    """a recording from a phone: checks it and puts it in the queue"""
+    pid, tag, k = str(m.get("p", "")), str(m.get("tag", "")), str(m.get("s", ""))
+    if not PID_RE.fullmatch(pid) or not TAG_RE.fullmatch(tag):
+        return "bad player"
+    if not sing_on():
+        return "singing is off"
+    who = {x[0]: x for x in sing_list() if x[4]}
+    if k not in who:
+        return "unknown singer"
+    if not isinstance(att, dict):
+        return "no recording"
+    url, size = str(att.get("url", "")), att.get("size", 0)
+    if not url.startswith(GIFX_URL) or not isint(size) or not 0 < size <= SING_MAX_BYTES:
+        return "bad recording"
+    now = time.time()
+    with lock:
+        if now - SING["last_from"].get(pid, 0) < SING_GAP:
+            return "too soon"
+        if len(SING["queue"]) + len(SING["pending"]) >= SING_QUEUE:
+            return "queue full"
+        SING["last_from"][pid] = now
+        item = {"id": secrets.token_hex(4), "p": pid, "tag": tag, "k": k, "who": who[k][2] + " " + who[k][1], "url": url, "at": now}
+        (SING["pending"] if S.get("sing_approve") else SING["queue"]).append(item)
+        SING["v"] += 1
+    log("sing: a recording for %s %s" % (who[k][1], "(waiting for approval)" if S.get("sing_approve") else "queued"))
+    return ""
+
+
+class SingFace:
+    """a singing model: face outline and eyes on, the mouth shape of the moment (other nodes off)"""
+    def __init__(self, model, face, n):
+        self.geoms = [PropGeom(model, "nodes", n, [0.5] * n, [0.5] * n)]
+        self.face, self.n = face, n
+
+    def frames(self, t):
+        cur = SING["cur"]
+        buf = bytearray(self.n * 3)
+        if not cur:
+            return [bytes(buf)]
+        i = int((time.time() - cur["t0"]) * SING_FPS)
+        shape = cur["shapes"][i] if 0 <= i < len(cur["shapes"]) else "rest"
+        parts = self.face["parts"]
+        blink = int(time.time() * 10) % 37 == 0                      # a blink now and then
+        mouth = parts.get("Mouth-" + shape) or parts.get("Mouth-AI" if shape != "rest" else "Mouth-rest") or []
+        for key, default in (("FaceOutline", (255, 170, 60)), ("Eyes-Closed" if blink else "Eyes-Open", (255, 255, 255))):
+            for nodes, col in parts.get(key, []):
+                c = hexrgb(col[1:]) if col else default
+                for j in nodes:
+                    if j < self.n:
+                        buf[j * 3:j * 3 + 3] = bytes(c)
+        for nodes, col in mouth:
+            c = hexrgb(col[1:]) if col else (255, 60, 60)
+            for j in nodes:
+                if j < self.n:
+                    buf[j * 3:j * 3 + 3] = bytes(c)
+        return [bytes(buf)]
+
+
+class SingPulse:
+    """any prop singing: it glows with the voice, its colour turning slowly"""
+    def __init__(self, geoms):
+        self.geoms = geoms
+
+    def frames(self, t):
+        cur = SING["cur"]
+        lv = 0.0
+        if cur:
+            i = int((time.time() - cur["t0"]) * SING_FPS)
+            lv = cur["levels"][i] if 0 <= i < len(cur["levels"]) else 0.0
+        c = hsv((t * 0.08) % 1, 0.9, 0.12 + 0.88 * lv)
+        return [bytes(c) * g.n for g in self.geoms]
+
+
+class SingSide(Anim):
+    """a side of the cube singing: two eyes and a mouth that opens with the voice"""
+    def frame(self, t):
+        w, h = self.w, self.h
+        cur = SING["cur"]
+        self.buf[:] = bytes(len(self.buf))
+        lv, shape = 0.0, "rest"
+        if cur:
+            i = int((time.time() - cur["t0"]) * SING_FPS)
+            if 0 <= i < len(cur["levels"]):
+                lv, shape = cur["levels"][i], cur["shapes"][i]
+        face = (255, 200, 40)
+        cx, cy, r = (w - 1) / 2, (h - 1) / 2, min(w, h) / 2 - 0.5
+        for y in range(h):                          # the face's outline
+            for x in range(w):
+                if abs(math.hypot(x - cx, y - cy) - r) < 0.6:
+                    self.px(x, y, face)
+        ey = int(cy - r * 0.35)
+        blink = int(time.time() * 10) % 37 == 0
+        for ex in (int(cx - r * 0.4), int(round(cx + r * 0.4))):
+            self.px(ex, ey, (255, 255, 255))
+            if not blink:
+                self.px(ex, ey - 1, (255, 255, 255))
+        mw = max(1, int(r * (0.9 if shape in ("E", "etc") else 0.6)))   # wide for E, round for O
+        mh = 0 if shape in ("rest", "MBP") else max(1, int(lv * r * 0.8))
+        my = int(cy + r * 0.35)
+        for x in range(int(cx - mw / 2), int(cx + mw / 2) + 1):
+            self.px(x, my, (255, 60, 60))
+            if mh:
+                self.px(x, my + mh, (255, 60, 60))
+        for y in range(my, my + mh + 1):
+            self.px(int(cx - mw / 2), y, (255, 60, 60))
+            self.px(int(cx + mw / 2), y, (255, 60, 60))
+        return self.buf
+
+
+sing_objs = {}
+
+
+def sing_items(items):
+    """render_loop: the one singing now goes on top"""
+    cur = SING["cur"]
+    if not cur:
+        return items
+    k = cur["k"]
+    try:
+        if k.startswith("s:"):
+            i = int(k[2:])
+            if i < len(S["faces"]):
+                f = S["faces"][i]
+                o = sing_objs.get(k)
+                if o is None or (o.w, o.h) != (f["w"], f["h"]):
+                    o = sing_objs[k] = SingSide(f["w"], f["h"])
+                return [(n, a) for n, a in items if n != i] + [(i, {"anim": o, "t0": 0.0})]
+        elif k.startswith("f:"):
+            m = k[2:]
+            face = SING["faces"].get(m)
+            if face:
+                o = sing_objs.get(k)
+                if o is None:
+                    o = sing_objs[k] = SingFace(m, face, face["n"])
+                return list(items) + [(SING_BASE, {"anim": o, "t0": 0.0})]
+        elif k.startswith("p:"):
+            g = prop_geometry(int(k[2:]))
+            if g:
+                return list(items) + [(SING_BASE + 1, {"anim": SingPulse(g), "t0": 0.0})]
+    except Exception as e:
+        log("sing: drawing error:", e)
+    return items
+
+
+def sing_play(item):
+    """downloads, works out the mouth, plays the sound and makes the singer sing; deletes the file after"""
+    import tempfile
+    try:
+        data = fetch(item["url"], limit=SING_MAX_BYTES + 1, timeout=20)
+        if len(data) > SING_MAX_BYTES:
+            raise ValueError("too big")
+        rate, a = wav_read(data)
+    except Exception as e:
+        log("sing: the recording could not be read:", e)
+        return
+    shapes, levels = mouth_track(rate, a)
+    fd, path = tempfile.mkstemp(suffix=".wav", prefix="showplay-sing-")
+    os.close(fd)
+    try:
+        wav_write(path, rate, a, max(0.1, min(1.0, S.get("sing_volume", 100) / 100)))
+        if item["k"].startswith("f:"):
+            sing_objs.pop(item["k"], None)
+        with lock:
+            SING["cur"] = dict(item, shapes=shapes, levels=levels, t0=time.time() + max(0.0, S.get("sing_delay", 0.15)), secs=len(a) / rate)
+            SING["v"] += 1
+        log("sing: %s sings (%.1f s)" % (item["who"], len(a) / rate))
+        play_audio(path)
+        end = SING["cur"]["t0"] + len(a) / rate
+        while time.time() < end:          # if the player returned early, the mouth still finishes
+            time.sleep(0.05)
+    finally:
+        with lock:
+            SING["cur"] = None
+            SING["v"] += 1
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+def sing_loop():
+    """plays the queue one recording at a time; reads the singing models; posts the queue for the phones"""
+    posted, fails, last_check = -1, 0, 0.0
+    while True:
+        now = time.time()
+        if now - last_check > 30:
+            last_check = now
+            if ezp_state["ok"] and S.get("sing") and SING["faces_ver"] != ezp_state.get("layoutVersion"):
+                threading.Thread(target=sing_faces_load, daemon=True).start()
+        item = None
+        with lock:
+            if SING["queue"] and not SING["cur"] and not SING.get("busy"):
+                item = SING["queue"].pop(0)
+                SING["busy"] = True
+                SING["v"] += 1
+        if S["topic"] and SING["v"] != posted:
+            st = sing_state()
+            try:
+                urllib.request.urlopen(urllib.request.Request(RELAY + S["topic"] + "-sing", data=json.dumps(st).encode(),
+                                                              headers={"Cache": "yes"}), timeout=10).read()
+                posted, fails = st["v"], 0
+            except Exception as e:
+                fails += 1
+                if fails in (1, 10):
+                    log("could not post the singing queue:", e)
+        if item:   # plays in its own thread, so the queue keeps being posted for the phones while it sings
+            def run(it=item):
+                try:
+                    sing_play(it)
+                finally:
+                    SING["busy"] = False
+            threading.Thread(target=run, daemon=True).start()
+        time.sleep(0.3)
+
+
+def sing_state():
+    with lock:
+        cur = SING["cur"]
+        return {"on": sing_on(), "now": cur["tag"] if cur else "", "who": cur["who"] if cur else "",
+                "q": [x["tag"] for x in SING["queue"]], "wait": [x["tag"] for x in SING["pending"]], "v": SING["v"], "at": int(time.time())}
+
+
+def sing_test_wav(path):
+    """a short three-note chime for the 'Test sound' button"""
+    import array
+    rate = 11025
+    a = array.array("h")
+    for f in (523, 659, 784):
+        for i in range(int(rate * 0.25)):
+            env = min(1.0, i / 200) * (1 - i / (rate * 0.25))
+            a.append(int(12000 * env * math.sin(2 * math.pi * f * i / rate)))
+    wav_write(path, rate, a, max(0.1, min(1.0, S.get("sing_volume", 100) / 100)))
+
+
 # ------------------------------------------------------------------------------------ control page ----
 ADMIN = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ShowPlay</title>
@@ -2780,7 +5245,7 @@ select,input[type=number],input[type=text]{width:100%;min-height:44px;padding:8p
 pre{white-space:pre-wrap;font-size:12px;color:var(--muted);margin:0;max-height:220px;overflow:auto}.warn{color:#ffb36b}
 [hidden]{display:none!important}
 </style></head><body><main>
-<div class="row" style="justify-content:space-between"><h1>ShowPlay</h1><a class="btn" href="/mixer" style="text-decoration:none;display:inline-flex;align-items:center">🎛️ Mixer &amp; 🎹 Keys</a></div>
+<div class="row" style="justify-content:space-between"><h1>ShowPlay</h1><span class="row"><a class="btn" href="/race" style="text-decoration:none;display:inline-flex;align-items:center">🌟 Race</a><a class="btn" href="/mixer" style="text-decoration:none;display:inline-flex;align-items:center">🎛️ Mixer &amp; 🎹 Keys</a></span></div>
 <div class="card">
   <label class="big"><input type="checkbox" id="on"> Show the visitors' requests</label>
   <div class="note" id="state"></div>
@@ -2834,10 +5299,37 @@ pre{white-space:pre-wrap;font-size:12px;color:var(--muted);margin:0;max-height:2
 </div>
 <div class="card">
   <div class="ct">Games</div>
-  <label class="big" style="font-size:16px"><input type="checkbox" id="games"> Let visitors play Four in a Row on the cube</label>
-  <div class="note">Two visitors play each other from their phones, or one plays the computer. While a game is on, that side shows the board and other requests for it wait.</div>
-  <label for="cpuLevel">The computer plays</label>
+  <label class="big" style="font-size:16px"><input type="checkbox" id="games"> Let visitors play games on the cube</label>
+  <div class="row" style="gap:16px"><label><input type="checkbox" id="gC4"> 🔴 Four in a Row</label><label><input type="checkbox" id="gTtt"> ❌ Tic-tac-toe</label><label><input type="checkbox" id="gSimon"> 🟢 Simon</label><label><input type="checkbox" id="gCount"> 🔢 Count the colours</label><label><input type="checkbox" id="gSnake"> 🐍 Snake</label><label><input type="checkbox" id="gInv"> 👾 Space Invaders</label><label><input type="checkbox" id="gPong"> 🏓 Pong</label><label><input type="checkbox" id="gRace"> 🌟 Race to the Star</label></div>
+  <div class="row"><a class="btn" href="/race" style="text-decoration:none;display:inline-flex;align-items:center">🌟 Race to the Star settings</a><span class="note">track, star, ways to play, levels, difficulty, effects, test race</span></div>
+  <div class="note">Four in a Row and Tic-tac-toe: two visitors play each other from their phones, or one plays the computer. Simon: the cube shows a sequence of colours and one visitor repeats it on their phone, a colour more each round. Count the colours: up to 8 phones at once count how many times a colour flashes. Snake: one visitor steers a slow snake with arrows. Space Invaders: one visitor slides the ship and it fires by itself. Pong: one visitor slides the paddle against the computer, with a slower ball. Race to the Star: up to 8 phones race up a track (tap, voice, shake or run) and the winner lights the star; set it up on its own page. (The crew can play faster Space Invaders and Pong from the Mixer page.) One game at a time; while it is on, that side shows the game and other requests for it wait.</div>
+  <label for="cpuLevel">The computer plays (Four in a Row and Tic-tac-toe)</label>
   <select id="cpuLevel"><option value="easy">Easy (good for small children)</option><option value="normal">Normal</option><option value="hard">Hard</option></select>
+</div>
+<div class="card" id="singCard">
+  <div class="ct">Sing (visitors)</div>
+  <label class="big" style="font-size:16px"><input type="checkbox" id="sgOn"> Let visitors record a song and make the show sing it</label>
+  <div class="note">A 🎤 Sing tab on the visitors' page: a visitor picks who sings (a singing model of the show moves its mouth, a prop glows with the voice, or a side of the cube shows a face), records up to 10 seconds and sends it. It plays on this computer's speaker. Recordings are deleted as soon as they have been played.</div>
+  <label class="big" style="font-size:16px"><input type="checkbox" id="sgApprove"> Approve each recording before it plays</label>
+  <div class="row"><label class="note">Volume <select id="sgVol"><option value="25">25 %</option><option value="50">50 %</option><option value="75">75 %</option><option value="100">100 %</option></select></label>
+   <label class="note" id="sgDevBox" hidden>Sound output <select id="sgDev"></select></label>
+   <button class="btn" type="button" id="sgTest">🔊 Test sound</button></div>
+  <div class="row"><label class="note">Mouth timing <select id="sgDelay"><option value="0">0 s</option><option value="0.1">0.1 s</option><option value="0.15">0.15 s</option><option value="0.25">0.25 s</option><option value="0.4">0.4 s</option><option value="0.6">0.6 s</option></select></label><span class="note">later if the mouth moves before the voice</span></div>
+  <div class="row"><label><input type="checkbox" id="sgProps"> Props can sing (they glow with the voice)</label><label><input type="checkbox" id="sgCube"> The cube can sing (a face on a side)</label></div>
+  <div class="row"><button class="btn" type="button" id="sgFind">Find the singing models in EZPlayer</button><span class="note" id="sgMsg"></span></div>
+  <div class="note">Who visitors can pick (untick to hide; you can rename them and change the emoji):</div>
+  <div id="sgList" style="display:flex;flex-direction:column;gap:6px;max-height:360px;overflow:auto"></div>
+  <div id="sgPend"></div>
+  <div class="row"><button class="btn primary" type="button" id="sgSave">Save singing settings</button><span class="note" id="sgSaved"></span></div>
+</div>
+<div class="card">
+  <div class="ct">Play the lights (visitors)</div>
+  <label class="big" style="font-size:16px"><input type="checkbox" id="play"> Let visitors take turns to play the lights</label>
+  <div class="note">A 🎹 Play tab on the visitors' page: one visitor at a time gets a turn and taps pads to light up the models of the props ticked below, in a colour they pick, like the keys of a keyboard. No strobe, no blackout; the others wait in a queue. Needs EZPlayer and props.</div>
+  <label for="playSecs">Each turn lasts</label>
+  <select id="playSecs"><option value="20">20 s</option><option value="30">30 s</option><option value="45">45 s</option><option value="60">1 min</option></select>
+  <div class="note">Props visitors can play (each of their models becomes a pad, up to 32):</div>
+  <div class="row" id="playProps" style="gap:14px"></div>
 </div>
 <div class="card">
   <div class="ct">Props of the show (through EZPlayer)</div>
@@ -2947,7 +5439,8 @@ function render(){
  $('state').innerHTML=line+(usesEzp?'<br>EZPlayer: '+st.ezpMsg:'')+'<br>bridge '+st.version;
  if(!editing){sides=JSON.parse(JSON.stringify(st.faces));drawSides();props=JSON.parse(JSON.stringify(st.props||[]));drawProps();$('sProp').value=st.seconds.prop||20;
   $('ezp').value=st.ezp;$('title').value=st.title||'';$('page').value=st.page||'';
-  $('free').checked=st.free;$('theme').value=st.theme;$('sText').value=st.seconds.text;$('sGif').value=st.seconds.gif;$('sDraw').value=st.seconds.draw;$('sFx').value=st.seconds.fx||180;$('wait').value=st.wait||0;$('hold').checked=!!st.hold;$('endDark').checked=!!st.end_dark;$('waitTurn').checked=!!st.wait_turn;$('approve').checked=st.approve;$('games').checked=!!st.games;$('fps').value=String(st.fps||20);$('cpuLevel').value=st.cpu_level||'normal';}
+  $('free').checked=st.free;$('theme').value=st.theme;$('sText').value=st.seconds.text;$('sGif').value=st.seconds.gif;$('sDraw').value=st.seconds.draw;$('sFx').value=st.seconds.fx||180;$('wait').value=st.wait||0;$('hold').checked=!!st.hold;$('endDark').checked=!!st.end_dark;$('waitTurn').checked=!!st.wait_turn;$('approve').checked=st.approve;$('games').checked=!!st.games;{const gl=st.game_list||['c4','ttt','simon','count','snake','invaders','pong','race'];$('gC4').checked=gl.includes('c4');$('gTtt').checked=gl.includes('ttt');$('gSimon').checked=gl.includes('simon');$('gCount').checked=gl.includes('count');$('gSnake').checked=gl.includes('snake');$('gInv').checked=gl.includes('invaders');$('gPong').checked=gl.includes('pong');$('gRace').checked=gl.includes('race');}
+  $('play').checked=st.play!==false;$('playSecs').value=String(st.play_secs||30);drawPlayProps(st.props||[],st.play_props);$('fps').value=String(st.fps||20);$('cpuLevel').value=st.cpu_level||'normal';}
  $('noPage').hidden=!!st.urls.hw;
  const qk=THEMES.map(t=>st.urls[t]).join();
  for(const t of THEMES){$('url_'+t).textContent=st.urls[t]||'—';}
@@ -2965,7 +5458,7 @@ async function refresh(){st=await api('state');render();}
 $('on').onchange=()=>api('settings',{on:$('on').checked}).then(refresh);
 ['ezp','title','page','sText','sGif','sDraw','sFx','wait','theme','approve','free','hold','endDark','waitTurn','games','cpuLevel','sProp','fps'].forEach(id=>{const e=$(id);e.addEventListener('focus',()=>editing=true);e.addEventListener('input',()=>editing=true);e.addEventListener('change',()=>editing=true);});
 async function saveAll(){
- const r=await api('settings',{ezp:$('ezp').value.trim(),title:$('title').value.trim(),page:$('page').value.trim(),faces:sides,props:props,theme:$('theme').value,approve:$('approve').checked,free:$('free').checked,hold:$('hold').checked,end_dark:$('endDark').checked,wait_turn:$('waitTurn').checked,games:$('games').checked,fps:+$('fps').value,cpu_level:$('cpuLevel').value,wait:Math.max(0,Math.min(600,+$('wait').value|0)),seconds:{text:+$('sText').value,gif:+$('sGif').value,draw:+$('sDraw').value,fx:+$('sFx').value,prop:+$('sProp').value}});
+ const r=await api('settings',{ezp:$('ezp').value.trim(),title:$('title').value.trim(),page:$('page').value.trim(),faces:sides,props:props,theme:$('theme').value,approve:$('approve').checked,free:$('free').checked,hold:$('hold').checked,end_dark:$('endDark').checked,wait_turn:$('waitTurn').checked,games:$('games').checked,play:$('play').checked,play_secs:+$('playSecs').value,play_props:[...document.querySelectorAll('#playProps input:checked')].map(e=>+e.value),game_list:[['c4','gC4'],['ttt','gTtt'],['simon','gSimon'],['count','gCount'],['snake','gSnake'],['invaders','gInv'],['pong','gPong'],['race','gRace']].filter(x=>$(x[1]).checked).map(x=>x[0]),fps:+$('fps').value,cpu_level:$('cpuLevel').value,wait:Math.max(0,Math.min(600,+$('wait').value|0)),seconds:{text:+$('sText').value,gif:+$('sGif').value,draw:+$('sDraw').value,fx:+$('sFx').value,prop:+$('sProp').value}});
  const bad=r.problems&&r.problems.length;
  $('saveMsg').textContent=bad?'Not saved for these sides (fix them and save again): '+r.problems.join(' · '):'Saved.';
  if(!bad){editing=false;setTimeout(()=>$('saveMsg').textContent='',4000);}
@@ -2974,6 +5467,38 @@ $('save').onclick=saveAll;
 document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>st.urls[b.dataset.copy]&&navigator.clipboard&&navigator.clipboard.writeText(st.urls[b.dataset.copy]).then(()=>{b.textContent='Copied';setTimeout(()=>b.textContent='Copy address',2000);}));
 $('test').onclick=()=>api('test',{t:$('testTxt').value||'Hello!'}).then(refresh);
 refresh();setInterval(()=>{if(!editing)refresh();},3000);
+function drawPlayProps(ps,pick){const box=document.getElementById('playProps');if(!box)return;const old=[...box.querySelectorAll('input')].map(e=>e.checked);
+ box.replaceChildren(...ps.map((p,i)=>{const l=document.createElement('label');const c=document.createElement('input');c.type='checkbox';c.value=i;c.checked=Array.isArray(pick)?pick.includes(i):true;l.append(c,' '+(p.e||'')+' '+p.n);return l;}));
+ if(!ps.length)box.textContent='No props yet: add them below.';}
+// ---- Sing card (its own Save button)
+let SG=null,sgDirty=false;
+async function sgLoad(force){try{const r=await fetch('/api/sing');SG=await r.json();}catch(e){return;}
+ const $=id=>document.getElementById(id);
+ if(!sgDirty||force){$('sgOn').checked=SG.sing;$('sgApprove').checked=SG.approve;$('sgVol').value=String(SG.volume);$('sgDelay').value=String(SG.delay);$('sgProps').checked=SG.props;$('sgCube').checked=SG.cube;
+  $('sgDevBox').hidden=SG.os!=='linux';if(SG.os==='linux'){$('sgDev').replaceChildren(...[['','Default']].concat(SG.devices).map(([v,d])=>{const o=document.createElement('option');o.value=v;o.textContent=v?(v+(d?' — '+d:'')):'Default';return o;}));$('sgDev').value=SG.device;}
+  $('sgList').replaceChildren(...SG.singers.map(x=>{const row=document.createElement('div');row.className='row';row.dataset.k=x.k;
+   const c=document.createElement('input');c.type='checkbox';c.checked=x.on;c.className='sgC';
+   const e=document.createElement('input');e.type='text';e.value=x.e;e.maxLength=4;e.style.width='56px';e.className='sgE';
+   const n=document.createElement('input');n.type='text';n.value=x.n;n.maxLength=28;n.style.flex='1';n.className='sgN';
+   const t=document.createElement('span');t.className='note';t.textContent=x.kind==='face'?'moves its mouth':x.kind==='prop'?'glows':'cube face';
+   [c,e,n].forEach(el=>el.oninput=()=>{sgDirty=true;});row.append(c,e,n,t);return row;}));
+  if(!SG.singers.length)$('sgList').textContent=SG.ezpOk?'Nobody can sing yet: find the singing models, add props, or let the cube sing.':'EZPlayer is not answering: only the cube can sing for now.';}
+ $('sgMsg').textContent=SG.loading?'Reading the show…':(SG.found+' singing model(s) found'+(SG.ezpOk?'':' (EZPlayer not answering)'));
+ $('sgPend').replaceChildren(...(SG.pending||[]).map(x=>{const row=document.createElement('div');row.className='row';
+  const a=document.createElement('audio');a.controls=true;a.src='/api/sing/audio?id='+x.id;a.preload='none';
+  const ok=document.createElement('button');ok.className='btn primary';ok.type='button';ok.textContent='▶ Play';ok.onclick=()=>sgAct('approve',x.id);
+  const no=document.createElement('button');no.className='btn';no.type='button';no.textContent='✕';no.onclick=()=>sgAct('reject',x.id);
+  const l=document.createElement('span');l.textContent=x.who+' · '+x.ago+' s ago';row.append(l,a,ok,no);return row;}));}
+async function sgPost(b){const r=await fetch('/api/sing',{method:'POST',headers:{'X-Cube':'1'},body:JSON.stringify(b)});return r.json();}
+async function sgAct(a,id){await sgPost({a,id});sgLoad();}
+(function(){const $=id=>document.getElementById(id);if(!$('singCard'))return;
+ ['sgOn','sgApprove','sgVol','sgDelay','sgProps','sgCube','sgDev'].forEach(id=>$(id).addEventListener('input',()=>{sgDirty=true;}));
+ $('sgFind').onclick=async()=>{await sgPost({a:'find'});$('sgMsg').textContent='Reading the show…';setTimeout(()=>sgLoad(true),4000);};
+ $('sgTest').onclick=()=>sgPost({a:'test'});
+ $('sgSave').onclick=async()=>{const off=[],names={};document.querySelectorAll('#sgList .row').forEach(r=>{const k=r.dataset.k;if(!r.querySelector('.sgC').checked)off.push(k);names[k]={n:r.querySelector('.sgN').value.trim(),e:r.querySelector('.sgE').value.trim()};});
+  await sgPost({a:'set',sing:$('sgOn').checked,sing_approve:$('sgApprove').checked,sing_volume:+$('sgVol').value,sing_delay:+$('sgDelay').value,sing_props:$('sgProps').checked,sing_cube:$('sgCube').checked,sing_device:$('sgDev').value||'',sing_off:off,sing_names:names});
+  sgDirty=false;$('sgSaved').textContent='Saved.';setTimeout(()=>{$('sgSaved').textContent='';},2500);sgLoad(true);};
+ sgLoad(true);setInterval(()=>sgLoad(false),4000);})();
 </script></body></html>"""
 
 MIXER = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
@@ -3022,10 +5547,15 @@ input[type=text],input[type=number],select{min-height:44px;padding:8px 12px;bord
 #bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--learn);color:#120b1f;font-weight:800;padding:10px 14px;text-align:center}
 .mono{font-family:ui-monospace,monospace;background:#000;padding:8px 10px;border-radius:10px;font-size:13px}
 .maprow{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:6px 8px}.maprow .what{flex:1}
+.strips{display:flex;gap:16px;justify-content:center}
+.strip{position:relative;width:110px;height:300px;border-radius:16px;border:2px solid var(--line);background:#120c1e;touch-action:none;user-select:none;-webkit-user-select:none;cursor:ns-resize}
+.strip .pd{position:absolute;left:8px;right:8px;height:64px;border-radius:12px;transform:translateY(-50%)}
+.strip b{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:12px;color:var(--muted)}
+.score{font:900 44px/1 system-ui;text-align:center;letter-spacing:.1em}
 [hidden]{display:none!important}
 </style></head><body>
 <header><h1>🎛️ ShowPlay</h1>
- <button class="tab sel" data-tab="mix">🎚️ Mixer</button><button class="tab" data-tab="keys">🎹 Keys</button><button class="tab" data-tab="midi">🎛️ MIDI</button>
+ <button class="tab sel" data-tab="mix">🎚️ Mixer</button><button class="tab" data-tab="keys">🎹 Keys</button><button class="tab" data-tab="midi">🎛️ MIDI</button><button class="tab" data-tab="pong">🏓 Pong</button><button class="tab" data-tab="inv">👾 Invaders</button>
  <span class="sp"></span><button class="tab" id="learnBtn" title="Map a MIDI control: press this, touch a control here, then move the one on the device">🎓 Learn</button><a href="/">Control page</a></header>
 <main>
 <!-- ================= MIXER ================= -->
@@ -3059,6 +5589,28 @@ input[type=text],input[type=number],select{min-height:44px;padding:8px 12px;bord
   <div class="faders" id="kFaders"></div>
   <div class="row"><button class="btn primary" id="kTry">Hold to try</button></div></div>
  <div class="card"><div class="ct">All keys</div><div class="faders" id="kGlob"></div></div>
+</section>
+<!-- ================= PONG ================= -->
+<section id="t_pong" hidden style="display:flex;flex-direction:column;gap:12px">
+ <div class="card"><div class="ct">Pong on the lights</div>
+  <div class="note">For the people running the show, on the home network: no delay. Red is on the left, blue on the right. The computer plays any side nobody moves. First to 5 points.</div>
+  <div class="row"><label class="note">Side <select id="pSide"></select></label><button class="btn primary" id="pCpu">🤖 1 player (against the computer)</button><button class="btn" id="pPvp">👫 2 players</button><button class="btn" id="pStop">⏹ Stop</button></div>
+  <div class="note" id="pMsg"></div>
+  <div class="score" id="pScore">0 : 0</div>
+  <div class="strips"><div class="strip" id="pS0"><div class="pd" style="background:#ff3c3c"></div><b>Red · W / S</b></div><div class="strip" id="pS1"><div class="pd" style="background:#3c8cff"></div><b>Blue · ↑ / ↓</b></div></div>
+  <div class="note">Drag in a strip to move that paddle (two phones can each hold one). On a computer: W / S for red, ↑ / ↓ for blue. A MIDI fader or knob can be a paddle: press 🎓 Learn, touch a strip, then move the fader or knob.</div></div>
+</section>
+<!-- ================= INVADERS ================= -->
+<section id="t_inv" hidden style="display:flex;flex-direction:column;gap:12px">
+ <div class="card"><div class="ct">Space Invaders on the lights</div>
+  <div class="note">The crew's game: fast, no delay. Move the ship, fire, clear the waves. Three lives; a mystery ship crosses the top for extra points. (Visitors have their own slower version on their page.)</div>
+  <div class="row"><label class="note">Side <select id="iSide"></select></label><button class="btn primary" id="iStart">▶️ Start</button><button class="btn" id="iStop">⏹ Stop</button></div>
+  <div class="note" id="iMsg"></div>
+  <div class="score" id="iScore">0</div>
+  <div class="row" style="justify-content:center" id="iLives"></div>
+  <input type="range" id="iPos" min="0" max="1000" value="500" style="width:100%;height:44px;accent-color:#3cff5a">
+  <div class="holds"><button class="hold" id="iL" data-mid="game:left">◀</button><button class="hold" id="iF" data-mid="game:fire" style="background:#5a1010">🔥 Fire</button><button class="hold" id="iR" data-mid="game:right">▶</button></div>
+  <div class="note">On a computer: ← / → (or A / D) to move, Space to fire. MIDI: press 🎓 Learn, then touch the slider (a knob or fader moves the ship), ◀ / ▶ or 🔥 (a pad or key).</div></div>
 </section>
 <!-- ================= MIDI ================= -->
 <section id="t_midi" hidden style="display:flex;flex-direction:column;gap:12px">
@@ -3098,7 +5650,7 @@ $('learnBtn').onclick=()=>{learn=!learn;$('learnBtn').classList.toggle('sel',lea
 document.querySelectorAll('[data-mid]').forEach(e=>learnable(e,e.dataset.mid));
 // ---------- tabs
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('sel',x===b));
- for(const t of ['mix','keys','midi'])$('t_'+t).hidden=t!==tab;refresh();});
+ for(const t of ['mix','keys','midi','pong','inv'])$('t_'+t).hidden=t!==tab;refresh();});
 // ---------- MIXER
 const cur=()=>M.sel.length?M.t[M.sel[0]]:null;
 function mix(b){busy=Date.now();return post('mixer',b).then(()=>get('mixer')).then(r=>{M=r;drawMix(false);});}
@@ -3207,12 +5759,231 @@ $('webMidi').onclick=async()=>{
    if(t===0xA0||t===0xB0||t===0xD0){pend.set(d[0]+':'+(t===0xD0?0:d[1]),d);if(!tm)tm=setTimeout(flush,25);}else if(t===0x80||t===0x90){flush();post('midi',{a:'msg',d});}};});
    $('webMidiMsg').textContent=names.length?'Passing on: '+names.join(', '):'No MIDI device found in this browser.';};
   hook();acc.onstatechange=hook;}catch(e){$('webMidiMsg').textContent='MIDI not allowed: '+e;}};
+// ---------- PONG
+let PG=null;const pPad=[0.5,0.5],pDrag=[false,false];
+const pSend=[0,1].map(p=>throttle(v=>post('pong',{a:'pad',p,v}),40));
+function pMove(p,v){pPad[p]=Math.max(0,Math.min(1,v));pSend[p](pPad[p]);pDrawPads();}
+function pDrawPads(){[0,1].forEach(p=>{const el=$('pS'+p).querySelector('.pd');el.style.top=(8+pPad[p]*(300-16))+'px';});}
+[0,1].forEach(p=>{const el=$('pS'+p);learnable(el,p?'game:p2':'game:p1');
+ const at=e=>{const r=el.getBoundingClientRect();return (e.clientY-r.top-8)/(r.height-16);};
+ el.addEventListener('pointerdown',e=>{if(learn)return;e.preventDefault();el.setPointerCapture(e.pointerId);pDrag[p]=true;pMove(p,at(e));});
+ el.addEventListener('pointermove',e=>{if(pDrag[p])pMove(p,at(e));});
+ const up=()=>{pDrag[p]=false;};el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);});
+const pKeys={};addEventListener('keydown',e=>{if(tab!=='pong')return;const k={w:[0,-1],s:[0,1],ArrowUp:[1,-1],ArrowDown:[1,1]}[e.key];if(k){e.preventDefault();pKeys[e.key]=k;}});
+addEventListener('keyup',e=>{delete pKeys[e.key];});
+setInterval(()=>{if(tab!=='pong')return;Object.values(pKeys).forEach(([p,d])=>pMove(p,pPad[p]+d*0.05));},30);
+$('pCpu').onclick=()=>post('pong',{a:'start',mode:'cpu',z:+$('pSide').value}).then(r=>{$('pMsg').textContent=r.ok?'':r.msg;loadPong();});
+$('pPvp').onclick=()=>post('pong',{a:'start',mode:'pvp',z:+$('pSide').value}).then(r=>{$('pMsg').textContent=r.ok?'':r.msg;loadPong();});
+$('pStop').onclick=()=>post('pong',{a:'stop'}).then(loadPong);
+async function loadPong(){PG=await get('pong');
+ const sel=$('pSide');const opts=[['-1','All sides']].concat(PG.sides.map((n,i)=>[String(i),n]));
+ if(sel.options.length!==opts.length)sel.replaceChildren(...opts.map(([v,n])=>mk('option',{value:v,textContent:n})));
+ $('pScore').textContent=PG.score[0]+' : '+PG.score[1];
+ $('pMsg').textContent=PG.busy?('Visitors are playing '+PG.busyName+': Pong can start when it ends.'):PG.st==='over'?(PG.winner?(PG.winner===1?'Red':'Blue')+' wins! 🏆':'Stopped.'):PG.st==='playing'?(PG.mode==='pvp'?'Two players':'Against the computer (blue)'):'Pick a side and start.';
+ [0,1].forEach(p=>{if(!pDrag[p]&&PG.st==='playing'&&!(Object.values(pKeys).some(k=>k[0]===p)))pPad[p]=PG.pad[p];});pDrawPads();}
+// ---------- INVADERS
+let IV=null;
+learnable($('iPos'),'game:ship');
+const iSend=throttle(x=>post('invaders',{a:'move',x}),50);
+$('iPos').oninput=()=>iSend($('iPos').value/1000);
+$('iStart').onclick=()=>post('invaders',{a:'start',z:+$('iSide').value}).then(r=>{$('iMsg').textContent=r.ok?'':r.msg;loadInv();});
+$('iStop').onclick=()=>post('invaders',{a:'stop'}).then(loadInv);
+holdBtn($('iL'),()=>post('invaders',{a:'move',d:-1}),()=>post('invaders',{a:'move',d:0}));
+holdBtn($('iR'),()=>post('invaders',{a:'move',d:1}),()=>post('invaders',{a:'move',d:0}));
+holdBtn($('iF'),()=>post('invaders',{a:'fire'}),()=>{});
+const iHeld=new Set();
+addEventListener('keydown',e=>{if(tab!=='inv'||e.repeat)return;const k=e.key;
+ if(k===' '){e.preventDefault();post('invaders',{a:'fire'});}
+ else if(['ArrowLeft','a','A'].includes(k)){e.preventDefault();iHeld.add('L');post('invaders',{a:'move',d:-1});}
+ else if(['ArrowRight','d','D'].includes(k)){e.preventDefault();iHeld.add('R');post('invaders',{a:'move',d:1});}});
+addEventListener('keyup',e=>{if(tab!=='inv')return;const k=e.key;
+ if(['ArrowLeft','a','A'].includes(k))iHeld.delete('L');else if(['ArrowRight','d','D'].includes(k))iHeld.delete('R');else return;
+ post('invaders',{a:'move',d:iHeld.has('L')?-1:iHeld.has('R')?1:0});});
+async function loadInv(){IV=await get('invaders');
+ const sel=$('iSide');const opts=[['-1','All sides']].concat(IV.sides.map((n,i)=>[String(i),n]));
+ if(sel.options.length!==opts.length)sel.replaceChildren(...opts.map(([v,n])=>mk('option',{value:v,textContent:n})));
+ $('iScore').textContent=IV.score+(IV.wave?'  ·  wave '+IV.wave:'');
+ $('iLives').textContent=IV.st==='idle'?'':'💚'.repeat(Math.max(0,IV.lives))||'—';
+ $('iMsg').textContent=IV.busy?('Visitors are playing '+IV.busyName+': the game can start when it ends.'):IV.visitor?'A visitor is playing Space Invaders from their phone.':IV.st==='over'?('Game over ('+IV.why+'). Score '+IV.score+(IV.best?', best '+IV.best:'')):IV.st==='playing'||IV.st==='ready'?'Go!':'Pick a side and start.';
+ if(document.activeElement!==$('iPos')&&IV.st==='playing')$('iPos').value=Math.round(IV.x*1000);}
 // ---------- refresh
 async function refresh(){try{
  if(tab==='mix'&&Date.now()-busy>700){M=await get('mixer');drawMix(false);}
  if(tab==='keys'&&!document.querySelector('.key.down'))await loadKeys();
- if(tab==='midi'||learn)await loadMidi();}catch(e){}}
-refresh();setInterval(refresh,1200);
+ if(tab==='midi'||learn)await loadMidi();
+ if(tab==='pong')await loadPong();
+ if(tab==='inv')await loadInv();}catch(e){}}
+refresh();setInterval(refresh,1200);setInterval(()=>{if(tab==='pong'&&PG&&PG.st==='playing')loadPong().catch(()=>{});if(tab==='inv'&&IV&&(IV.st==='playing'||IV.st==='ready'))loadInv().catch(()=>{});},500);
+</script></body></html>"""
+
+RACE_PAGE = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ShowPlay · Race to the Star</title>
+<style>
+:root{--bg:#0d0a16;--card:#1a1428;--raise:#261d3a;--line:#3a2d52;--fg:#fff;--muted:#bfb3d4;--hot:#ffc83c;--ok:#39d353}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif}
+header{position:sticky;top:0;z-index:5;background:#0d0a16ee;border-bottom:1px solid var(--line);padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+header h1{font-size:19px;margin:0}a{color:var(--muted)}.sp{flex:1}
+main{max-width:980px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.ct{font-weight:800;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--hot)}.note{font-size:13px;color:var(--muted)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden}.seg button{border:0;background:var(--raise);color:var(--fg);padding:9px 14px;font:inherit;font-weight:700;cursor:pointer}
+.seg button.sel{background:var(--hot);color:#1a1200}
+.btn{min-height:42px;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:var(--raise);color:var(--fg);font:inherit;font-weight:700;cursor:pointer}
+.btn.primary{background:var(--hot);border-color:var(--hot);color:#1a1200}
+select,input[type=text],input[type=number]{min-height:40px;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--raise);color:var(--fg);font:inherit}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:var(--raise);border:1px solid var(--line);font-size:13px}
+.chip button{border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px}
+.pair{display:grid;grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) 44px;gap:8px;align-items:center}.pair select{width:100%;min-width:0}
+.sl{display:grid;grid-template-columns:160px 1fr 60px;gap:10px;align-items:center}.sl input{width:100%;accent-color:var(--hot)}
+.cols{display:flex;gap:8px;flex-wrap:wrap}.cols input[type=color]{width:46px;height:38px;border:1px solid var(--line);border-radius:10px;background:none;padding:2px}
+label.ck{display:inline-flex;gap:8px;align-items:center}input[type=checkbox]{width:20px;height:20px;accent-color:var(--hot)}
+#bar{position:sticky;bottom:0;background:#0d0a16ee;border-top:1px solid var(--line);padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:center}
+.live{font-size:13px;color:var(--muted)}
+</style></head><body>
+<header><h1>🌟 Race to the Star</h1><span class="sp"></span><span class="live" id="live"></span><a href="/">Control page</a><a href="/mixer">Mixer</a></header>
+<main>
+<div class="card"><div class="ct">1 · Track</div>
+ <div class="row"><span class="note">Type</span><div class="seg" id="track"><button data-v="split">One shared track</button><button data-v="each">A track per player</button><button data-v="cube">The cube</button></div></div>
+ <div id="splitBox" style="display:flex;flex-direction:column;gap:10px">
+  <div class="note">The track: any models or groups of the show (a mega tree, a matrix, a custom model, strings, the roof line…). A group is added as its models.</div>
+  <div class="row"><select id="trackPick" style="min-width:260px"></select><button class="btn" id="trackAdd">Add to the track</button></div>
+  <div class="row" id="trackChips"></div>
+  <div class="row"><span class="note">Split the track</span><div class="seg" id="split"><button data-v="stripes">Stripes</button><button data-v="halves">Side by side</button><button data-v="rings">Rings</button></div></div>
+  <div class="sl" id="frontRow"><span class="note">Front of the tree (side by side)</span><input type="range" id="front" min="0" max="100"><span id="frontV"></span></div>
+  <div class="note">The star: any models (a star, a snowflake, a singing prop…), several, or none (the top of the track becomes the star).</div>
+  <div class="row"><select id="starPick" style="min-width:260px"></select><button class="btn" id="starAdd">Add as a star</button></div>
+  <div class="row" id="starChips"></div>
+ </div>
+ <div id="eachBox" style="display:flex;flex-direction:column;gap:8px">
+  <div class="note">One track and one star for each player (up to 8). <b>Pair automatically</b> matches names like "TreeMiniMega 1" with "StarMiniMega1".</div>
+  <div class="row"><button class="btn" id="autoPair">Pair automatically</button><button class="btn" id="addPair">+ Add a pair</button></div>
+  <div id="pairs" style="display:flex;flex-direction:column;gap:6px"></div>
+ </div>
+ <div id="cubeBox" class="row"><span class="note">Side of the cube</span><select id="side"></select><span class="note">Lanes are columns; the star is the top two rows. Works without EZPlayer.</span></div>
+ <div class="row"><span class="note">Climb direction</span><div class="seg" id="dir"><button data-v="up">Up</button><button data-v="down">Down</button><button data-v="right">Right</button><button data-v="left">Left</button><button data-v="order">Along the string</button></div></div>
+ <div class="note">"Down" for trees wired upside down; "Right" / "Left" for a roof line or an arch; "Along the string" follows the order of the pixels.</div>
+</div>
+<div class="card"><div class="ct">2 · Ways to play</div>
+ <div class="row"><label class="ck"><input type="checkbox" class="mode" value="tap"> 👆 Tap</label><label class="ck"><input type="checkbox" class="mode" value="voice"> 🎤 Voice</label><label class="ck"><input type="checkbox" class="mode" value="shake"> 🤳 Shake</label><label class="ck"><input type="checkbox" class="mode" value="run"> 🏃 Run on the spot</label></div>
+ <label class="ck"><input type="checkbox" id="mix"> Each player picks their own way (off: everyone plays the first player's way)</label>
+ <label class="ck"><input type="checkbox" id="shared"> Two players on one phone (👆 Tap: the screen splits into two buttons)</label>
+</div>
+<div class="card"><div class="ct">3 · Players</div>
+ <div class="row"><label class="note">At least <input type="number" id="min" min="1" max="8" style="width:70px"></label><label class="note">At most <input type="number" id="max" min="1" max="8" style="width:70px"></label><span class="note">(1 = a player can race alone, against the clock)</span></div>
+ <div class="note">Colours players can pick (a colour taken is locked for the others):</div>
+ <div class="cols" id="cols"></div>
+ <div class="row"><label class="note">Waiting room open for <input type="number" id="lobby" min="10" max="120" style="width:80px"> s</label><label class="ck"><input type="checkbox" id="early"> The first player can start sooner</label></div>
+</div>
+<div class="card"><div class="ct">4 · Players' levels</div>
+ <div class="note">How far the same effort climbs for each level (100 % = normal).</div>
+ <div class="sl"><span>🧒 Child</span><input type="range" class="lvl" data-k="kid" min="50" max="250"><span></span></div>
+ <div class="sl"><span>🧑 Adult</span><input type="range" class="lvl" data-k="adult" min="50" max="250"><span></span></div>
+ <div class="sl"><span>🏃 Sporty</span><input type="range" class="lvl" data-k="sport" min="50" max="250"><span></span></div>
+ <label class="ck"><input type="checkbox" id="catchup"> Help whoever is behind (they climb a little faster, so races stay close to the end)</label>
+</div>
+<div class="card"><div class="ct">5 · Difficulty</div>
+ <div class="seg" id="difficulty"><button data-v="easy">Easy</button><button data-v="normal">Normal</button><button data-v="hard">Hard</button><button data-v="custom">Custom</button></div>
+ <div class="sl"><span>Race length (average effort)</span><input type="range" id="target" min="10" max="120"><span></span></div>
+ <div class="sl"><span>Slide speed when stopped</span><input type="range" id="slide" min="0" max="30"><span></span></div>
+ <div class="sl"><span>Wait before sliding</span><input type="range" id="delay" min="0" max="50"><span></span></div>
+ <div class="sl"><span>Longest race</span><input type="range" id="max_time" min="30" max="300"><span></span></div>
+</div>
+<div class="card"><div class="ct">6 · Star and effects</div>
+ <label class="ck"><input type="checkbox" id="leader"> The star shows the leader's colour during the race</label>
+ <label class="ck"><input type="checkbox" id="countdown"> 3-2-1 countdown on the lights</label>
+ <label class="ck"><input type="checkbox" id="rainbow"> Rainbow party on the track at the end (off: the winner's colour)</label>
+ <div class="sl"><span>Party length</span><input type="range" id="party" min="3" max="20"><span></span></div>
+ <div class="sl"><span>Brightness</span><input type="range" id="bright" min="10" max="100"><span></span></div>
+ <div class="row"><span class="note">Track background</span><div class="seg" id="bg"><button data-v="dim">Dim lane colours</button><button data-v="off">Off</button></div></div>
+</div>
+<div class="card"><div class="ct">7 · Test and profiles</div>
+ <div class="row"><label class="note">Test race with <select id="testN"><option>2</option><option>3</option><option>4</option><option>6</option><option>8</option></select> pretend players</label><button class="btn" id="test">▶ Test race</button>
+  <label class="note">Finish in <select id="finCol"></select></label><button class="btn" id="fin">🌟 Test the finish</button><button class="btn" id="stop">⏹ Stop</button></div>
+ <div class="note" id="testMsg"></div>
+ <div class="row"><select id="prof" style="min-width:180px"></select><button class="btn" id="profLoad">Load</button><button class="btn" id="profDel">Delete</button>
+  <input type="text" id="profName" placeholder="Profile name (e.g. Children)" maxlength="24"><button class="btn" id="profSave">Save as profile</button></div>
+ <div class="note">Saving a profile also saves the settings above. Visitors see the race in 🎮 Games when "Race to the Star" is ticked under Games on the control page.</div>
+</div>
+</main>
+<div id="bar"><button class="btn primary" id="save">Save the race settings</button><span class="note" id="saved"></span></div>
+<script>
+const $=id=>document.getElementById(id);
+const post=(b)=>fetch('/api/race',{method:'POST',headers:{'X-Cube':'1'},body:JSON.stringify(b)}).then(r=>r.json());
+let C=null,MODELS=[],GROUPS={},R=null;
+function seg(id,v){[...$(id).children].forEach(b=>b.classList.toggle('sel',b.dataset.v===v));}
+function segVal(id){const b=$(id).querySelector('.sel');return b?b.dataset.v:null;}
+document.querySelectorAll('.seg').forEach(s=>s.addEventListener('click',e=>{if(e.target.dataset.v){seg(s.id,e.target.dataset.v);if(s.id==='difficulty')applyPreset(e.target.dataset.v);show();}}));
+const PRE={easy:{target:25,slide:0.02,delay:2.0},normal:{target:35,slide:0.035,delay:1.2},hard:{target:45,slide:0.06,delay:0.6}};
+function applyPreset(v){if(PRE[v]){$('target').value=PRE[v].target;$('slide').value=Math.round(PRE[v].slide*500);$('delay').value=Math.round(PRE[v].delay*10);labels();}}
+function labels(){
+ $('frontV').textContent=$('front').value+'%';
+ document.querySelectorAll('.lvl').forEach(i=>i.nextElementSibling.textContent=i.value+' %');
+ $('target').nextElementSibling.textContent=$('target').value+' s';
+ $('slide').nextElementSibling.textContent=($('slide').value/5).toFixed(1)+' %/s';
+ $('delay').nextElementSibling.textContent=($('delay').value/10).toFixed(1)+' s';
+ $('max_time').nextElementSibling.textContent=$('max_time').value+' s';
+ $('party').nextElementSibling.textContent=$('party').value+' s';
+ $('bright').nextElementSibling.textContent=$('bright').value+' %';}
+['front','target','slide','delay','max_time','party','bright'].forEach(id=>$(id).addEventListener('input',()=>{labels();if(['target','slide','delay'].includes(id))seg('difficulty','custom');}));
+document.querySelectorAll('.lvl').forEach(i=>i.addEventListener('input',labels));
+function show(){const t=segVal('track');$('splitBox').style.display=t==='split'?'flex':'none';$('eachBox').style.display=t==='each'?'flex':'none';$('cubeBox').style.display=t==='cube'?'flex':'none';
+ $('frontRow').style.display=segVal('split')==='halves'?'grid':'none';}
+function opts(sel,withGroups){sel.replaceChildren(...[['','— pick —']].concat(withGroups?Object.keys(GROUPS).sort().map(g=>['g:'+g,'Group: '+g+' ('+GROUPS[g].length+')']):[]).concat(MODELS.map(m=>['m:'+m,m])).map(([v,n])=>{const o=document.createElement('option');o.value=v;o.textContent=n;return o;}));}
+function expand(v){return v.startsWith('g:')?(GROUPS[v.slice(2)]||[]):v.startsWith('m:')?[v.slice(2)]:[];}
+function chips(box,list){box.replaceChildren(...list.map((m,i)=>{const c=document.createElement('span');c.className='chip';c.textContent=m;const x=document.createElement('button');x.textContent='✕';x.onclick=()=>{list.splice(i,1);chips(box,list);};c.append(x);return c;}));
+ if(!list.length){const n=document.createElement('span');n.className='note';n.textContent='Nothing yet.';box.append(n);}}
+$('trackAdd').onclick=()=>{expand($('trackPick').value).forEach(m=>{if(!C.models.includes(m))C.models.push(m);});chips($('trackChips'),C.models);};
+$('starAdd').onclick=()=>{expand($('starPick').value).forEach(m=>{if(!C.stars.includes(m))C.stars.push(m);});chips($('starChips'),C.stars);};
+function drawPairs(){$('pairs').replaceChildren(...C.pairs.map((p,i)=>{const row=document.createElement('div');row.className='pair';
+  const n=document.createElement('b');n.textContent=i+1;const a=document.createElement('select'),b=document.createElement('select');opts(a,true);opts(b,true);
+  a.value=p.track.length===1?'m:'+p.track[0]:'';b.value=p.star.length===1?'m:'+p.star[0]:(p.star.length?'':'');
+  if(p.track.length>1){const o=document.createElement('option');o.value='keep';o.textContent=p.track.length+' models';a.prepend(o);a.value='keep';}
+  a.onchange=()=>{if(a.value!=='keep')p.track=expand(a.value);};b.onchange=()=>{p.star=expand(b.value);};
+  const x=document.createElement('button');x.className='btn';x.textContent='✕';x.onclick=()=>{C.pairs.splice(i,1);drawPairs();};
+  row.append(n,a,b,x);return row;}));
+ if(!C.pairs.length){const n=document.createElement('div');n.className='note';n.textContent='No pairs yet: press "Pair automatically" or "+ Add a pair". Left: the track, right: its star.';$('pairs').append(n);}}
+$('addPair').onclick=()=>{if(C.pairs.length<8){C.pairs.push({track:[],star:[]});drawPairs();}};
+$('autoPair').onclick=()=>{const key=s=>s.toLowerCase().replace(/tree|star|mega|mini/g,'').replace(/[^a-z0-9]/g,'');
+ const trees=MODELS.filter(m=>/tree/i.test(m)),stars=MODELS.filter(m=>/star/i.test(m));const out=[];
+ trees.forEach(t=>{const k=key(t);const s=stars.find(x=>key(x)===k);if(s&&k&&out.length<8)out.push({track:[t],star:[s]});});
+ if(!out.length){$('testMsg').textContent='No matching tree / star names found: add the pairs by hand.';return;}
+ C.pairs=out;drawPairs();$('testMsg').textContent='Paired '+out.length+' tracks with their stars. Check them, then save.';};
+function drawCols(){$('cols').replaceChildren(...C.colours.map((c,i)=>{const w=document.createElement('span');const inp=document.createElement('input');inp.type='color';inp.value='#'+c;
+ inp.oninput=()=>{C.colours[i]=inp.value.slice(1);finCols();};w.append(inp);return w;}));finCols();}
+function finCols(){$('finCol').replaceChildren(...C.colours.map((c,i)=>{const o=document.createElement('option');o.value=c;o.textContent='colour '+(i+1);o.style.background='#'+c;return o;}));}
+function fill(){
+ seg('track',C.track);seg('split',C.split);seg('dir',C.dir);seg('difficulty',C.difficulty);seg('bg',C.bg);
+ $('front').value=Math.round(C.front*100);
+ document.querySelectorAll('.mode').forEach(c=>c.checked=C.modes.includes(c.value));
+ ['mix','shared','early','catchup','leader','countdown','rainbow'].forEach(k=>$(k).checked=!!C[k]);
+ ['min','max','lobby'].forEach(k=>$(k).value=C[k]);
+ document.querySelectorAll('.lvl').forEach(i=>i.value=Math.round(C.levels[i.dataset.k]*100));
+ $('target').value=C.target;$('slide').value=Math.round(C.slide*500);$('delay').value=Math.round(C.delay*10);$('max_time').value=C.max_time;$('party').value=C.party;$('bright').value=C.bright;
+ chips($('trackChips'),C.models);chips($('starChips'),C.stars);drawPairs();drawCols();
+ $('side').replaceChildren(...[['-1','All sides']].concat((R.sides||[]).map((n,i)=>[String(i),n])).map(([v,n])=>{const o=document.createElement('option');o.value=v;o.textContent=n;return o;}));$('side').value=String(C.side);
+ $('prof').replaceChildren(...(R.profiles.length?R.profiles:['']).map(n=>{const o=document.createElement('option');o.value=n;o.textContent=n||'(no profiles yet)';return o;}));
+ labels();show();}
+function gather(){return {track:segVal('track'),models:C.models,stars:C.stars,pairs:C.pairs.filter(p=>p.track.length),split:segVal('split'),front:$('front').value/100,dir:segVal('dir'),side:+$('side').value,
+ modes:[...document.querySelectorAll('.mode:checked')].map(c=>c.value),mix:$('mix').checked,shared:$('shared').checked,min:+$('min').value,max:+$('max').value,colours:C.colours,lobby:+$('lobby').value,early:$('early').checked,
+ levels:Object.fromEntries([...document.querySelectorAll('.lvl')].map(i=>[i.dataset.k,i.value/100])),catchup:$('catchup').checked,
+ difficulty:segVal('difficulty'),target:+$('target').value,slide:$('slide').value/500,delay:$('delay').value/10,max_time:+$('max_time').value,
+ leader:$('leader').checked,countdown:$('countdown').checked,rainbow:$('rainbow').checked,party:+$('party').value,bright:+$('bright').value,bg:segVal('bg')};}
+async function save(){const r=await post(Object.assign({a:'set'},gather()));C=r.cfg;$('saved').textContent='Saved.';setTimeout(()=>{$('saved').textContent='';},2500);return r;}
+$('save').onclick=save;
+$('test').onclick=async()=>{await save();const r=await post({a:'test',n:+$('testN').value});$('testMsg').textContent=r.ok?'Test race on the lights…':r.msg;};
+$('fin').onclick=async()=>{await save();const r=await post({a:'finish',c:$('finCol').value});$('testMsg').textContent=r.ok?'The finish, on the lights…':r.msg;};
+$('stop').onclick=()=>post({a:'stop'}).then(()=>{$('testMsg').textContent='Stopped.';});
+$('profSave').onclick=async()=>{const n=$('profName').value.trim();if(!n)return;await save();R=await post({a:'psave',name:n});load(false);};
+$('profLoad').onclick=async()=>{if(!$('prof').value)return;await post({a:'pload',name:$('prof').value});load(true);};
+$('profDel').onclick=async()=>{if(!$('prof').value||!confirm('Delete the profile '+$('prof').value+'?'))return;await post({a:'pdel',name:$('prof').value});load(false);};
+async function load(full){R=await (await fetch('/api/race')).json();if(full||!C){C=R.cfg;fill();}
+ else{$('prof').replaceChildren(...(R.profiles.length?R.profiles:['']).map(n=>{const o=document.createElement('option');o.value=n;o.textContent=n||'(no profiles yet)';return o;}));}}
+async function models(){try{const r=await (await fetch('/api/props-models',{method:'POST',headers:{'X-Cube':'1'},body:'{}'})).json();MODELS=(r.models||[]).map(x=>x.model).sort();GROUPS=r.groups||{};
+ opts($('trackPick'),true);opts($('starPick'),true);if(C)drawPairs();if(!r.ok)$('testMsg').textContent='EZPlayer: '+(r.msg||'not answering')+' (only the cube track works without it).';}catch(e){}}
+async function live(){try{const s=await (await fetch('/api/race')).json();const st=s.state;
+ $('live').textContent=st.st==='idle'?'No race now':(st.test?'Test: ':'')+st.st+' · '+st.n+' player(s)'+(st.winner!=null&&st.st==='over'?' · winner '+(st.winner+1):'');}catch(e){}}
+load(true).then(models);setInterval(live,1500);
 </script></body></html>"""
 
 URL_RE = re.compile(r"https?://[A-Za-z0-9.\-]+(:\d{1,5})?/?")
@@ -3332,10 +6103,53 @@ class Admin(BaseHTTPRequestHandler):
             return self.send(200, ADMIN, "text/html")
         if p in ("/mixer", "/keys"):
             return self.send(200, MIXER, "text/html")
+        if p == "/race":
+            return self.send(200, RACE_PAGE, "text/html")
+        if p == "/api/race":
+            r = game.all["race"]
+            return self.send(200, {"cfg": race_cfg(), "state": r.state(), "profiles": sorted(S.get("race_profiles") or {}),
+                                   "sides": [face_name(i) for i in range(len(S["faces"]))], "ezpOk": ezp_state["ok"]})
         if p == "/api/mixer":
             return self.send(200, mix_state())
         if p == "/api/midi":
             return self.send(200, midi_state())
+        if p == "/api/sing":
+            st = sing_state()
+            st.update(singers=[{"k": k, "n": n, "e": e, "kind": kind, "on": on} for k, n, e, kind, on in sing_list()],
+                      sing=bool(S.get("sing")), approve=bool(S.get("sing_approve")), volume=S.get("sing_volume", 100),
+                      device=S.get("sing_device", ""), devices=audio_devices(), delay=S.get("sing_delay", 0.15),
+                      props=bool(S.get("sing_props", True)), cube=bool(S.get("sing_cube", True)), loading=SING["loading"],
+                      found=len(SING["faces"]), ezpOk=ezp_state["ok"], os="windows" if os.name == "nt" else "mac" if sys.platform == "darwin" else "linux",
+                      pending=[{"id": x["id"], "who": x["who"], "ago": int(time.time() - x["at"])} for x in SING["pending"]])
+            return self.send(200, st)
+        if p == "/api/sing/audio":
+            sid = self.path.split("id=", 1)[-1][:16]
+            it = next((x for x in SING["pending"] if x["id"] == sid), None)
+            if not it:
+                return self.send(404, {"error": "?"})
+            try:
+                data = fetch(it["url"], limit=SING_MAX_BYTES + 1, timeout=20)
+            except Exception:
+                return self.send(404, {"error": "?"})
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/wav")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        if p == "/api/invaders":
+            st = game.all["invaders"].state()
+            st["busy"] = game.cur.CODE != "invaders" and game.cur.st not in ("idle", "over")
+            st["busyName"] = game.cur.NAME if st["busy"] else ""
+            st["visitor"] = game.cur.CODE == "invaders" and st["mode"] == "visitor" and st["st"] in ("ready", "playing")
+            st["sides"] = [face_name(i) for i in range(len(S["faces"]))]
+            return self.send(200, st)
+        if p == "/api/pong":
+            st = game.all["pong"].state()
+            st["busy"] = (game.cur.CODE != "pong" and game.cur.st not in ("idle", "over")) or (st["mode"] == "visitor" and st["st"] == "playing")
+            st["busyName"] = ("Pong (a visitor)" if game.cur.CODE == "pong" else game.cur.NAME) if st["busy"] else ""
+            st["sides"] = [face_name(i) for i in range(len(S["faces"]))]
+            return self.send(200, st)
         if p == "/api/keys":
             if S.get("props") and ezp_state["ok"] and not key_geoms:
                 threading.Thread(target=keys_prepare, daemon=True).start()
@@ -3359,6 +6173,134 @@ class Admin(BaseHTTPRequestHandler):
             return self.send(200, {"ok": keys_action(b)})
         if p == "/api/midi":
             return self.send(200, {"ok": midi_action(b)})
+        if p == "/api/race":
+            a, r = b.get("a"), game.all["race"]
+            if a == "set":
+                with lock:
+                    S["race"] = race_clean(b)
+                    save()
+                return self.send(200, {"ok": True, "cfg": race_cfg()})
+            if a in ("test", "finish"):
+                if game.cur is not r and game.cur.st not in ("idle", "over"):
+                    return self.send(200, {"ok": False, "msg": "visitors are playing " + game.cur.NAME})
+                if game.cur is not r:
+                    with game.cur.lock:
+                        game.cur.reset()
+                    game.cur = r
+                if a == "test":
+                    why = r.start_test(b.get("n", 2) if isint(b.get("n")) else 2)
+                    return self.send(200, {"ok": not why, "msg": why})
+                with r.lock:
+                    if r.st in ("lobby", "countdown", "race") and not r.test:
+                        return self.send(200, {"ok": False, "msg": "a race is on"})
+                    r.reset()
+                    r.test = True
+                    c = b.get("c") if b.get("c") in r.cfg["colours"] else r.cfg["colours"][0]
+                    r.add_player("t" * 16, "test00", 0, c, "tap", "adult")
+                    r.players[0]["h"] = 1.0
+                    r.finish(0, "test")
+                    r.until = time.time() + min(6, r.cfg["party"])
+                return self.send(200, {"ok": True})
+            if a == "stop":
+                with r.lock:
+                    if r.test:
+                        r.reset()
+                    elif r.st in ("lobby", "countdown", "race"):
+                        r.finish(None, "stopped by the crew")
+                return self.send(200, {"ok": True})
+            if a in ("psave", "pload", "pdel"):
+                name = str(b.get("name", "")).strip()[:24]
+                with lock:
+                    prof = dict(S.get("race_profiles") or {})
+                    if a == "psave" and name:
+                        prof[name] = race_cfg()
+                    elif a == "pload" and name in prof:
+                        S["race"] = dict(prof[name])
+                    elif a == "pdel":
+                        prof.pop(name, None)
+                    S["race_profiles"] = prof
+                    save()
+                return self.send(200, {"ok": True, "cfg": race_cfg(), "state": r.state(), "profiles": sorted(prof), "sides": [face_name(i) for i in range(len(S["faces"]))]})
+            return self.send(200, {"ok": False})
+        if p == "/api/sing":
+            a = b.get("a")
+            if a == "set":
+                with lock:
+                    for k in ("sing", "sing_approve", "sing_props", "sing_cube"):
+                        if k in b:
+                            S[k] = bool(b[k])
+                    if b.get("sing_volume") in (25, 50, 75, 100):
+                        S["sing_volume"] = b["sing_volume"]
+                    if isinstance(b.get("sing_delay"), (int, float)) and 0 <= b["sing_delay"] <= 1.5:
+                        S["sing_delay"] = float(b["sing_delay"])
+                    if isinstance(b.get("sing_device"), str) and len(b["sing_device"]) < 120 and re.fullmatch(r"[\w:=,.\-]*", b["sing_device"]):
+                        S["sing_device"] = b["sing_device"]
+                    if isinstance(b.get("sing_off"), list):
+                        S["sing_off"] = [str(x)[:120] for x in b["sing_off"]][:200]
+                    if isinstance(b.get("sing_names"), dict):
+                        S["sing_names"] = {str(k)[:120]: {"n": str(v.get("n", ""))[:28], "e": str(v.get("e", ""))[:4]}
+                                           for k, v in list(b["sing_names"].items())[:200] if isinstance(v, dict)}
+                    save()
+                    SING["v"] += 1
+                return self.send(200, {"ok": True})
+            if a == "find":
+                SING["faces_ver"] = None
+                threading.Thread(target=sing_faces_load, daemon=True).start()
+                return self.send(200, {"ok": True})
+            if a == "test":
+                def test():
+                    import tempfile
+                    fd, path = tempfile.mkstemp(suffix=".wav", prefix="showplay-test-")
+                    os.close(fd)
+                    try:
+                        sing_test_wav(path)
+                        play_audio(path)
+                        log("sing: test sound played")
+                    finally:
+                        try:
+                            os.remove(path)
+                        except OSError:
+                            pass
+                threading.Thread(target=test, daemon=True).start()
+                return self.send(200, {"ok": True})
+            if a in ("approve", "reject"):
+                with lock:
+                    it = next((x for x in SING["pending"] if x["id"] == b.get("id")), None)
+                    if it:
+                        SING["pending"].remove(it)
+                        if a == "approve":
+                            SING["queue"].append(it)
+                        SING["v"] += 1
+                return self.send(200, {"ok": bool(it)})
+            return self.send(200, {"ok": False})
+        if p == "/api/invaders":
+            a, g = b.get("a"), game.all["invaders"]
+            if a == "start":
+                why = game.start_crew("invaders", "crew", b.get("z", -1))
+                return self.send(200, {"ok": not why, "msg": why})
+            if a == "move":
+                x, d = b.get("x"), b.get("d")
+                g.crew_move(x=x if isinstance(x, (int, float)) and not isinstance(x, bool) else None, d=d if isint(d) else None)
+                return self.send(200, {"ok": True})
+            if a == "fire":
+                g.crew_fire()
+                return self.send(200, {"ok": True})
+            if a == "stop":
+                g.stop()
+                return self.send(200, {"ok": True})
+            return self.send(200, {"ok": False})
+        if p == "/api/pong":
+            a = b.get("a")
+            if a == "start":
+                why = game.start_pong(b.get("mode"), b.get("z", -1))
+                return self.send(200, {"ok": not why, "msg": why})
+            if a == "pad" and b.get("p") in (0, 1) and isinstance(b.get("v"), (int, float)):
+                game.all["pong"].set_pad(b["p"], b["v"])
+                return self.send(200, {"ok": True})
+            if a == "stop":
+                game.all["pong"].stop()
+                return self.send(200, {"ok": True})
+            return self.send(200, {"ok": False})
         if p == "/api/models":   # read the models from EZPlayer (with the address typed on the page, not saved yet)
             ezp = str(b.get("ezp") or S["ezp"]).strip()
             if not URL_RE.fullmatch(ezp):
@@ -3375,7 +6317,13 @@ class Admin(BaseHTTPRequestHandler):
                     S["fps"] = b["fps"]
                 if b.get("cpu_level") in ("easy", "normal", "hard"):
                     S["cpu_level"] = b["cpu_level"]
-                for k in ("on", "approve", "free", "hold", "wait_turn", "games"):
+                if b.get("play_secs") in (20, 30, 45, 60):
+                    S["play_secs"] = b["play_secs"]
+                if isinstance(b.get("play_props"), list):
+                    S["play_props"] = [i for i in b["play_props"] if isint(i) and 0 <= i < 64]
+                if isinstance(b.get("game_list"), list):
+                    S["game_list"] = [g for g in GAMES if g in b["game_list"]]
+                for k in ("on", "approve", "free", "hold", "wait_turn", "games", "play"):
                     if k in b:
                         S[k] = bool(b[k])
                 ezp = str(b.get("ezp", "")).strip()
@@ -3483,7 +6431,7 @@ class Admin(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     load()
     log("ShowPlay bridge %s - control page: http://%s:%d" % (VERSION, my_ip(), PORT))
-    for target in (show_loop, render_loop, listen, status_loop, ezp_watch, game_loop, mix_watch, midi_native,
+    for target in (show_loop, render_loop, listen, status_loop, ezp_watch, game_loop, mix_watch, midi_native, play_loop, sing_loop,
                    lambda: (time.sleep(3), ezp_targets() if S.get("props") else None, prepare_props())):
         threading.Thread(target=target, daemon=True).start()
     ThreadingHTTPServer(("0.0.0.0", PORT), Admin).serve_forever()

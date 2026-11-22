@@ -1,7 +1,7 @@
-# ShowPlay — Installation guide for macOS (v12)
+# ShowPlay — Installation guide for macOS (v18)
 
 Visitors scan a QR code on the wall, and from their phone they send a message, a picture, an effect or a drawing
-to a cube of LED matrices, play **Four in a Row** on it, or light up **props of the show** (the wings, the bats,
+to a cube of LED matrices, play **games** on it (Four in a Row, Tic-tac-toe, Simon, Count the colours, Snake, Space Invaders, Pong, Race to the Star), take turns to **play the lights** of the props, **sing** into the phone and make a singing prop sing it, or light up **props of the show** (the wings, the bats,
 the spinners…) with effects and colours.
 
 The cube is **independent**: it needs no xLights and no show player. The bridge runs on a Mac at home, draws each
@@ -180,32 +180,189 @@ fight over it.
   Other celebrations: rainbow, fireworks, plasma, ripples, falling code, ocean.
 - **Drawing:** in 9 colours, at the size of the chosen side, which can also be brought to life.
 
-## Game: Four in a Row
+## Games
 
-Visitors open the **🎮 Game** tab on the visitors' page:
+Visitors open the **🎮 Games** tab on the visitors' page and pick a game. The tab shows only the games switched on
+under **Games** on the control page (all eight by default). The crew's faster **Pong** and **Space Invaders** are played by the
+people running the show, from the Mixer page (see below).
 
-- **Play against the computer:** the visitor plays red (or orange at Halloween) and goes first. The computer can be
-  set to **Easy**, **Normal** or **Hard** on the control page (Games). Easy is good for small children: it makes
-  mistakes on purpose.
-- **Play against a friend:** the first visitor starts the game, and a friend opens the same page on their own phone
-  (from the same QR code), goes to **🎮 Game** and taps **Join the game**.
+| Game | Players | In short |
+| --- | --- | --- |
+| 🔴 Four in a Row | 1 against the computer, or 2 | Drop discs, four in a row wins |
+| ❌ Tic-tac-toe | 1 against the computer, or 2 | Three in a row wins; the computer never loses on Hard |
+| 🟢 Simon | 1 | Repeat the colours the lights show, one more each round |
+| 🔢 Count the colours | 1 to 8 at once | Count how many times a colour flashes; 5 rounds |
+| 🐍 Snake | 1 | Steer a slow snake with arrows; eat to grow |
+| 👾 Space Invaders | 1 | Slide the ship; it fires by itself. Three lives, waves, a mystery ship |
+| 🏓 Pong | 1 against the computer | Slide the paddle; slower ball, longer paddles; first to 5 |
+| 🌟 Race to the Star | 1 to 8 at once | Tap, sing, shake or run to climb a track of lights; the first to the top lights the star |
 
-How it works:
+**🔴 Four in a Row** and **❌ Tic-tac-toe** (noughts and crosses):
 
-- The game shows on the side the visitor picked, or on all sides. While a game is on, that side shows the board, and
-  other requests for it wait until the game ends.
-- Each player has **45 seconds** per move. If time runs out, the game ends (against a friend, the other player wins).
-  A friend has 90 seconds to join.
-- Only one game can be played at a time. Other visitors see "A game is being played" and can watch it on the lights
-  and on their phone.
-- At the end, the four winning discs blink and the board turns rainbow for a few seconds. Then the side goes back to
-  normal.
-- Each phone keeps its own player code, so another phone cannot play for someone else.
-- To switch games off, untick **Let visitors play Four in a Row on the cube** on the control page.
+- **Play against the computer:** the visitor plays first. The computer can be set to **Easy**, **Normal** or **Hard**
+  on the control page (Games). Easy is good for small children: it makes mistakes on purpose. In Tic-tac-toe, Hard
+  never loses.
+- **Play against a friend:** the first visitor starts the game. A friend opens the same page on their own phone (from
+  the same QR code), goes to **🎮 Games** and taps **Join the game**.
+- **Time limits:** each player has **45 seconds** per move. If time runs out, the game ends (against a friend, the
+  other player wins). A friend has 90 seconds to join.
+- **The end:** the winning line blinks and the board turns rainbow for a few seconds.
 
-The bridge posts the board on ntfy.sh **once per move**, and each phone sends its own moves. That keeps well inside
-ntfy.sh's free limits for a show. If you ever see "could not post the game board" in the log, ntfy.sh is limiting
-the bridge, and the board on the phones updates again a few seconds later.
+**🟢 Simon** (memory of colours), for one player:
+
+- **How it plays:** the side shows four colours (green, red, yellow, blue) and lights them up one by one in a
+  sequence. The visitor repeats it on four big buttons on their phone, each with its own note.
+- **Each round:** a right answer flashes the side green and adds a colour, a little faster each round. The time to
+  answer is 6 s plus 1.2 s per colour.
+- **The end:** a wrong colour ends the game (the side blinks the colour that was right), and 30 rounds wins. The
+  phone shows the score and the best score since the bridge started.
+
+**🔢 Count the colours**, a party game for up to 8 phones at once:
+
+1. **Players join.** One visitor starts a new game. Others scan the same QR code, open **🎮 Games** and tap **Join**
+   within 25 seconds. Each player gets an animal (🦊 🐼 🐸 🐧 🦁 🐯 🐨 🐵). Dots on the side show how many have joined,
+   and the first player can **Start now**.
+2. **The colour to count.** The side shows a frame in the colour to count, and the phones say which one ("Count the red
+   flashes!").
+3. **The flashes.** The side flashes red, green, blue and yellow quickly, never the same colour twice in a row.
+4. **The answers.** Everyone taps how many times the colour flashed (0–15) within 12 seconds.
+5. **The result.** The side shows the right number as dots, and the phones show who got it right (✅ / ❌).
+6. **The winner.** After 5 rounds, each one faster and longer, the most right answers wins.
+
+This game is fair over the relay: the answer is a number, so it does not matter whose phone is faster.
+
+**🐍 Snake**, for one player:
+
+- **The board:** 8 × 8 squares on the side.
+- **Steering:** arrow buttons on the phone, a swipe on them, or the arrow keys on a computer. The snake eats the red
+  squares to grow and must not hit the walls or itself.
+- **Speed:** the relay takes up to a second, so the snake moves slowly on purpose. It starts at about one square a
+  second and gets a little faster as it grows. Up to 3 turns are remembered in advance, so players can plan ahead.
+- **The end:** a game lasts at most 5 minutes. The phone shows the score and the best score since the bridge started.
+- **Messages:** each turn is one message from the phone. A long game is still well inside ntfy.sh's free limits for
+  one phone, but very long sessions on the same phone can reach them.
+
+**👾 Space Invaders**, for one player:
+
+- **Playing:** rows of invaders march across the side and come down. Shoot them before they land and dodge their
+  bombs. There are shields, a mystery ship at the top for extra points, three lives, an extra life for each wave
+  cleared, and waves that get faster.
+- **Made for the relay's delay:**
+  - the visitor slides a finger on a strip and the phone sends **where the ship should go**: one message per slide,
+    at most two a second; the ship glides there by itself;
+  - the ship **fires by itself**;
+  - invaders, bombs and the game's speed are slower than in the crew's version;
+  - at most one bomb falls at a time in the first waves.
+- **The end:** the invaders land, or the lives run out. A game lasts at most 7 minutes. The phone shows the score and
+  the best score since the bridge started.
+
+**🌟 Race to the Star** (new in v18), for 1 to 8 phones at once (two players can share one phone):
+
+- **Playing:** players climb a track of lights (a mega tree, a matrix, any model or group, or a side of the cube) by
+  tapping, singing, shaking the phone or running on the spot. Stopping makes them slide down. The first to the top
+  lights the star in their colour.
+- **Fair for everyone:** each player picks their colour, their way to play and their level (child, adult, sporty).
+  The phone measures the effort itself and sends it about once a second (no sound is sent), so the relay's delay is
+  the same for everyone.
+- **Set it up** on its own page, **http://\<this-computer's-ip\>:8099/race**:
+  - track and star;
+  - split of the track;
+  - ways to play;
+  - players and colours;
+  - levels;
+  - difficulty;
+  - effects;
+  - a test race with pretend players;
+  - saved profiles.
+- **The full guide** is [../docs/race.md](../docs/race.md).
+
+**🏓 Pong for visitors** (new in v16), one visitor against the computer:
+
+- **Playing:** the visitor is red on the left and the computer is blue on the right. First to 5 points wins.
+- **Made for the relay's delay:**
+  - the visitor slides a finger up and down on a strip and the phone sends where the paddle should go (at most two
+    messages a second); the paddle glides there;
+  - the ball is slower and the paddles longer than in the crew's Pong;
+  - the computer reacts late and aims a little off, so children can win.
+- **The end:** a game lasts at most 5 minutes, and stops after 1 minute with nobody moving the paddle.
+
+**🏓 Pong for the crew** (Mixer page, no delay):
+
+- **Where:** the Mixer page, on the home network (**🏓 Pong** tab at http://\<bridge-ip\>:8099/mixer). There is no
+  relay in between, so there is no delay.
+- **Players:** one player against the computer, or two players (two phones, or one each side of a computer).
+- **Paddles:** a finger dragging in a strip, W / S and ↑ / ↓ on a keyboard, or a **MIDI fader or knob** (learn
+  `game:p1` / `game:p2` with 🎓 Learn). The computer plays any side nobody moves. First to 5 points wins.
+- **Visitors:** while the crew's Pong is on, the visitors' 🎮 Games tab shows that the crew is playing, with the
+  score. The crew cannot start Pong while a visitor is playing it.
+
+**👾 Space Invaders for the crew** (Mixer page, **👾 Invaders** tab, no delay):
+
+- **Speed:** the full-speed game, with more bombs and faster invaders.
+- **Moving:** the slider, ◀ / ▶, the arrow keys or A / D. A MIDI knob or fader can be learned as `game:ship`, and
+  pads as `game:left` / `game:right`.
+- **Firing:** 🔥, Space, or a MIDI pad learned as `game:fire`.
+
+**For all the games:**
+
+- **Where it shows:** the game shows on the side the visitor picked, or on all sides. While a game is on, that side
+  shows the game, and other requests for it wait until the game ends.
+- **One game at a time:** other visitors see that a game is being played and can watch it on the lights and on their
+  phone. A different game can start as soon as the last one ends.
+- **Fair play:** each phone keeps its own player code, so another phone cannot play for someone else.
+- **Switching games off:** untick a game on the control page to hide it, or untick **Let visitors play games on the
+  cube** to switch them all off.
+
+The bridge posts a game on ntfy.sh only when something changes for the phones (a move, a new round, a score), never
+every step. If you ever see "could not post the game board" in the log, ntfy.sh is limiting the bridge, and the phones
+update again a few seconds later.
+
+## Play the lights (visitors)
+
+A **🎹 Play** tab on the visitors' page lets visitors take turns to play the lights of the show like a keyboard. It is
+a safe, public version of the Keys of the Mixer page.
+
+- **One visitor at a time:** each turn lasts 30 seconds by default (20, 30 or 45 seconds, or 1 minute, on the control
+  page). The others **join a queue** and see their place in it. A turn passes on early when the visitor taps "I'm
+  done" or stops tapping for 10 seconds.
+- **On the phone:** a pad for each model of the props ticked under **Play the lights (visitors)** on the control page,
+  up to 32 pads. For example, a prop made from the group of all the snowflakes gives one pad per snowflake. The
+  visitor picks one of 9 colours or 🌈 surprise, and each tap lights that model for a moment, then it fades out.
+- **No strobe, no blackout:** visitors cannot change the rest of the show or block it.
+- **Messages:** the phone gathers its taps for half a second into one message, so a whole turn stays well inside
+  ntfy.sh's free limits.
+- **How it works:**
+  - it uses the Keys engine of the bridge, so the crew can play the same models from the Mixer page at the same time;
+  - the crew's keys keep their own colours;
+  - it needs EZPlayer running and at least one prop.
+- **Switching it off:** untick **Let visitors take turns to play the lights** on the control page, and the tab
+  disappears from the phones.
+
+## Sing (visitors)
+
+New in v17. A **🎤 Sing** tab on the visitors' page:
+
+1. A visitor picks who sings.
+2. They record up to 10 seconds on their phone and send it.
+3. It plays on this computer's speaker while the singer "sings" it:
+   - a **singing model** of the show (a model with a face in xLights: pumpkins, trees, skulls…) moves its mouth;
+   - a **prop** glows with the voice;
+   - a **side of the cube** shows a face.
+
+The full guide is [../docs/sing.md](../docs/sing.md).
+
+- **Set it up** in the card **Sing (visitors)** on the control page:
+  1. press **Find the singing models in EZPlayer**;
+  2. untick the singers you do not want, and rename them if you like;
+  3. set the volume and press **🔊 Test sound**;
+  4. press **Save singing settings**.
+- **The speaker:** recordings play on the Mac's current sound output with `afplay`, which is part of macOS: nothing
+  to install.
+- **No approval by default:** recordings play straight away. Tick **Approve each recording before it plays** to listen
+  to each one first.
+- **Nothing is kept:** the bridge deletes each recording as soon as it has been played. There is no word filter for
+  sound.
+- **Microphone:** the visitors' page must be on HTTPS (GitHub Pages is) for phones to allow the microphone.
 
 ## Props of the show (through EZPlayer)
 
@@ -262,6 +419,7 @@ New in v12: pads, faders and keys for **whoever runs the show**. The full guide 
   - Master, Speed, Colour and White faders;
   - hold Flash, Strobe or Blackout;
   - save up to 8 scenes.
+- **Pong and 👾 Invaders tabs:** play Pong or Space Invaders on the lights, with a finger, the keyboard or MIDI controls.
 - **Keys tab:** every model of your props (and every side) is a key. Press higher to play harder, slide while holding
   to change it, let go to fade. Each key has its own effect and colour.
 - **Visitors:** while the Mixer drives a side or prop, visitors' requests for it wait. "Release all" gives everything
@@ -317,3 +475,5 @@ New in v12: pads, faders and keys for **whoever runs the show**. The full guide 
   bottom of the control page.
 - **MIDI does nothing on the Mac:** use Chrome or Edge at http://localhost:8099/mixer, press "Use the MIDI devices of this browser" and keep that tab open.
 - **The Mixer page does not open from a phone:** it uses the same port as the control page (8099), so the same network and firewall rules apply.
+- **No sound from 🎤 Sing:** press **🔊 Test sound** in the Sing card and read the log (see "Sing (visitors)").
+- **Race to the Star does not start:** set up its track on the race page (http://localhost:8099/race), or use the cube track (see "Games").

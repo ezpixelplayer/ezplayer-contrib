@@ -16,6 +16,8 @@ MIDI controller ──► bridge (Windows, Linux, Pi) or page (Chrome / Edge) �
 - [Opening the Mixer](#opening-the-mixer)
 - [Mixer tab](#mixer-tab)
 - [Keys tab](#keys-tab)
+- [Pong tab](#pong-tab)
+- [Invaders tab](#invaders-tab)
 - [MIDI tab: real controllers](#midi-tab-real-controllers)
 - [Alesis VI25 preset](#alesis-vi25-preset)
 - [How it works with the visitors](#how-it-works-with-the-visitors)
@@ -102,6 +104,39 @@ two props appears once.
 
 The bridge reads the pixel positions of the models once, in the background, when the Keys tab first opens. On a big
 show this takes a few seconds the first time.
+
+## Pong tab
+
+New in v14. Pong on the lights, for the people running the show. The page talks to the bridge on the home network,
+so there is no delay.
+
+- **Start:** pick a side (or all sides) and press **🤖 1 player** (red against the computer) or **👫 2 players**.
+- **Paddles:**
+  - drag a finger in the red or blue strip (two phones can each hold one);
+  - on a computer, use W / S and ↑ / ↓;
+  - a MIDI fader or knob works too: press 🎓 Learn, touch a strip, then move the fader or knob. The controls are named
+    `game:p1` and `game:p2`.
+- **The computer:** it plays any paddle nobody moves. It reacts late and aims a little off, so it can be beaten.
+- **Scoring:** first to 5 points wins. The score shows as dots at the top of the side.
+- **Ending:** **⏹ Stop** ends the game. A two-player game also ends after 2 minutes with nobody moving a paddle.
+- **With visitors' games:** Pong can start only when no visitors' game is being played (including a visitor's own
+  Pong, new in v16), and visitors cannot start one while the crew's Pong is on. Their 🎮 Games tab shows that the crew
+  is playing, with the score. The crew's paddles and MIDI controls do nothing during a visitor's Pong.
+
+## Invaders tab
+
+New in v15. Space Invaders on the lights, at full speed, for the people running the show. Visitors have a slower
+version on their page, made for the relay's delay.
+
+- **Start:** pick a side (or all sides) and press **▶️ Start**. After 2.5 seconds the invaders march.
+- **Moving:** the slider (where the ship goes), ◀ / ▶ held, or ← / → (A / D) on a keyboard.
+- **Firing:** 🔥 (held, it fires again and again), Space, or a MIDI pad. At most 2 shots fly at a time.
+- **MIDI:** press 🎓 Learn, then touch the slider (`game:ship`: a knob or fader moves the ship), ◀ / ▶ (`game:left` /
+  `game:right`) or 🔥 (`game:fire`), and move or press the control on the device.
+- **The game:** three lives, an extra life per wave cleared, shields, a mystery ship (50–150 points), and faster waves.
+  It ends when the invaders land, the lives run out, after 7 minutes, or after 2 minutes with nobody touching it.
+- **With visitors' games:** like Pong, it starts only when no visitors' game is being played, and the phones show that
+  the crew is playing.
 
 ## MIDI tab: real controllers
 
@@ -210,6 +245,8 @@ Every control has a name, the same one the Learn mode stores:
 | `scene:0` … `scene:7` | Scenes |
 | `target:s0`, `target:p0` | Pick or unpick a side (`s` + number) or a prop (`p` + number) |
 | `key:s0`, `key:m:<model>` | One key |
+| `game:p1` / `game:p2` | Pong paddles (red / blue): a fader or knob moves the paddle |
+| `game:ship` / `game:left` / `game:right` / `game:fire` | Space Invaders: a knob or fader moves the ship; pads move it while held, or fire |
 | `off` / `release` | Stop the picked / Release all |
 
 The page talks to the bridge with JSON. POST requests need the header `X-Cube: 1`, like the control page.
@@ -225,6 +262,10 @@ The page talks to the bridge with JSON. POST requests need the header `X-Cube: 1
 - `GET /api/midi`, `POST /api/midi`: `{"a": "msg", "d": [status, data1, data2]}` (a raw MIDI message),
   `{"a": "learn", "id": "pad:fire"}`, `{"a": "forget", "k": "c0:20"}`, `{"a": "base", "v": 48}`, `{"a": "learnBase"}`,
   `{"a": "preset", "name": "vi25"}`, `{"a": "clear"}`, `{"a": "native", "v": true}`.
+- `GET /api/invaders`, `POST /api/invaders`: `{"a": "start", "z": -1}`, `{"a": "move", "x": 0.0–1.0}` or `{"a": "move", "d": -1 | 0 | 1}`,
+  `{"a": "fire"}`, `{"a": "stop"}`.
+- `GET /api/pong`, `POST /api/pong`: `{"a": "start", "mode": "cpu" | "pvp", "z": -1}`, `{"a": "pad", "p": 0 | 1, "v": 0.0–1.0}`
+  (0 = top), `{"a": "stop"}`.
 
 Keys held from a MIDI device do not need the "still held" message: they stay on until their note off.
 
