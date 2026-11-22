@@ -261,7 +261,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   <p class="msg" id="msg" role="status"></p>
   <p class="note" id="waitNote" hidden></p>
 </main>
-<script src="gifmaker.js?v=19"></script>
+<script src="gifmaker.js?v=22"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -276,17 +276,20 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	function relayPost(url, req, low) {
 		const now = Date.now();
 		NB.t = Math.min(30, NB.t + (now - NB.at) / 8000); NB.at = now;
-		if (now < NB.block) return Promise.reject(new Error('busy'));
+		if (now < NB.block) return Promise.reject(new Error(low ? 'skip' : 'busy'));
 		if (low && NB.t < low) return Promise.reject(new Error('skip'));
 		if (NB.t < 1) return Promise.reject(new Error('busy'));
 		NB.t -= 1;
 		return fetch(url, req).then(r => {
-			if (r.status === 429) { NB.block = Date.now() + 60000; NB.t = 0; throw new Error('busy'); }
+			if (r.status === 429) { NB.block = Date.now() + 60000; NB.t = 0; throw new Error(low ? 'skip' : 'busy'); }
 			if (!r.ok) throw new Error('http ' + r.status);
 			return r;
 		});
 	}
-	const LOW = { go: 12, dir: 12, tap: 12, e: 4 };   // steady messages and the budget they leave for the others
+	const LOW = { go: 4, dir: 8, tap: 12, e: 4 };   // steady messages and the budget they leave for the others
+	// how far apart steady messages go: often while the budget is full, less often as it runs low (v22)
+	const nbGap = () => Date.now() < NB.block ? 3000 : NB.t > 20 ? 600 : NB.t > 10 ? 1200 : 2500;
+	const nbSlow = () => Date.now() < NB.block || NB.t <= 10;
 	function sayErr(e) {
 		if (e && e.message === 'skip') return;
 		say(e && e.message === 'busy' ? 'Too many messages right now. Wait a minute and try again.' : 'It could not be sent. Please try again.', 'err');
@@ -729,15 +732,17 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		if (Math.max(Math.abs(dx), Math.abs(dy)) < 40) return; kDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0)); });
 	addEventListener('keydown', e => { if (tab !== 'game' || G.g !== 'snake') return; const d = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 }[e.key]; if (d !== undefined) { e.preventDefault(); kDir(d); } });
 	// Space Invaders: slide on the strip; the phone sends where the ship should go (half a second apart at most)
-	let iGoalX = 0.5, iDrag = false, iSentAt = 0, iTm = null;
+	let iGoalX = 0.5, iDrag = false, iSentAt = 0, iTm = null, iLast = -1;
 	const iPos = e => { const r = $('iStrip').getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left - 20) / (r.width - 40))); };
 	function iSend(force) {
 		if (G.g !== 'invaders' || !['ready', 'playing'].includes(G.st) || gMe() !== 0) return;
-		const wait = 500 - (Date.now() - iSentAt);
+		const v = Math.round(iGoalX * 1000) / 1000;
+		if (Math.abs(v - iLast) < 0.02) return;                       // the same place: nothing to send
+		const wait = nbGap() - (Date.now() - iSentAt);
 		clearTimeout(iTm);
-		if (wait > 0 && !force) { iTm = setTimeout(() => iSend(true), wait); return; }
+		if (wait > 0) { iTm = setTimeout(() => iSend(true), wait); return; }
 		iSentAt = Date.now();
-		gSend({ a: 'go', id: G.id, x: Math.round(iGoalX * 1000) / 1000 }).catch(sayErr);
+		gSend({ a: 'go', id: G.id, x: v }).then(() => { iLast = v; }).catch(sayErr);
 	}
 	function iShow() { const r = $('iStrip').getBoundingClientRect(); $('iGoal').style.left = (20 + iGoalX * (r.width - 40)) + 'px'; }
 	$('iStrip').addEventListener('pointerdown', e => { if ($('iStrip').classList.contains('off')) return; e.preventDefault(); $('iStrip').setPointerCapture(e.pointerId); iDrag = true; iGoalX = iPos(e); iShow(); iSend(); });
@@ -746,15 +751,17 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	$('iStrip').addEventListener('pointerup', iUp); $('iStrip').addEventListener('pointercancel', iUp);
 	addEventListener('keydown', e => { if (tab !== 'game' || G.g !== 'invaders') return; const d = { ArrowLeft: -1, ArrowRight: 1 }[e.key]; if (d) { e.preventDefault(); iGoalX = Math.max(0, Math.min(1, iGoalX + d * 0.15)); iShow(); iSend(); } });
 	// Pong: slide on the strip; the phone sends where the paddle should go (half a second apart at most)
-	let pgGoal = 0.5, pgDrag = false, pgSentAt = 0, pgTm = null;
+	let pgGoal = 0.5, pgDrag = false, pgSentAt = 0, pgTm = null, pgLast = -1;
 	const pgPos = e => { const r = $('pStrip').getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientY - r.top - 20) / (r.height - 40))); };
 	function pgSend(force) {
 		if (G.g !== 'pong' || G.st !== 'playing' || G.mode !== 'visitor' || gMe() !== 0) return;
-		const wait = 500 - (Date.now() - pgSentAt);
+		const v = Math.round(pgGoal * 1000) / 1000;
+		if (Math.abs(v - pgLast) < 0.02) return;                       // the same place: nothing to send
+		const wait = nbGap() - (Date.now() - pgSentAt);
 		clearTimeout(pgTm);
-		if (wait > 0 && !force) { pgTm = setTimeout(() => pgSend(true), wait); return; }
+		if (wait > 0) { pgTm = setTimeout(() => pgSend(true), wait); return; }
 		pgSentAt = Date.now();
-		gSend({ a: 'go', id: G.id, y: Math.round(pgGoal * 1000) / 1000 }).catch(sayErr);
+		gSend({ a: 'go', id: G.id, y: v }).then(() => { pgLast = v; }).catch(sayErr);
 	}
 	function pgShow() { const r = $('pStrip').getBoundingClientRect(); $('pGoal').style.top = (20 + pgGoal * (r.height - 40)) + 'px'; }
 	$('pStrip').addEventListener('pointerdown', e => { if ($('pStrip').classList.contains('off')) return; e.preventDefault(); $('pStrip').setPointerCapture(e.pointerId); pgDrag = true; pgGoal = pgPos(e); pgShow(); pgSend(); });
@@ -969,7 +976,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 			if (G.st === 'idle') { s = 'Defend the lights from the invaders!'; bt = [btn('▶️ Start Space Invaders', 'primary', () => gAct({ a: 'new', z: face }, 'Starting… look at the lights!'))]; }
 			else if (G.mode === 'crew' && G.st !== 'over') s = 'The show\'s crew is playing Space Invaders. Watch the lights! 👾';
 			else if (G.st === 'ready') s = mine ? (G.wave > 1 ? 'Wave cleared! 🎉 Here comes wave ' + G.wave + '…' : 'Get ready… slide on the strip to move!') : 'Someone is playing Space Invaders. Watch the lights!';
-			else if (G.st === 'playing') s = mine ? 'Slide to move — your ship fires by itself. The ship follows about a second later.' : 'Someone is playing Space Invaders. Watch the lights!';
+			else if (G.st === 'playing') s = mine ? 'Slide to move — your ship fires by itself. The ship follows about a second later.' + (nbSlow() ? ' Busy connection right now: it follows a bit later, keep sliding slowly.' : '') : 'Someone is playing Space Invaders. Watch the lights!';
 			else if (G.st === 'over') s = (G.why === 'invaded' ? 'The invaders landed! 👾 ' : G.why === 'no lives left' ? 'Boom! No lives left. ' : 'Game over. ') + 'Score: ' + G.score + (G.score && G.score >= G.best ? ' — best today! 🏆' : '');
 			if (mine && G.mode !== 'crew' && ['ready', 'playing'].includes(G.st)) bt = [btn('Stop', '', () => { if (confirmGiveUp()) gAct({ a: 'quit', id: G.id }); })];
 		} else if (vg === 'race') {
@@ -1008,7 +1015,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 			pgShow();
 			if (G.st === 'idle') { s = 'Play Pong against the computer!'; bt = [btn('▶️ Start Pong', 'primary', () => gAct({ a: 'new', z: face }, 'Starting… look at the lights!'))]; }
 			else if (!vis && G.st === 'playing') s = 'The show\'s crew is playing Pong on the lights. Watch! 🏓';
-			else if (G.st === 'playing') s = mine ? 'Slide to move your red paddle. It follows about a second later, so move early!' : 'Someone is playing Pong. Watch the lights! 🏓';
+			else if (G.st === 'playing') s = mine ? 'Slide to move your red paddle. It follows about a second later, so move early!' + (nbSlow() ? ' Busy connection right now: it follows a bit later.' : '') : 'Someone is playing Pong. Watch the lights! 🏓';
 			else if (G.st === 'over') s = mine ? (G.winner === 1 ? 'You win! 🎉🏆' : G.why === 'nobody playing' ? 'The game stopped: nobody was moving the paddle.' : G.why === 'time up' ? 'Time is up!' : 'The computer wins this time!') : (G.winner ? (G.winner === 1 ? 'Red' : 'Blue') + ' wins Pong! 🏆' : 'Pong is over.');
 			if (mine && G.st === 'playing') bt = [btn('Stop', '', () => { if (confirmGiveUp()) gAct({ a: 'quit', id: G.id }); })];
 		} else if (vg === 'simon') {
