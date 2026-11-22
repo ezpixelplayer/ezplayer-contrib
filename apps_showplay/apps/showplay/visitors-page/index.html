@@ -32,6 +32,68 @@ h1 { margin: 4px 0 0; font-size: 30px; line-height: 1.15; }
 .c4 button.win { box-shadow: 0 0 0 3px #fff; }
 .c4 button.last { box-shadow: 0 0 0 2px rgba(255,255,255,.55); }
 .c4.off button { cursor: default; }
+.gpick { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+.gpick button { min-height: 64px; border-radius: 14px; border: 2px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-weight: 700; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.gpick button .e { font-size: 24px; line-height: 1; }
+.gpick button[aria-pressed="true"] { border-color: var(--hot); box-shadow: 0 0 0 2px var(--hot) inset; }
+.ttt { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; background: #3a2d52; padding: 6px; border-radius: 14px; max-width: 340px; margin: 0 auto; width: 100%; }
+.ttt button { aspect-ratio: 1; border: 0; border-radius: 10px; background: #0d0818; color: #fff; font: 900 clamp(40px, 14vw, 76px)/1 system-ui, sans-serif; cursor: pointer; padding: 0; }
+.ttt.off button { cursor: default; }
+.ttt button.win { box-shadow: 0 0 0 3px #fff inset; }
+.simon { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 340px; margin: 0 auto; width: 100%; touch-action: manipulation; }
+.simon button { aspect-ratio: 1; border: 0; border-radius: 22px; cursor: pointer; opacity: .45; transition: opacity .08s, transform .08s; }
+.simon button.lit { opacity: 1; transform: scale(.96); box-shadow: 0 0 24px currentColor; }
+.simon.off button { cursor: default; opacity: .25; }
+.sprog { text-align: center; font-weight: 800; font-size: 18px; min-height: 1.4em; }
+.cnum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; max-width: 360px; margin: 0 auto; width: 100%; }
+.cnum button { min-height: 60px; border-radius: 14px; border: 2px solid var(--line); background: var(--raise); color: var(--fg); font: 900 26px/1 system-ui, sans-serif; cursor: pointer; }
+.cnum button.pick { background: var(--hot); border-color: var(--hot); color: #120b1f; }
+.cnum.off button { opacity: .4; cursor: default; }
+.cchip { display: inline-block; width: 1em; height: 1em; border-radius: 50%; vertical-align: -0.15em; box-shadow: 0 0 10px currentColor; }
+.cboard { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.cboard span { padding: 6px 10px; border-radius: 999px; background: var(--raise); border: 1px solid var(--line); font-weight: 700; }
+.cboard span.me { border-color: var(--hot); box-shadow: 0 0 0 1px var(--hot) inset; }
+.dpad { display: grid; grid-template-columns: repeat(3, 84px); grid-template-rows: repeat(3, 84px); gap: 8px; justify-content: center; touch-action: none; user-select: none; -webkit-user-select: none; }
+.dpad button { border-radius: 18px; border: 2px solid var(--line); background: var(--raise); color: var(--fg); font-size: 34px; cursor: pointer; }
+.dpad button:active { background: var(--hot); color: #120b1f; }
+.dpad.off button { opacity: .35; }
+.istrip { position: relative; height: 96px; border-radius: 18px; border: 2px solid var(--line); background: linear-gradient(180deg, #0b0716, #1a1030); touch-action: none; user-select: none; -webkit-user-select: none; max-width: 420px; margin: 0 auto; width: 100%; cursor: ew-resize; }
+.istrip .ship { position: absolute; bottom: 14px; width: 56px; height: 36px; margin-left: -28px; font-size: 34px; text-align: center; line-height: 36px; transition: left .12s; }
+.istrip .goal { position: absolute; top: 8px; bottom: 8px; width: 3px; margin-left: -1px; background: #3cff5a; border-radius: 2px; opacity: .7; }
+.istrip.off { opacity: .4; cursor: default; }
+.vstrip { position: relative; width: 120px; height: 280px; border-radius: 18px; border: 2px solid var(--line); background: linear-gradient(90deg, #1a1030, #0b0716); touch-action: none; user-select: none; -webkit-user-select: none; margin: 0 auto; cursor: ns-resize; }
+.vstrip .pad { position: absolute; left: 22px; width: 18px; height: 84px; margin-top: -42px; border-radius: 9px; background: #ff3c3c; transition: top .7s linear; box-shadow: 0 0 12px #ff3c3c; }
+.vstrip .goal { position: absolute; left: 8px; right: 8px; height: 3px; margin-top: -1px; background: #ffd23f; border-radius: 2px; opacity: .8; }
+.vstrip .hint { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 12px; text-align: center; width: 60px; }
+.vstrip.off { opacity: .4; cursor: default; }
+.rchoice { display: flex; flex-direction: column; gap: 8px; }
+.rcols { display: flex; flex-wrap: wrap; gap: 8px; }
+.rcols button { width: 42px; height: 42px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+.rcols button[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 10px #fff9; }
+.rcols button:disabled { opacity: .2; cursor: default; }
+.rbig { width: 100%; min-height: 150px; border-radius: 26px; border: 0; font: 900 30px/1.1 system-ui, sans-serif; color: #fff; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.rbig:active { transform: scale(.97); filter: brightness(1.2); }
+.rtwo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rtwo .rbig { min-height: 220px; font-size: 24px; }
+.rmeter { height: 22px; border-radius: 11px; background: var(--raise); overflow: hidden; }
+.rmeter div { height: 100%; width: 0; transition: width .15s; }
+.rlanes { display: flex; gap: 8px; align-items: flex-end; justify-content: center; height: 150px; padding: 6px; border-radius: 14px; background: #0006; }
+.rlanes div { width: 30px; border-radius: 8px 8px 3px 3px; position: relative; min-height: 4px; transition: height .5s; }
+.rlanes div.me { outline: 3px solid #fff; }
+.rlanes div span { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-size: 14px; }
+.lives { text-align: center; font-size: 20px; min-height: 1.3em; }
+.ppads { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; }
+.ppads button { min-height: 76px; border-radius: 16px; border: 2px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; padding: 6px; touch-action: manipulation; word-break: break-word; }
+.ppads button.hit { transform: scale(.95); }
+.ppads.off button { opacity: .4; cursor: default; }
+.recbtn { width: 132px; height: 132px; border-radius: 50%; border: 6px solid #fff3; background: radial-gradient(circle at 35% 30%, #ff6b6b, #c00); color: #fff; font: 800 18px/1.1 system-ui, sans-serif; cursor: pointer; display: block; margin: 6px auto; box-shadow: 0 6px 24px #c004; }
+.recbtn.on { animation: recpulse 1s infinite; background: radial-gradient(circle at 35% 30%, #ff9b9b, #f22); }
+@keyframes recpulse { 50% { box-shadow: 0 0 0 14px #ff222233; } }
+.meter { height: 14px; border-radius: 7px; background: var(--raise); overflow: hidden; max-width: 360px; margin: 0 auto; }
+.meter div { height: 100%; width: 0; background: linear-gradient(90deg, #39d353, #ffd23f, #ff3b3b); transition: width .06s; }
+.pcols { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.pcols button { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; font-size: 18px; }
+.pcols button[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 10px #fff8; }
 .gstat { font-size: 18px; font-weight: 700; text-align: center; min-height: 27px; }
 .gbtns { display: flex; flex-direction: column; gap: 8px; }
 .tabs button { min-height: 52px; border: 0; border-radius: 14px; background: none; color: var(--muted); font: inherit; font-weight: 700; font-size: 15px; padding: 0 2px; cursor: pointer; }
@@ -87,8 +149,10 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
     <button type="button" role="tab" aria-selected="false" data-tab="gif">Picture</button>
     <button type="button" role="tab" aria-selected="false" data-tab="fx">Effect</button>
     <button type="button" role="tab" aria-selected="false" data-tab="draw">Draw</button>
-    <button type="button" role="tab" aria-selected="false" data-tab="game" id="gameTab" hidden>🎮 Game</button>
+    <button type="button" role="tab" aria-selected="false" data-tab="game" id="gameTab" hidden>🎮 Games</button>
     <button type="button" role="tab" aria-selected="false" data-tab="prop" id="propTab" hidden>✨ Props</button>
+    <button type="button" role="tab" aria-selected="false" data-tab="play" id="playTab" hidden>🎹 Play</button>
+    <button type="button" role="tab" aria-selected="false" data-tab="sing" id="singTab" hidden>🎤 Sing</button>
   </div>
 
   <section class="card" id="pText">
@@ -148,19 +212,56 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
   </section>
 
   <section class="card" id="pGame" hidden>
-    <div class="lab">🎮 Four in a Row</div>
-    <p class="note" id="gHow">Drop your discs and get four in a row (across, up and down, or diagonally) before the other player. The board shows on the lights!</p>
+    <div class="lab" id="gTitle">🎮 Games</div>
+    <div class="gpick" id="gPick" role="group" aria-label="Pick a game"></div>
+    <p class="note" id="gHow"></p>
     <div class="gstat" id="gStat" role="status"></div>
     <div class="c4 off" id="gBoard"></div>
+    <div class="ttt off" id="tBoard" hidden></div>
+    <div class="sprog" id="sProg" hidden></div>
+    <div class="simon off" id="sBoard" hidden></div>
+    <div class="cboard" id="cPlayers" hidden></div>
+    <div class="cnum off" id="cNums" hidden></div>
+    <div class="dpad off" id="kPad" hidden></div>
+    <div class="rchoice" id="rChoice" hidden></div>
+    <div class="rlanes" id="rLanes" hidden></div>
+    <div id="rPlay" hidden></div>
+    <div class="lives" id="iLives" hidden></div>
+    <div class="vstrip off" id="pStrip" hidden><div class="goal" id="pGoal"></div><div class="pad" id="pPad"></div><div class="hint">Slide up and down</div></div>
+    <div class="istrip off" id="iStrip" hidden><div class="goal" id="iGoal"></div><div class="ship" id="iShip">🚀</div></div>
     <p class="note" id="gTimer" style="text-align:center"></p>
     <div class="gbtns" id="gBtns"></div>
+  </section>
+
+  <section class="card" id="pPlay" hidden>
+    <div class="lab">🎹 Play the lights</div>
+    <p class="note">Take a turn to play the lights of the show like a keyboard: pick a colour, then tap the pads. Each pad lights up one part of the show. Everyone gets a turn!</p>
+    <div class="gstat" id="plStat" role="status"></div>
+    <div class="pcols" id="plCols" hidden></div>
+    <div class="ppads off" id="plPads"></div>
+    <p class="note" id="plTimer" style="text-align:center"></p>
+    <div class="gbtns" id="plBtns"></div>
+  </section>
+
+  <section class="card" id="pSing" hidden>
+    <div class="lab">🎤 Sing with the lights</div>
+    <p class="note">Pick who sings, record your song (up to 10 seconds) and send it: it plays out loud at the show while the lights sing it with you!</p>
+    <div class="lab" style="font-size:14px">1 · Who sings?</div>
+    <div class="chips" id="sgWho"></div>
+    <div class="lab" style="font-size:14px">2 · Record</div>
+    <button class="recbtn" type="button" id="sgRec">🎙️<br>Record</button>
+    <div class="meter" aria-hidden="true"><div id="sgMeter"></div></div>
+    <p class="note" id="sgTime" style="text-align:center">Tap the red button and sing. Tap again to stop.</p>
+    <div class="gbtns" id="sgBtns"></div>
+    <div class="gstat" id="sgStat" role="status"></div>
+    <p class="note" style="text-align:center">Your recording is played out loud at the show and then deleted.</p>
   </section>
 
   <button class="btn primary" type="button" id="send">Show it on the lights!</button>
   <p class="msg" id="msg" role="status"></p>
   <p class="note" id="waitNote" hidden></p>
 </main>
-<script src="gifmaker.js?v=10"></script>
+<script src="gifmaker.js?v=18"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -196,13 +297,15 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 
 	// ---- tabs ----
 	let tab = 'text';
-	const panes = { text: $('pText'), gif: $('pGif'), fx: $('pFx'), draw: $('pDraw'), game: $('pGame'), prop: $('pProp') };
+	const panes = { text: $('pText'), gif: $('pGif'), fx: $('pFx'), draw: $('pDraw'), game: $('pGame'), prop: $('pProp'), play: $('pPlay'), sing: $('pSing') };
 	$('tabs').querySelectorAll('button').forEach(b => b.onclick = () => {
 		tab = b.dataset.tab;
 		$('tabs').querySelectorAll('button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
 		Object.entries(panes).forEach(([k, p]) => p.hidden = k !== tab);
-		$('send').hidden = tab === 'game'; $('waitNote').hidden = tab === 'game' || !WAIT_MS;
+		$('send').hidden = ['game', 'play', 'sing'].includes(tab); $('waitNote').hidden = ['game', 'play', 'sing'].includes(tab) || !WAIT_MS;
 		if (tab === 'game') gameOpen();
+		if (tab === 'play') playOpen();
+		if (tab === 'sing') singOpen();
 		say('');
 	});
 
@@ -543,22 +646,233 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 	}
 	requestAnimationFrame(pvFrame);
 
-	// ---- game: four in a row (the bridge keeps the game and posts the board on "<code>-game") ----
+	// ---- games: Four in a Row, Tic-tac-toe, Simon (the bridge keeps the game and posts it on "<code>-game") ----
+	const GAMES = {
+		c4: { e: '🔴', n: 'Four in a Row', how: 'Drop your discs and get four in a row (across, up and down, or diagonally) before the other player. The board shows on the lights!' },
+		ttt: { e: '❌', n: 'Tic-tac-toe', how: 'Take turns putting your mark in a square. Three in a row (across, up and down, or diagonally) wins. The board shows on the lights!' },
+		simon: { e: '🟢', n: 'Simon', how: 'Watch the lights: they show a sequence of colours. Then tap the same colours here, in the same order. Every round adds one more colour!' },
+		count: { e: '🔢', n: 'Count the colours', how: 'Up to 8 players! The lights flash colours very fast. Count how many times the colour asked flashes, then tap your answer. 5 rounds: the most right answers wins.' },
+		snake: { e: '🐍', n: 'Snake', how: 'Steer the snake on the lights with the arrows (or swipe on them). Eat the red squares to grow, and don\'t hit the walls or yourself!' },
+		invaders: { e: '👾', n: 'Space Invaders', how: 'Slide your finger on the strip to move your ship: it fires by itself! Shoot the invaders before they land, and dodge their bombs. You have 3 lives.' },
+		race: { e: '🌟', n: 'Race to the Star', how: 'Race up the lights against your friends: the first to the top lights the star in their colour! Tap, sing, shake or run to climb. Stop, and you slide back down.' },
+		pong: { e: '🏓', n: 'Pong', how: 'You are red, on the left; the computer is blue. Slide your finger up and down on the strip to move your paddle and send the ball back. First to 5 points wins!' }
+	};
 	const rnd = n => { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map(v => 'abcdefghijklmnopqrstuvwxyz0123456789'[v % 36]).join(''); };
 	const keep = (key, n, re) => { try { let v = localStorage.getItem(key); if (!v || !re.test(v)) { v = rnd(n); localStorage.setItem(key, v); } return v; } catch (e) { return rnd(n); } };
 	const PID = keep('cubePid', 16, /^[a-z0-9]{16}$/);   // secret: only this phone and the bridge know it
 	const TAG = keep('cubeTag', 6, /^[a-z0-9]{6}$/);     // public: in the posted board, so this phone knows which player it is
-	let G = { st: 'idle' }, gGot = 0, gBusy = false, gES = null, gSentN = -1;
-	const gSend = o => fetch(RELAY + TOPIC, { method: 'POST', body: JSON.stringify(Object.assign({ k: 'game', g: 'c4', p: PID, tag: TAG }, o)) });
+	let G = { st: 'idle' }, gGot = 0, gBusy = false, gES = null, gSentN = -1, gPick = '', sIn = [], sInN = -1;
+	const gSend = o => fetch(RELAY + TOPIC, { method: 'POST', body: JSON.stringify(Object.assign({ k: 'game', g: G.st === 'idle' || o.a === 'new' ? gPick : G.g, p: PID, tag: TAG }, o)) });
+	// Four in a Row board
 	const gCells = [];
 	for (let i = 0; i < 42; i++) { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', 'Column ' + (i % 7 + 1)); b.onclick = () => gMove(i % 7); gCells.push(b); }
 	$('gBoard').append(...gCells);
+	// Tic-tac-toe board
+	const tCells = [];
+	for (let i = 0; i < 9; i++) { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', 'Square ' + (i + 1)); b.onclick = () => gMove(i); tCells.push(b); }
+	$('tBoard').append(...tCells);
+	// Simon pads, with a sound for each colour
+	const sPads = [], TONES = [329.6, 277.2, 220, 164.8];
+	let actx = null;
+	function beep(q, ms) {
+		try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); const o = actx.createOscillator(), g = actx.createGain();
+			o.type = 'triangle'; o.frequency.value = TONES[q]; g.gain.setValueAtTime(0.18, actx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + ms / 1000);
+			o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + ms / 1000); } catch (e) {}
+	}
+	for (let q = 0; q < 4; q++) { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', ['Green', 'Red', 'Yellow', 'Blue'][q]); b.onclick = () => sTap(q); sPads.push(b); }
+	$('sBoard').append(...sPads);
+	// Count the colours: number buttons
+	const cBtns = [];
+	let cPicked = -1, cPickedR = -1;
+	for (let n = 0; n <= 15; n++) { const b = document.createElement('button'); b.type = 'button'; b.textContent = n; b.onclick = () => cAnswer(n); cBtns.push(b); }
+	$('cNums').append(...cBtns);
+	async function cAnswer(n) {
+		if (G.g !== 'count' || !['show', 'answer'].includes(G.st) || gMe() < 0 || cPickedR === G.round) return;
+		cPicked = n; cPickedR = G.round; gDraw();
+		try { await gSend({ a: 'answer', id: G.id, n: G.round, v: n }); } catch (e) { cPickedR = -1; say('It could not be sent. Please try again.', 'err'); }
+		gDraw();
+	}
+	// Snake: arrows and swipes
+	const kBtns = {};
+	['', '⬆️', '', '⬅️', '', '➡️', '', '⬇️', ''].forEach((t, i) => { const b = document.createElement('button'); b.type = 'button'; if (!t) b.style.visibility = 'hidden'; b.textContent = t;
+		const d = { 1: 0, 5: 1, 7: 2, 3: 3 }[i]; if (d !== undefined) { b.setAttribute('aria-label', ['Up', 'Right', 'Down', 'Left'][d]); b.addEventListener('pointerdown', e => { e.preventDefault(); kDir(d); }); kBtns[d] = b; }
+		$('kPad').append(b); });
+	let kSw = null;
+	$('kPad').addEventListener('touchstart', e => { const t = e.touches[0]; kSw = [t.clientX, t.clientY]; }, { passive: true });
+	$('kPad').addEventListener('touchend', e => { if (!kSw) return; const t = e.changedTouches[0], dx = t.clientX - kSw[0], dy = t.clientY - kSw[1]; kSw = null;
+		if (Math.max(Math.abs(dx), Math.abs(dy)) < 40) return; kDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0)); });
+	addEventListener('keydown', e => { if (tab !== 'game' || G.g !== 'snake') return; const d = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 }[e.key]; if (d !== undefined) { e.preventDefault(); kDir(d); } });
+	// Space Invaders: slide on the strip; the phone sends where the ship should go (half a second apart at most)
+	let iGoalX = 0.5, iDrag = false, iSentAt = 0, iTm = null;
+	const iPos = e => { const r = $('iStrip').getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left - 20) / (r.width - 40))); };
+	function iSend(force) {
+		if (G.g !== 'invaders' || !['ready', 'playing'].includes(G.st) || gMe() !== 0) return;
+		const wait = 500 - (Date.now() - iSentAt);
+		clearTimeout(iTm);
+		if (wait > 0 && !force) { iTm = setTimeout(() => iSend(true), wait); return; }
+		iSentAt = Date.now();
+		gSend({ a: 'go', id: G.id, x: Math.round(iGoalX * 1000) / 1000 }).catch(() => say('It could not be sent. Please try again.', 'err'));
+	}
+	function iShow() { const r = $('iStrip').getBoundingClientRect(); $('iGoal').style.left = (20 + iGoalX * (r.width - 40)) + 'px'; }
+	$('iStrip').addEventListener('pointerdown', e => { if ($('iStrip').classList.contains('off')) return; e.preventDefault(); $('iStrip').setPointerCapture(e.pointerId); iDrag = true; iGoalX = iPos(e); iShow(); iSend(); });
+	$('iStrip').addEventListener('pointermove', e => { if (!iDrag) return; iGoalX = iPos(e); iShow(); iSend(); });
+	const iUp = () => { if (!iDrag) return; iDrag = false; iSend(); };
+	$('iStrip').addEventListener('pointerup', iUp); $('iStrip').addEventListener('pointercancel', iUp);
+	addEventListener('keydown', e => { if (tab !== 'game' || G.g !== 'invaders') return; const d = { ArrowLeft: -1, ArrowRight: 1 }[e.key]; if (d) { e.preventDefault(); iGoalX = Math.max(0, Math.min(1, iGoalX + d * 0.15)); iShow(); iSend(); } });
+	// Pong: slide on the strip; the phone sends where the paddle should go (half a second apart at most)
+	let pgGoal = 0.5, pgDrag = false, pgSentAt = 0, pgTm = null;
+	const pgPos = e => { const r = $('pStrip').getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientY - r.top - 20) / (r.height - 40))); };
+	function pgSend(force) {
+		if (G.g !== 'pong' || G.st !== 'playing' || G.mode !== 'visitor' || gMe() !== 0) return;
+		const wait = 500 - (Date.now() - pgSentAt);
+		clearTimeout(pgTm);
+		if (wait > 0 && !force) { pgTm = setTimeout(() => pgSend(true), wait); return; }
+		pgSentAt = Date.now();
+		gSend({ a: 'go', id: G.id, y: Math.round(pgGoal * 1000) / 1000 }).catch(() => say('It could not be sent. Please try again.', 'err'));
+	}
+	function pgShow() { const r = $('pStrip').getBoundingClientRect(); $('pGoal').style.top = (20 + pgGoal * (r.height - 40)) + 'px'; }
+	$('pStrip').addEventListener('pointerdown', e => { if ($('pStrip').classList.contains('off')) return; e.preventDefault(); $('pStrip').setPointerCapture(e.pointerId); pgDrag = true; pgGoal = pgPos(e); pgShow(); pgSend(); });
+	$('pStrip').addEventListener('pointermove', e => { if (!pgDrag) return; pgGoal = pgPos(e); pgShow(); pgSend(); });
+	const pgUp = () => { if (!pgDrag) return; pgDrag = false; pgSend(); };
+	$('pStrip').addEventListener('pointerup', pgUp); $('pStrip').addEventListener('pointercancel', pgUp);
+	addEventListener('keydown', e => { if (tab !== 'game' || G.g !== 'pong') return; const d = { ArrowUp: -1, ArrowDown: 1 }[e.key]; if (d) { e.preventDefault(); pgGoal = Math.max(0, Math.min(1, pgGoal + d * 0.15)); pgShow(); pgSend(); } });
+	// ---- Race to the Star: choices, effort measured on the phone, sent about once a second ----
+	const RMODES = { tap: '👆 Tap', voice: '🎤 Voice', shake: '🤳 Shake', run: '🏃 Run' }, RLVL = { kid: '🧒 Child', adult: '🧑 Adult', sport: '🏃 Sporty' };
+	const rc = { c: '', m: '', l: 'adult', two: false, c2: '', l2: 'kid' };
+	let rTaps = [[], []], rMeas = null, rSendT = null, rRaceId = '', rStartAt = 0, rLvl = [0, 0];
+	const rCfg = () => (G.g === 'race' && G.colours ? G : (cfg.race || { modes: ['tap'], colours: ['ff2a2a', '2a7bff', '39d353', 'ffd23f'], shared: true, mix: true, max: 4 }));
+	const rHasMotion = () => typeof DeviceMotionEvent !== 'undefined';
+	function rChips(list, cur, on, fmt) { return list.map(v => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.setAttribute('aria-pressed', String(v === cur)); b.textContent = fmt(v); b.onclick = () => { on(v); gDraw(); }; return b; }); }
+	function rDrawChoice(joining) {
+		const c = rCfg(), taken = G.g === 'race' && G.st === 'lobby' ? (G.players || []).map(p => p.c) : [];
+		const modes = (c.modes || ['tap']).filter(m => !['shake', 'run'].includes(m) || rHasMotion());
+		const fixed = G.g === 'race' && G.st === 'lobby' && !c.mix && (G.players || []).length ? G.players[0].m : '';
+		if (!modes.includes(rc.m)) rc.m = fixed || modes[0] || 'tap';
+		if (fixed) rc.m = fixed;
+		const free = (c.colours || []).filter(x => !taken.includes(x));
+		if (!free.includes(rc.c)) rc.c = free[0] || '';
+		if (!free.includes(rc.c2) || rc.c2 === rc.c) rc.c2 = free.find(x => x !== rc.c) || '';
+		const box = [], lab = t => { const d = document.createElement('div'); d.className = 'lab'; d.style.fontSize = '14px'; d.textContent = t; return d; };
+		const cols = (cur, set, other) => { const d = document.createElement('div'); d.className = 'rcols'; d.append(...(c.colours || []).map(x => { const b = document.createElement('button'); b.type = 'button'; b.style.background = '#' + x;
+			b.disabled = taken.includes(x) || x === other; b.setAttribute('aria-pressed', String(x === cur)); b.setAttribute('aria-label', 'Colour'); b.onclick = () => { set(x); gDraw(); }; return b; })); return d; };
+		box.push(lab(rc.two ? 'Player 1 · colour' : 'Your colour'), cols(rc.c, v => rc.c = v, rc.two ? rc.c2 : ''));
+		if (!fixed && modes.length > 1) { const d = document.createElement('div'); d.className = 'chips'; d.append(...rChips(modes, rc.m, v => { rc.m = v; if (v !== 'tap') rc.two = false; }, v => RMODES[v])); box.push(lab('How you climb'), d); }
+		else box.push(lab('How you climb: ' + RMODES[rc.m]));
+		const d2 = document.createElement('div'); d2.className = 'chips'; d2.append(...rChips(Object.keys(RLVL), rc.l, v => rc.l = v, v => RLVL[v])); box.push(lab(rc.two ? 'Player 1 · level' : 'Your level'), d2);
+		if (c.shared && rc.m === 'tap' && (c.max || 2) >= 2) {
+			const l = document.createElement('label'); l.className = 'note'; const ck = document.createElement('input'); ck.type = 'checkbox'; ck.checked = rc.two; ck.onchange = () => { rc.two = ck.checked; gDraw(); };
+			l.append(ck, ' 👥 Two players on this phone (one button each)'); box.push(l);
+			if (rc.two) { box.push(lab('Player 2 · colour'), cols(rc.c2, v => rc.c2 = v, rc.c)); const d3 = document.createElement('div'); d3.className = 'chips'; d3.append(...rChips(Object.keys(RLVL), rc.l2, v => rc.l2 = v, v => RLVL[v])); box.push(lab('Player 2 · level'), d3); }
+		}
+		if (['shake', 'run'].includes(rc.m)) { const n = document.createElement('p'); n.className = 'note'; n.textContent = '⚠️ Hold your phone tight (both hands or the strap) and keep some space around you. Don\'t throw it!'; box.push(n); }
+		$('rChoice').replaceChildren(...box);
+	}
+	async function rMotionOk() {
+		if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+			try { return (await DeviceMotionEvent.requestPermission()) === 'granted'; } catch (e) { return false; }
+		}
+		return rHasMotion();
+	}
+	// permissions are asked while the player taps New race / Join (phones allow them only during a tap)
+	let rPrep = { motion: false, stream: null, ctx: null };
+	async function rPrepare(mode) {
+		if (mode === 'shake' || mode === 'run') {
+			rPrep.motion = await rMotionOk();
+			if (!rPrep.motion) { say('Motion is not allowed on this phone: allow it, or pick another way to climb.', 'err'); return false; }
+		}
+		if (mode === 'voice' && !rPrep.stream) {
+			try {
+				rPrep.ctx = new (window.AudioContext || window.webkitAudioContext)();
+				rPrep.ctx.resume && rPrep.ctx.resume();
+				rPrep.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false } });
+			} catch (e) { say('The microphone is not allowed. Allow it to climb with your voice!', 'err'); rPrep.ctx = null; return false; }
+		}
+		return true;
+	}
+	function rRelease() { if (rPrep.stream) { rPrep.stream.getTracks().forEach(x => x.stop()); rPrep.stream = null; } if (rPrep.ctx) { try { rPrep.ctx.close(); } catch (e) {} rPrep.ctx = null; } }
+	function rStopMeasure() { if (rMeas) { try { rMeas.stop(); } catch (e) {} rMeas = null; } clearInterval(rSendT); rSendT = null; }
+	async function rStartMeasure(mode) {   // returns a function giving the effort(s) of the last second
+		rStopMeasure();
+		const now = () => performance.now();
+		if (mode === 'tap') { rTaps = [[], []]; rMeas = { stop() {}, e: () => [0, 1].map(k => { const t = now(); rTaps[k] = rTaps[k].filter(x => t - x < 1000); return Math.min(1, rTaps[k].length / 8); }) }; return; }
+		if (mode === 'voice') {
+			if (!rPrep.stream && !(await rPrepare('voice'))) return;
+			const stream = rPrep.stream, ctx = rPrep.ctx, an = ctx.createAnalyser(); an.fftSize = 1024; ctx.createMediaStreamSource(stream).connect(an);
+			if (ctx.resume) ctx.resume();
+			const buf = new Float32Array(an.fftSize), hist = [];
+			const t = setInterval(() => { an.getFloatTimeDomainData(buf); let s = 0; for (const x of buf) s += x * x; const lv = Math.max(0, Math.min(1, (Math.sqrt(s / buf.length) - 0.015) / 0.15)); hist.push([now(), lv]); while (hist.length && now() - hist[0][0] > 1000) hist.shift(); rLvl[0] = lv; }, 80);
+			rMeas = { stop() { clearInterval(t); rRelease(); }, e: () => { if (!hist.length) return [0]; const voiced = hist.filter(h => h[1] > 0.12).length / hist.length, avg = hist.reduce((a, h) => a + h[1], 0) / hist.length; return [Math.min(1, 0.6 * voiced + 0.4 * avg)]; } };
+			return;
+		}
+		if (!rPrep.motion && !(await rMotionOk())) { say('Motion is not allowed on this phone: allow it, or pick another way to climb.', 'err'); return; }
+		const hist = [], peaks = []; let g = [0, 0, 0], lastPeak = 0;
+		const onm = ev => {
+			let a = ev.acceleration && ev.acceleration.x != null ? [ev.acceleration.x, ev.acceleration.y, ev.acceleration.z] : null;
+			if (!a) { const ag = ev.accelerationIncludingGravity || {}; const v = [ag.x || 0, ag.y || 0, ag.z || 0]; g = g.map((x, i) => x * 0.9 + v[i] * 0.1); a = v.map((x, i) => x - g[i]); }
+			const mag = Math.hypot(a[0], a[1], a[2]), t = now();
+			hist.push([t, mag]); while (hist.length && t - hist[0][0] > 1000) hist.shift();
+			const thr = mode === 'shake' ? 8 : 3.5, gap = mode === 'shake' ? 110 : 260;
+			if (mag > thr && t - lastPeak > gap) { peaks.push(t); lastPeak = t; }
+			while (peaks.length && t - peaks[0] > 1000) peaks.shift();
+			rLvl[0] = Math.min(1, mag / 20);
+		};
+		addEventListener('devicemotion', onm);
+		rMeas = { stop() { removeEventListener('devicemotion', onm); }, e: () => {
+			if (mode === 'run') return [Math.min(1, peaks.length / 3.5)];
+			const energy = hist.length ? Math.min(1, hist.reduce((s, h) => s + Math.min(h[1], 25), 0) / hist.length / 14) : 0;   // capped strength
+			return [Math.min(1, 0.5 * energy + 0.5 * Math.min(1, peaks.length / 6))];
+		} };
+	}
+	function rSendLoop() {
+		clearInterval(rSendT);
+		const tick = () => {
+			if (G.g !== 'race' || !['countdown', 'race'].includes(G.st) || !rMeas) return;
+			const e = rMeas.e(), mine = (G.players || []).filter(p => p.t === TAG);
+			const vals = mine.length > 1 ? e.slice(0, 2).map(x => Math.round(x * 100) / 100) : Math.round(e[0] * 100) / 100;
+			gSend({ a: 'e', id: G.id, e: vals }).catch(() => {});
+			$('rPlay').querySelectorAll('.rmeter div').forEach((d, k) => d.style.width = Math.round((Array.isArray(vals) ? vals[k] : vals) * 100) + '%');
+		};
+		rSendT = setInterval(() => { tick(); if (Date.now() - rStartAt > 30000 && !rSendT.slow) { clearInterval(rSendT); rSendT = setInterval(tick, 1500); rSendT.slow = true; } }, 1000);
+	}
+	function rDrawPlay(mine) {
+		const box = [];
+		if (!mine.length) { $('rPlay').replaceChildren(); return; }
+		const m = mine[0].m, two = mine.length > 1;
+		if (m === 'tap') {
+			const wrap = document.createElement('div'); wrap.className = two ? 'rtwo' : '';
+			mine.forEach((p, k) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'rbig'; b.style.background = '#' + p.c; b.textContent = two ? 'Tap! ' + (k + 1) : 'TAP TAP TAP!';
+				b.addEventListener('pointerdown', ev => { ev.preventDefault(); rTaps[k].push(performance.now()); if (navigator.vibrate) navigator.vibrate(8); }); wrap.append(b); });
+			box.push(wrap);
+		} else {
+			const t = document.createElement('div'); t.className = 'gstat'; t.textContent = m === 'voice' ? '🎤 Sing "aaaa" loud and long!' : m === 'shake' ? '🤳 Shake, shake, shake!' : '🏃 Run on the spot!'; box.push(t);
+		}
+		mine.forEach(p => { const mt = document.createElement('div'); mt.className = 'rmeter'; const d = document.createElement('div'); d.style.background = '#' + p.c; mt.append(d); box.push(mt); });
+		$('rPlay').replaceChildren(...box);
+	}
+	let kLast = 0;
+	function kDir(d) {
+		if (G.g !== 'snake' || !['ready', 'playing'].includes(G.st) || gMe() !== 0 || Date.now() - kLast < 150) return;
+		kLast = Date.now(); if (navigator.vibrate) navigator.vibrate(15);
+		gSend({ a: 'dir', id: G.id, d }).catch(() => say('It could not be sent. Please try again.', 'err'));
+	}
 	const gMe = () => (G.tags || []).indexOf(TAG);
 	async function gMove(c) {
-		if (G.st !== 'playing' || gMe() !== G.turn || gBusy || G.b[c] !== '0' || gSentN === G.n) return;
+		if (G.st !== 'playing' || gMe() !== G.turn || gBusy || (G.b || '')[c] !== '0' || gSentN === G.n) return;
+		if (G.g === 'c4' && (G.b || '')[c] !== '0') return;
 		gBusy = true; gSentN = G.n; gDraw();
 		try { await gSend({ a: 'move', id: G.id, n: G.n, c }); } catch (e) { gSentN = -1; say('It could not be sent. Please try again.', 'err'); }
 		gBusy = false; gDraw();
+	}
+	async function sTap(q) {
+		if (G.g !== 'simon' || G.st !== 'input' || gMe() !== 0 || gSentN === G.n) return;
+		if (sInN !== G.n) { sIn = []; sInN = G.n; }
+		sIn.push(q); beep(q, 260);
+		sPads[q].classList.add('lit'); setTimeout(() => sPads[q].classList.remove('lit'), 180);
+		if (sIn.length >= G.n) {
+			gSentN = G.n; gDraw();
+			try { await gSend({ a: 'move', id: G.id, n: G.n, s: sIn }); } catch (e) { gSentN = -1; sIn = []; say('It could not be sent. Please try again.', 'err'); }
+		}
+		gDraw();
 	}
 	async function gAct(o, okMsg) {
 		if (gBusy) return; gBusy = true; gDraw();
@@ -566,46 +880,168 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		setTimeout(() => { gBusy = false; gDraw(); }, 1500);
 	}
 	const btn = (t, cls, on) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + (cls || ''); b.textContent = t; b.disabled = gBusy || closed; b.onclick = on; return b; };
+	function drawPick() {
+		const gl = (cfg.gl && cfg.gl.length ? cfg.gl : ['c4']);
+		if (!gl.includes(gPick)) gPick = gl[0];
+		const show = G.st === 'idle' && gl.length > 1;
+		$('gPick').hidden = !show;
+		if (show) $('gPick').replaceChildren(...gl.map(g => { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed', g === gPick);
+			const e = document.createElement('span'); e.className = 'e'; e.textContent = GAMES[g].e; b.append(e, GAMES[g].n); b.onclick = () => { gPick = g; gDraw(); }; return b; }));
+	}
 	function gDraw() {
-		const me = gMe(), cols = (G.c || ['ff2a2a', 'ffd23f']).map(c => '#' + c), b = G.b || '0'.repeat(42);
-		const myTurn = G.st === 'playing' && me === G.turn && gSentN !== G.n;
-		gCells.forEach((el, i) => { const v = +b[i]; el.style.background = v ? cols[v - 1] : ''; el.classList.toggle('win', (G.win || []).includes(i) && G.st === 'over'); el.classList.toggle('last', i === G.last && G.st === 'playing'); });
-		$('gBoard').className = 'c4 ' + (myTurn ? 'mine' : 'off');
-		const you = me >= 0 ? 'You are <span style="color:' + cols[me] + '">●</span>' : '';
+		drawPick();
+		const vg = G.st === 'idle' ? gPick : (GAMES[G.g] ? G.g : 'c4');
+		const me = gMe(), cols = (G.c || ['ff2a2a', 'ffd23f']).map(c => '#' + c), b = G.b || '';
+		$('gTitle').textContent = G.st === 'idle' && (cfg.gl || []).length > 1 ? '🎮 Pick a game' : '🎮 ' + GAMES[vg].n;
+		$('gBoard').hidden = vg !== 'c4'; $('tBoard').hidden = vg !== 'ttt'; $('sBoard').hidden = vg !== 'simon'; $('sProg').hidden = !['simon', 'count', 'snake', 'pong'].includes(vg);
+		$('rChoice').hidden = vg !== 'race' || !(G.st === 'idle' || (G.st === 'lobby' && !(G.players || []).some(p => p.t === TAG)));
+		$('rLanes').hidden = vg !== 'race' || !['lobby', 'countdown', 'race', 'over'].includes(G.st);
+		$('rPlay').hidden = vg !== 'race' || !['countdown', 'race'].includes(G.st);
+		$('pStrip').hidden = vg !== 'pong' || G.st !== 'playing' || G.mode !== 'visitor' || gMe() !== 0;
+		$('iStrip').hidden = vg !== 'invaders' || !['ready', 'playing'].includes(G.st) || gMe() !== 0; $('iLives').hidden = vg !== 'invaders' || G.st === 'idle';
+		$('sProg').hidden = $('sProg').hidden && vg !== 'invaders';
+		$('cPlayers').hidden = vg !== 'count' || G.st === 'idle'; $('cNums').hidden = vg !== 'count' || !['show', 'answer', 'result'].includes(G.st); $('kPad').hidden = vg !== 'snake' || !['ready', 'playing'].includes(G.st) || gMe() !== 0;
+		$('gHow').textContent = GAMES[vg].how;
 		let s = '', bt = [];
-		if (G.st === 'idle') {
-			s = 'Start a game!';
-			bt = [btn('🤖 Play against the computer', 'primary', () => gAct({ a: 'new', mode: 'cpu', z: face }, 'Starting… look at the lights!')),
-				btn('👫 Play against a friend', '', () => gAct({ a: 'new', mode: 'pvp', z: face }, 'Starting…'))];
-		} else if (G.st === 'waiting') {
-			if (me === 0) { s = 'Waiting for your friend… ' + you; bt = [btn('Cancel', '', () => gAct({ a: 'quit', id: G.id }))]; $('gHow').textContent = 'Your friend opens this page on their phone (scan the same QR code), goes to 🎮 Game and taps "Join the game".'; }
-			else { s = 'Someone is waiting for a friend to play!'; bt = [btn('🙋 Join the game', 'primary', () => gAct({ a: 'join', id: G.id }, 'Joining…'))]; }
-		} else if (G.st === 'playing') {
-			if (me < 0) s = 'A game is being played. Watch it on the lights!';
-			else if (myTurn) s = 'Your turn! Tap a column. ' + you;
-			else if (G.turn === me) s = 'Sending…';
-			else s = (G.mode === 'cpu' ? 'The computer is thinking… ' : 'Your friend\'s turn… ') + you;
-			if (me >= 0) bt = [btn('Give up', '', () => { if (confirmGiveUp()) gAct({ a: 'quit', id: G.id }); })];
-		} else if (G.st === 'over') {
-			const w = G.winner;
-			if (w === 3) s = 'It\'s a draw!';
-			else if (!w) s = G.why === 'nobody joined' ? 'Nobody joined this time.' : G.why === 'time ran out' ? 'Time ran out.' : 'Game over.';
-			else if (me < 0) s = (G.mode === 'cpu' ? (w === 2 ? 'The computer wins!' : 'The player wins! 🎉') : 'Player ' + w + ' wins!');
-			else s = w === me + 1 ? 'You win! 🎉🎉' : (G.mode === 'cpu' ? 'The computer wins this time!' : 'Your friend wins!');
-			if (G.why === 'gave up' && w && w !== me + 1 && me >= 0) s = 'You gave up.';
+		const you = me >= 0 && vg !== 'simon' ? 'You are <span style="color:' + cols[me] + '">' + (vg === 'ttt' ? (me ? '◯' : '✕') : '●') + '</span>' : '';
+		if (vg === 'count') {
+			const ps = G.players || [], tc = '#' + (G.tcol || 'ffffff'), chip = '<span class="cchip" style="background:' + tc + ';color:' + tc + '"></span>';
+			$('cPlayers').replaceChildren(...ps.map((p, i) => { const e = document.createElement('span'); e.className = i === me ? 'me' : '';
+				e.textContent = p.a + ' ' + p.s + (G.st === 'result' || G.st === 'over' ? (p.ok === true ? ' ✅' : p.ok === false ? ' ❌' : '') : (p.in && (G.st === 'show' || G.st === 'answer') ? ' ✔︎' : '')); return e; }));
+			const answering = ['show', 'answer'].includes(G.st) && me >= 0 && cPickedR !== G.round;
+			$('cNums').className = 'cnum ' + (answering ? '' : 'off');
+			cBtns.forEach((b, n) => b.classList.toggle('pick', cPickedR === G.round && cPicked === n));
+			$('sProg').textContent = G.st !== 'idle' && G.st !== 'lobby' ? 'Round ' + G.round + ' of ' + (G.rounds || 5) : '';
+			if (G.st === 'idle') { s = 'Play with your friends and family!'; bt = [btn('▶️ New game', 'primary', () => gAct({ a: 'new', z: face }, 'Starting…'))]; }
+			else if (G.st === 'lobby') {
+				s = (me >= 0 ? 'You are ' + ps[me].a + '. ' : '') + ps.length + ' player' + (ps.length > 1 ? 's' : '') + ' ready: ' + ps.map(p => p.a).join(' ') + '<br>More players: scan the QR code, open 🎮 Games and tap Join.';
+				if (me === 0) bt = [btn('▶️ Start now', 'primary', () => gAct({ a: 'start', id: G.id }, 'Look at the lights!'))];
+				else if (me < 0) bt = [btn('🙋 Join the game', 'primary', () => gAct({ a: 'join', id: G.id }, 'Joining…'))];
+				else s += '<br>Waiting for ' + ps[0].a + ' to start…';
+			}
+			else if (G.st === 'show') s = 'Count the ' + chip + ' <b>' + G.tname + '</b> flashes! 👀' + (me >= 0 && cPickedR === G.round ? '<br>Your answer: ' + cPicked : '');
+			else if (G.st === 'answer') s = me < 0 ? 'The players are answering…' : cPickedR === G.round ? 'Your answer: <b>' + cPicked + '</b>. Waiting for the others…' : 'How many ' + chip + ' <b>' + G.tname + '</b> flashes? Tap your answer!';
+			else if (G.st === 'result') { const mine = me >= 0 ? ps[me] : null; s = 'It was <b>' + G.right + '</b> ' + chip + '! ' + (mine ? (mine.ok ? 'You got it! 🎉' : 'Not this time.') : ''); }
+			else if (G.st === 'over') { const top = Math.max(0, ...ps.map(p => p.s)), win = ps.filter(p => p.s === top); s = G.why === 'stopped' ? 'The game was stopped.' : (win.length === 1 ? win[0].a + ' wins with ' + top + '! 🏆' : 'A tie: ' + win.map(p => p.a).join(' ') + ' with ' + top + '! 🏆') + (me >= 0 && ps[me].s === top && top > 0 ? '<br>That\'s you! 🎉' : ''); }
+			if (me >= 0 && ['lobby', 'show', 'answer', 'result'].includes(G.st)) bt.push(btn(me === 0 ? 'Stop the game' : 'Leave', '', () => { if (confirmGiveUp()) gAct({ a: 'quit', id: G.id }); }));
+		} else if (vg === 'snake') {
+			const mine = me === 0;
+			$('kPad').className = 'dpad ' + (['ready', 'playing'].includes(G.st) && mine ? '' : 'off');
+			$('sProg').textContent = G.st !== 'idle' ? 'Score ' + (G.score || 0) + (G.best ? ' · best today ' + G.best : '') : (G.best ? 'Best today: ' + G.best : '');
+			if (G.st === 'idle') { s = 'Ready to play Snake?'; bt = [btn('▶️ Start Snake', 'primary', () => gAct({ a: 'new', z: face }, 'Starting… look at the lights!'))]; }
+			else if (G.st === 'ready') s = mine ? 'Get ready… the snake starts moving right! 🐍' : 'Someone is playing Snake. Watch the lights!';
+			else if (G.st === 'playing') s = mine ? 'Steer with the arrows or swipe. Turns arrive about a second later, so plan ahead!' : 'Someone is playing Snake. Watch the lights!';
+			else if (G.st === 'over') s = (G.why === 'crashed' ? 'Crash! 💥 ' : G.why === 'time up' ? 'Time is up! ' : G.why === 'board full' ? 'The board is full! 🏆 ' : 'Game over. ') + 'Score: ' + G.score + (G.score && G.score >= G.best ? ' — best today! 🏆' : '');
+			if (mine && ['ready', 'playing'].includes(G.st)) bt = [btn('Stop', '', () => { if (confirmGiveUp()) gAct({ a: 'quit', id: G.id }); })];
+		} else if (vg === 'invaders') {
+			const mine = me === 0;
+			$('iStrip').className = 'istrip ' + (['ready', 'playing'].includes(G.st) && mine ? '' : 'off');
+			if (!iDrag && typeof G.x === 'number') { const r = $('iStrip').getBoundingClientRect(); $('iShip').style.left = (20 + G.x * (r.width - 40)) + 'px'; }
+			iShow();
+			$('iLives').textContent = G.st !== 'idle' ? '💚'.repeat(Math.max(0, G.lives || 0)) + (G.wave ? '   wave ' + G.wave : '') : '';
+			$('sProg').textContent = G.st !== 'idle' ? 'Score ' + (G.score || 0) + (G.best ? ' · best today ' + G.best : '') : (G.best ? 'Best today: ' + G.best : '');
+			if (G.st === 'idle') { s = 'Defend the lights from the invaders!'; bt = [btn('▶️ Start Space Invaders', 'primary', () => gAct({ a: 'new', z: face }, 'Starting… look at the lights!'))]; }
+			else if (G.mode === 'crew' && G.st !== 'over') s = 'The show\'s crew is playing Space Invaders. Watch the lights! 👾';
+			else if (G.st === 'ready') s = mine ? (G.wave > 1 ? 'Wave cleared! 🎉 Here comes wave ' + G.wave + '…' : 'Get ready… slide on the strip to move!') : 'Someone is playing Space Invaders. Watch the lights!';
+			else if (G.st === 'playing') s = mine ? 'Slide to move — your ship fires by itself. The ship follows about a second later.' : 'Someone is playing Space Invaders. Watch the lights!';
+			else if (G.st === 'over') s = (G.why === 'invaded' ? 'The invaders landed! 👾 ' : G.why === 'no lives left' ? 'Boom! No lives left. ' : 'Game over. ') + 'Score: ' + G.score + (G.score && G.score >= G.best ? ' — best today! 🏆' : '');
+			if (mine && G.mode !== 'crew' && ['ready', 'playing'].includes(G.st)) bt = [btn('Stop', '', () => { if (confirmGiveUp()) gAct({ a: 'quit', id: G.id }); })];
+		} else if (vg === 'race') {
+			const ps = G.players || [], mine = ps.filter(p => p.t === TAG), meIn = mine.length > 0;
+			if (G.st === 'idle' || (G.st === 'lobby' && !meIn)) rDrawChoice();
+			const order = ps.map((p, i) => i).sort((a, b) => ps[b].h - ps[a].h);
+			$('rLanes').replaceChildren(...ps.map((p, i) => { const d = document.createElement('div'); d.style.background = '#' + p.c; d.style.height = Math.max(4, p.h * 130) + 'px';
+				if (p.t === TAG) d.className = 'me'; const sp = document.createElement('span'); sp.textContent = G.st === 'over' && G.winner === i ? '🌟' : (p.t === TAG ? '★' : ''); d.append(sp); return d; }));
+			const rank = meIn ? order.indexOf(ps.indexOf(mine[0])) + 1 : 0, col = p => '<span style="color:#' + p.c + '">●</span>';
+			if (G.st === 'idle') { s = 'Race your friends to the star! 🌟';
+				const go = async () => { if (await rPrepare(rc.m)) gAct({ a: 'new', c: rc.c, m: rc.m, l: rc.l, two: rc.two, c2: rc.c2, l2: rc.l2 }, 'Opening the race…'); };
+				bt = [btn('▶️ New race', 'primary', go)]; }
+			else if (G.st === 'lobby') {
+				s = ps.length + ' player' + (ps.length > 1 ? 's' : '') + ' ready: ' + ps.map(col).join(' ') + (meIn ? '<br>You are ' + mine.map(col).join(' ') + '. More players: scan the QR code, open 🎮 Games and join.' : '');
+				if (!meIn && ps.length < (G.max || 4)) bt = [btn('🙋 Join the race', 'primary', async () => { if (await rPrepare(rc.m)) gAct({ a: 'join', id: G.id, c: rc.c, m: rc.m, l: rc.l, two: rc.two, c2: rc.c2, l2: rc.l2 }, 'Joining…'); })];
+				else if (!meIn) s += '<br>The race is full. Watch it on the lights!';
+				if (meIn) { bt = [btn('📍 Where am I?', '', () => gSend({ a: 'blink', id: G.id }).catch(() => {}))];
+					if (ps[0].t === TAG && G.early && ps.length >= (G.min || 1)) bt.unshift(btn('▶️ Start now', 'primary', () => gAct({ a: 'start', id: G.id }, 'Get ready!'))); }
+			}
+			else if (G.st === 'countdown' || G.st === 'race') {
+				if (meIn && rRaceId !== G.id) { rRaceId = G.id; rStartAt = Date.now(); rDrawPlay(mine); rStartMeasure(mine[0].m).then(rSendLoop); if (navigator.vibrate) navigator.vibrate(200); }
+				s = G.test ? 'The crew is testing the race. Watch the lights!' : !meIn ? 'A race is on! Watch the lights 🌟' : G.st === 'countdown' ? 'Get ready… 3… 2… 1…' : (mine.length > 1 ? 'Go go go! ' : 'Go! You are number ' + rank + ' of ' + ps.length + '. ') + 'Keep going to the star!';
+				if (meIn) bt = [btn('Leave', '', () => { if (confirmGiveUp()) { rStopMeasure(); gAct({ a: 'quit', id: G.id }); } })];
+			}
+			else if (G.st === 'over') {
+				rStopMeasure(); rRelease(); rRaceId = '';
+				const w = G.winner != null ? ps[G.winner] : null;
+				s = G.test ? 'The crew tested the finish 🌟' : w ? (w.t === TAG ? (mine.length > 1 ? 'Player ' + (w.s + 1) + ' wins! 🌟🎉' : 'You win! The star is yours! 🌟🎉') : 'Winner: ' + col(w) + ' — great race!') : (G.why === 'not enough players' ? 'Not enough players joined this time.' : 'The race is over.');
+				if (navigator.vibrate && w && w.t === TAG) navigator.vibrate([100, 60, 100]);
+			}
+		} else if (vg === 'pong') {
+			const sc = G.score || [0, 0], vis = G.mode === 'visitor', mine = vis && me === 0;
+			$('sProg').textContent = G.st !== 'idle' ? (mine ? 'You ' : 'Red ') + sc[0] + ' : ' + sc[1] + (vis ? ' Computer' : ' Blue') : '';
+			$('pStrip').className = 'vstrip ' + (mine && G.st === 'playing' ? '' : 'off');
+			{ const r = $('pStrip').getBoundingClientRect(); $('pPad').style.top = (20 + pgGoal * (r.height - 40)) + 'px'; }   // the paddle glides to where you slid
+			pgShow();
+			if (G.st === 'idle') { s = 'Play Pong against the computer!'; bt = [btn('▶️ Start Pong', 'primary', () => gAct({ a: 'new', z: face }, 'Starting… look at the lights!'))]; }
+			else if (!vis && G.st === 'playing') s = 'The show\'s crew is playing Pong on the lights. Watch! 🏓';
+			else if (G.st === 'playing') s = mine ? 'Slide to move your red paddle. It follows about a second later, so move early!' : 'Someone is playing Pong. Watch the lights! 🏓';
+			else if (G.st === 'over') s = mine ? (G.winner === 1 ? 'You win! 🎉🏆' : G.why === 'nobody playing' ? 'The game stopped: nobody was moving the paddle.' : G.why === 'time up' ? 'Time is up!' : 'The computer wins this time!') : (G.winner ? (G.winner === 1 ? 'Red' : 'Blue') + ' wins Pong! 🏆' : 'Pong is over.');
+			if (mine && G.st === 'playing') bt = [btn('Stop', '', () => { if (confirmGiveUp()) gAct({ a: 'quit', id: G.id }); })];
+		} else if (vg === 'simon') {
+			const mine = me === 0, scols = (G.c || ['39d353', 'ff2a2a', 'ffd23f', '2a7bff']).map(c => '#' + c);
+			sPads.forEach((p, q) => { p.style.background = scols[q]; p.style.color = scols[q]; });
+			const canTap = G.st === 'input' && mine && gSentN !== G.n;
+			$('sBoard').className = 'simon ' + (canTap ? '' : 'off');
+			if (sInN !== G.n) { sIn = []; sInN = G.n; }
+			$('sProg').textContent = canTap ? sIn.length + ' / ' + G.n : G.st === 'showing' || G.st === 'input' ? 'Round ' + (G.n || 0) + (G.best ? ' · best today ' + G.best : '') : (G.best ? 'Best today: ' + G.best : '');
+			if (G.st === 'idle') { s = 'Ready to test your memory?'; bt = [btn('▶️ Start Simon', 'primary', () => gAct({ a: 'new', mode: 'solo', z: face }, 'Starting… look at the lights!'))]; }
+			else if (G.st === 'showing') s = mine ? (G.n > 1 ? 'Right! 🎉 Now watch the lights… 👀' : 'Watch the lights… 👀') : 'Someone is playing Simon. Watch the lights!';
+			else if (G.st === 'input') s = !mine ? 'Someone is playing Simon. Watch the lights!' : canTap ? 'Your turn! Tap the ' + G.n + ' colour' + (G.n > 1 ? 's' : '') + ' in order.' : 'Sending…';
+			else if (G.st === 'over') s = G.why === 'all rounds' ? 'You did all ' + G.score + ' rounds! Amazing! 🏆' : G.why === 'wrong colour' ? (mine ? 'Oops, wrong colour! ' : 'Game over! ') + 'Score: ' + G.score + (G.score && G.score >= G.best ? ' — best today! 🏆' : '') : G.why === 'time ran out' ? 'Time ran out. Score: ' + G.score : 'Game over. Score: ' + G.score;
+			if (mine && (G.st === 'showing' || G.st === 'input')) bt = [btn('Stop', '', () => { if (confirmGiveUp()) gAct({ a: 'quit', id: G.id }); })];
+		} else {
+			const myTurn = G.st === 'playing' && me === G.turn && gSentN !== G.n;
+			if (vg === 'c4') {
+				const bb = b.length === 42 ? b : '0'.repeat(42);
+				gCells.forEach((el, i) => { const v = +bb[i]; el.style.background = v ? cols[v - 1] : ''; el.classList.toggle('win', (G.win || []).includes(i) && G.st === 'over'); el.classList.toggle('last', i === G.last && G.st === 'playing'); });
+				$('gBoard').className = 'c4 ' + (myTurn ? 'mine' : 'off');
+			} else {
+				const bb = b.length === 9 ? b : '0'.repeat(9);
+				tCells.forEach((el, i) => { const v = +bb[i]; el.textContent = v === 1 ? '✕' : v === 2 ? '◯' : ''; el.style.color = v ? cols[v - 1] : ''; el.classList.toggle('win', (G.win || []).includes(i) && G.st === 'over'); });
+				$('tBoard').className = 'ttt ' + (myTurn ? 'mine' : 'off');
+			}
+			if (G.st === 'idle') {
+				s = 'Start a game!';
+				bt = [btn('🤖 Play against the computer', 'primary', () => gAct({ a: 'new', mode: 'cpu', z: face }, 'Starting… look at the lights!')),
+					btn('👫 Play against a friend', '', () => gAct({ a: 'new', mode: 'pvp', z: face }, 'Starting…'))];
+			} else if (G.st === 'waiting') {
+				if (me === 0) { s = 'Waiting for your friend… ' + you; bt = [btn('Cancel', '', () => gAct({ a: 'quit', id: G.id }))]; $('gHow').textContent = 'Your friend opens this page on their phone (scan the same QR code), goes to 🎮 Games and taps "Join the game".'; }
+				else { s = 'Someone is waiting for a friend to play ' + GAMES[vg].n + '!'; bt = [btn('🙋 Join the game', 'primary', () => gAct({ a: 'join', id: G.id }, 'Joining…'))]; }
+			} else if (G.st === 'playing') {
+				if (me < 0) s = 'A game is being played. Watch it on the lights!';
+				else if (myTurn) s = (vg === 'c4' ? 'Your turn! Tap a column. ' : 'Your turn! Tap a square. ') + you;
+				else if (G.turn === me) s = 'Sending…';
+				else s = (G.mode === 'cpu' ? 'The computer is thinking… ' : 'Your friend\'s turn… ') + you;
+				if (me >= 0) bt = [btn('Give up', '', () => { if (confirmGiveUp()) gAct({ a: 'quit', id: G.id }); })];
+			} else if (G.st === 'over') {
+				const w = G.winner;
+				if (w === 3) s = 'It\'s a draw!';
+				else if (!w) s = G.why === 'nobody joined' ? 'Nobody joined this time.' : G.why === 'time ran out' ? 'Time ran out.' : 'Game over.';
+				else if (me < 0) s = (G.mode === 'cpu' ? (w === 2 ? 'The computer wins!' : 'The player wins! 🎉') : 'Player ' + w + ' wins!');
+				else s = w === me + 1 ? 'You win! 🎉🎉' : (G.mode === 'cpu' ? 'The computer wins this time!' : 'Your friend wins!');
+				if (G.why === 'gave up' && w && w !== me + 1 && me >= 0) s = 'You gave up.';
+			}
 		}
-		if (G.st !== 'waiting' || me !== 0) $('gHow').textContent = 'Drop your discs and get four in a row (across, up and down, or diagonally) before the other player. The board shows on the lights!';
 		$('gStat').innerHTML = s; $('gBtns').replaceChildren(...bt);
 		const left = Math.max(0, Math.round((G.left || 0) - (Date.now() - gGot) / 1000));
-		$('gTimer').textContent = (G.st === 'playing' && me >= 0) ? left + ' s left for this move' : G.st === 'waiting' ? left + ' s' : '';
+		$('gTimer').textContent = (G.st === 'playing' && me >= 0 && (G.g === 'c4' || G.g === 'ttt')) ? left + ' s left for this move' : G.st === 'waiting' ? left + ' s' : (G.st === 'input' && me === 0 && gSentN !== G.n) ? left + ' s left' : (G.g === 'count' && G.st === 'lobby') ? 'Starts in ' + left + ' s' : (G.g === 'count' && G.st === 'answer' && me >= 0 && cPickedR !== G.round) ? left + ' s to answer' : '';
 	}
 	// a bit friendlier than confirm() on a phone: the second tap within 3 s gives up
 	let giveUpAt = 0;
-	function confirmGiveUp() { if (Date.now() - giveUpAt < 3000) return true; giveUpAt = Date.now(); say('Tap "Give up" again to stop the game.', ''); return false; }
+	function confirmGiveUp() { if (Date.now() - giveUpAt < 3000) return true; giveUpAt = Date.now(); say('Tap again to stop the game.', ''); return false; }
 	function gApply(st) {
-		if (!st || st.g !== 'c4' || (G.v && st.v < G.v && st.id === G.id)) return;
-		if (st.st !== 'idle' && Date.now() / 1000 - (st.at || 0) > 600) st = { st: 'idle' };   // an old board: the bridge is off
-		G = st; gGot = Date.now(); if (G.n !== gSentN) gSentN = -1; gDraw();
+		if (!st || !GAMES[st.g] || (G.v && st.v < G.v && st.id === G.id && st.g === G.g)) return;
+		if (st.st !== 'idle' && Date.now() / 1000 - (st.at || 0) > 600) st = { st: 'idle', best: st.best };   // an old board: the bridge is off
+		const newRound = st.n !== G.n || st.id !== G.id;
+		G = st; gGot = Date.now(); if (newRound || G.st !== 'input') { if (G.n !== gSentN || G.st === 'idle') gSentN = -1; } gDraw();
 	}
 	function gameOpen() {
 		gDraw();
@@ -621,10 +1057,179 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		setInterval(() => { if (tab === 'game') gDraw(); }, 1000);
 	}
 
+	// ---- play the lights: turns posted by the bridge on "<code>-play"; taps go to the show channel ----
+	let PL = { on: false, holder: '', queue: [], keys: [], cols: [] }, plGot = 0, plES = null, plCol = 0, plBuf = [], plTm = null, plBusy = false;
+	const plSend = o => fetch(RELAY + TOPIC, { method: 'POST', body: JSON.stringify(Object.assign({ k: 'play', p: PID, tag: TAG }, o)) });
+	function plTap(i, el) {
+		if (PL.holder !== TAG) return;
+		el.classList.add('hit'); setTimeout(() => el.classList.remove('hit'), 120);
+		const c = PL.cols[plCol] ? '#' + PL.cols[plCol] : '#fff'; el.style.background = c; setTimeout(() => { el.style.background = ''; }, 350);
+		if (navigator.vibrate) navigator.vibrate(10);
+		if (!plBuf.includes(i)) plBuf.push(i);
+		if (plBuf.length >= 8) plFlush();
+		else if (!plTm) plTm = setTimeout(plFlush, 500);   // taps of half a second go in one message
+	}
+	function plFlush() {
+		clearTimeout(plTm); plTm = null;
+		if (!plBuf.length) return;
+		const m = plBuf.splice(0, 8);
+		plSend({ a: 'tap', m, c: plCol < PL.cols.length ? plCol : -1 }).catch(() => say('It could not be sent. Please try again.', 'err'));
+	}
+	async function plAct(o, okMsg) {
+		if (plBusy) return; plBusy = true; plDraw();
+		try { const r = await plSend(o); if (!r.ok) throw 0; if (okMsg) $('plStat').textContent = okMsg; } catch (e) { say('It could not be sent. Please try again.', 'err'); }
+		setTimeout(() => { plBusy = false; plDraw(); }, 1500);
+	}
+	let plSig = '';
+	function plDraw() {
+		const mine = PL.holder === TAG, pos = (PL.queue || []).indexOf(TAG);
+		const sig = JSON.stringify(PL.keys);
+		if (sig !== plSig) {
+			plSig = sig;
+			$('plPads').replaceChildren(...(PL.keys || []).map((k, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = k.n; b.title = k.g; b.onclick = () => plTap(i, b); return b; }));
+		}
+		$('plPads').className = 'ppads ' + (mine ? '' : 'off');
+		$('plCols').hidden = !mine;
+		if (mine && $('plCols').children.length !== PL.cols.length + 1) {
+			$('plCols').replaceChildren(...PL.cols.concat(['rnd']).map((c, i) => { const b = document.createElement('button'); b.type = 'button';
+				if (c === 'rnd') { b.textContent = '🌈'; b.style.background = 'conic-gradient(red,yellow,lime,cyan,blue,magenta,red)'; b.setAttribute('aria-label', 'Surprise colours'); } else { b.style.background = '#' + c; b.setAttribute('aria-label', 'Colour ' + (i + 1)); }
+				b.onclick = () => { plCol = i; plDraw(); }; return b; }));
+		}
+		[...$('plCols').children].forEach((b, i) => b.setAttribute('aria-pressed', String(i === plCol)));
+		const left = Math.max(0, Math.round((PL.left || 0) - (Date.now() - plGot) / 1000));
+		let s = '', bt = [];
+		if (!PL.on) s = 'Playing the lights is closed right now.';
+		else if (mine) { s = 'Your turn! Pick a colour and tap the pads. 🎹'; bt = [plBtn('I\'m done', '', () => plAct({ a: 'leave' }))]; }
+		else if (pos >= 0) { s = 'You are in the queue: number ' + (pos + 1) + '. Get ready!'; bt = [plBtn('Leave the queue', '', () => plAct({ a: 'leave' }))]; }
+		else if (PL.holder) { s = 'Someone is playing the lights. Watch the show! ' + ((PL.queue || []).length ? (PL.queue.length + ' waiting.') : ''); bt = [plBtn('🙋 Join the queue', 'primary', () => plAct({ a: 'join' }, 'Joining…'))]; }
+		else { s = 'Nobody is playing. Your turn could start right now!'; bt = [plBtn('🎹 Play the lights', 'primary', () => plAct({ a: 'join' }, 'Starting… look at the lights!'))]; }
+		$('plStat').textContent = s; $('plBtns').replaceChildren(...bt);
+		$('plTimer').textContent = mine ? left + ' s left' : PL.holder ? 'This turn ends in ' + left + ' s (each turn: ' + (PL.secs || 30) + ' s)' : '';
+	}
+	const plBtn = (t, cls, on) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + (cls || ''); b.textContent = t; b.disabled = plBusy || closed; b.onclick = on; return b; };
+	function plApply(st) {
+		if (!st || typeof st !== 'object' || (PL.v && st.v < PL.v && Date.now() / 1000 - (st.at || 0) < 5)) return;
+		if (Date.now() / 1000 - (st.at || 0) > 600) st = Object.assign({}, st, { holder: '', queue: [] });
+		const wasMine = PL.holder === TAG;
+		PL = st; plGot = Date.now(); if (wasMine && PL.holder !== TAG) { plBuf = []; clearTimeout(plTm); plTm = null; }
+		plDraw();
+	}
+	function playOpen() {
+		plDraw();
+		if (plES || !TOPIC) return;
+		fetch(RELAY + TOPIC + '-play/json?poll=1&since=latest').then(r => r.text()).then(t => {
+			const ev = t.trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(e => e && e.event === 'message').pop();
+			if (ev) { try { plApply(JSON.parse(ev.message)); } catch (e) {} }
+		}).catch(() => {});
+		try {
+			plES = new EventSource(RELAY + TOPIC + '-play/sse');
+			plES.onmessage = e => { try { const ev = JSON.parse(e.data); if (ev.event === 'message') plApply(JSON.parse(ev.message)); } catch (er) {} };
+		} catch (e) {}
+		setInterval(() => { if (tab === 'play') plDraw(); }, 1000);
+	}
+
+	// ---- sing: record on the phone, send a small WAV to the show; the queue is posted on "<code>-sing" ----
+	let SGQ = { on: false, now: '', q: [], wait: [] }, sgES = null, sgWho = '', sgRec = null, sgWav = null, sgUrl = '', sgBusy = false;
+	const SG_RATE = 11025, SG_MAX = 10;
+	function sgDrawWho() {
+		const list = cfg.singers || [];
+		if (!list.some(x => x.k === sgWho)) sgWho = list.length ? list[0].k : '';
+		$('sgWho').replaceChildren(...list.map(x => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.setAttribute('aria-pressed', String(x.k === sgWho));
+			b.textContent = x.e + ' ' + x.n; b.onclick = () => { sgWho = x.k; sgDrawWho(); }; return b; }));
+	}
+	function wavEncode(samples, rate) {
+		const n = samples.length, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+		const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+		w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+		v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+		for (let i = 0; i < n; i++) { const x = Math.max(-1, Math.min(1, samples[i])); v.setInt16(44 + i * 2, x < 0 ? x * 32768 : x * 32767, true); }
+		return new Blob([buf], { type: 'audio/wav' });
+	}
+	async function sgStart() {
+		if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { say('This phone\'s browser cannot record. Try Chrome or Safari.', 'err'); return; }
+		let stream;
+		try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true } }); }
+		catch (e) { say('The microphone is not allowed. Allow it in the browser to sing!', 'err'); return; }
+		const ctx = new (window.AudioContext || window.webkitAudioContext)();
+		const src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(4096, 1, 1), mute = ctx.createGain(); mute.gain.value = 0;
+		const ratio = ctx.sampleRate / SG_RATE, out = []; let acc = 0, cnt = 0, pos = 0;
+		proc.onaudioprocess = ev => {
+			const d = ev.inputBuffer.getChannelData(0); let peak = 0;
+			for (let i = 0; i < d.length; i++) {   // down to 11 kHz by averaging
+				acc += d[i]; cnt++; pos++; peak = Math.max(peak, Math.abs(d[i]));
+				if (pos >= ratio) { out.push(acc / cnt); acc = 0; cnt = 0; pos -= ratio; }
+			}
+			$('sgMeter').style.width = Math.min(100, peak * 140) + '%';
+			const secs = out.length / SG_RATE;
+			$('sgTime').textContent = 'Recording… ' + secs.toFixed(1) + ' s of ' + SG_MAX;
+			if (secs >= SG_MAX) sgStop();
+		};
+		src.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
+		sgRec = { ctx, stream, proc, out };
+		sgWav = null; if (sgUrl) { URL.revokeObjectURL(sgUrl); sgUrl = ''; }
+		$('sgRec').classList.add('on'); $('sgRec').innerHTML = '⏹<br>Stop'; sgDraw();
+	}
+	function sgStop() {
+		if (!sgRec) return;
+		const { ctx, stream, proc, out } = sgRec; sgRec = null;
+		try { proc.disconnect(); stream.getTracks().forEach(t => t.stop()); ctx.close(); } catch (e) {}
+		$('sgRec').classList.remove('on'); $('sgRec').innerHTML = '🎙️<br>Record again'; $('sgMeter').style.width = '0';
+		let a = 0, b = out.length;   // trim the silence at both ends
+		const quiet = x => Math.abs(x) < 0.02;
+		while (a < b && quiet(out[a])) a++;
+		while (b > a && quiet(out[b - 1])) b--;
+		a = Math.max(0, a - SG_RATE * 0.15 | 0); b = Math.min(out.length, b + SG_RATE * 0.25 | 0);
+		const clip = out.slice(a, Math.min(b, a + SG_RATE * SG_MAX));
+		if (clip.length < SG_RATE * 0.5) { $('sgTime').textContent = 'That was too short or too quiet. Try again, a bit louder!'; sgDraw(); return; }
+		sgWav = wavEncode(clip, SG_RATE); sgUrl = URL.createObjectURL(sgWav);
+		$('sgTime').textContent = 'Recorded ' + (clip.length / SG_RATE).toFixed(1) + ' s. Listen to it, or send it!'; sgDraw();
+	}
+	$('sgRec').onclick = () => { if (sgRec) sgStop(); else sgStart(); };
+	async function sgSend() {
+		if (!sgWav || sgBusy || !sgWho) return;
+		sgBusy = true; sgDraw();
+		try {
+			const meta = { k: 'sing', s: sgWho, p: PID, tag: TAG };
+			const r = await fetch(RELAY + TOPIC + '?filename=sing.wav&message=' + encodeURIComponent(JSON.stringify(meta)), { method: 'POST', body: sgWav });
+			if (!r.ok) throw 0;
+			say('Sent! Listen and watch the lights: your song plays in a moment.', 'ok');
+			sgWav = null; $('sgTime').textContent = 'Sent! You can record another song in a little while.';
+		} catch (e) { say('It could not be sent. Please try again.', 'err'); }
+		setTimeout(() => { sgBusy = false; sgDraw(); }, 2000);
+		sgDraw();
+	}
+	function sgDraw() {
+		sgDrawWho();
+		const bt = [];
+		if (sgWav && !sgRec) {
+			const lis = document.createElement('button'); lis.type = 'button'; lis.className = 'btn'; lis.textContent = '▶️ Listen';
+			lis.onclick = () => { try { new Audio(sgUrl).play(); } catch (e) {} };
+			const go = document.createElement('button'); go.type = 'button'; go.className = 'btn primary'; go.textContent = '🎤 Send it to the lights!'; go.disabled = sgBusy || closed || !sgWho;
+			go.onclick = sgSend; bt.push(go, lis);
+		}
+		$('sgBtns').replaceChildren(...bt);
+		const mine = SGQ.now === TAG, pos = (SGQ.q || []).indexOf(TAG), wpos = (SGQ.wait || []).indexOf(TAG);
+		$('sgStat').textContent = !SGQ.on ? 'Singing is closed right now.' : mine ? '🎶 Your song is playing now! Watch ' + SGQ.who + '!' : pos >= 0 ? 'Your song is number ' + (pos + 1) + ' in the queue.' :
+			wpos >= 0 ? 'Your song is waiting to be checked.' : SGQ.now ? '🎶 Now singing: ' + SGQ.who : '';
+	}
+	function sgApply(st) { if (!st || typeof st !== 'object') return; if (Date.now() / 1000 - (st.at || 0) > 600) st = Object.assign({}, st, { now: '', q: [] }); SGQ = st; sgDraw(); }
+	function singOpen() {
+		sgDraw();
+		if (sgES || !TOPIC) return;
+		fetch(RELAY + TOPIC + '-sing/json?poll=1&since=latest').then(r => r.text()).then(t => {
+			const ev = t.trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(e => e && e.event === 'message').pop();
+			if (ev) { try { sgApply(JSON.parse(ev.message)); } catch (e) {} }
+		}).catch(() => {});
+		try {
+			sgES = new EventSource(RELAY + TOPIC + '-sing/sse');
+			sgES.onmessage = e => { try { const ev = JSON.parse(e.data); if (ev.event === 'message') sgApply(JSON.parse(ev.message)); } catch (er) {} };
+		} catch (e) {}
+	}
+
 	// ---- state of the lights (posted by the bridge on "<code>-status") ----
 	const apply = () => {
-		$('gameTab').hidden = !cfg.games; $('propTab').hidden = !(cfg.props && cfg.props.length);
-		const nt = 4 + (cfg.games ? 1 : 0) + (cfg.props && cfg.props.length ? 1 : 0);
+		$('gameTab').hidden = !cfg.games; $('propTab').hidden = !(cfg.props && cfg.props.length); $('playTab').hidden = !cfg.play; $('singTab').hidden = !cfg.sing;
+		const nt = 4 + (cfg.games ? 1 : 0) + (cfg.props && cfg.props.length ? 1 : 0) + (cfg.play ? 1 : 0) + (cfg.sing ? 1 : 0);
 		$('tabs').classList.toggle('five', nt === 5); $('tabs').classList.toggle('six', nt === 6);
 		if (typeof drawProps === 'function') drawProps();
 		setKick(); drawFaces(); drawQuick(); drawGifs(); drawFx(); buildGrid(); if (txtS.draw) txtS.draw(); updPrev(); $('closed').hidden = !TOPIC || !closed; tick(); };
@@ -633,7 +1238,8 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		let st = null; try { st = last && JSON.parse(last.message); } catch (e) {}
 		closed = !st || !st.on || Date.now() / 1000 - (st.at || 0) > 7200;   // no news for 2 hours: the bridge is off
 		if (st && Array.isArray(st.faces) && st.faces.length) cfg.faces = st.faces.slice(0, 8).map(f => ({ n: String(f.n || '').slice(0, 20), w: Math.max(1, Math.min(128, f.w | 0)), h: Math.max(1, Math.min(128, f.h | 0)) }));
-		if (st) { cfg.theme = URL_THEME || (['hw', 'xm', 'ev', ''].includes(st.theme) ? st.theme : ''); cfg.free = !!st.free; cfg.title = String(st.title || '').slice(0, 40); cfg.games = !!st.games; cfg.props = Array.isArray(st.props) ? st.props.slice(0, 12).map(p => ({ n: String(p.n || '').slice(0, 24), e: String(p.e || '✨').slice(0, 4) })) : []; WAIT_MS = Math.max(0, Math.min(600, st.wait | 0)) * 1000; }
+		if (st) { cfg.theme = URL_THEME || (['hw', 'xm', 'ev', ''].includes(st.theme) ? st.theme : ''); cfg.free = !!st.free; cfg.title = String(st.title || '').slice(0, 40); cfg.games = !!st.games; cfg.play = !!st.play; cfg.race = st.race && typeof st.race === 'object' ? st.race : null; cfg.sing = !!st.sing && Array.isArray(st.singers) && st.singers.length > 0;
+			cfg.singers = Array.isArray(st.singers) ? st.singers.slice(0, 30).map(x => ({ k: String(x.k || '').slice(0, 130), n: String(x.n || '').slice(0, 28), e: String(x.e || '🎤').slice(0, 4) })) : []; cfg.gl = Array.isArray(st.gl) ? st.gl.filter(g => GAMES[g]) : ['c4']; cfg.props = Array.isArray(st.props) ? st.props.slice(0, 12).map(p => ({ n: String(p.n || '').slice(0, 24), e: String(p.e || '✨').slice(0, 4) })) : []; WAIT_MS = Math.max(0, Math.min(600, st.wait | 0)) * 1000; }
 		if (face >= cfg.faces.length) face = -1;
 		apply();
 	}).catch(() => {});
