@@ -1,4 +1,4 @@
-# ShowPlay — Installation guide for Linux x64 (v18)
+# ShowPlay — Installation guide for Linux x64 (v23)
 
 Visitors scan a QR code on the wall, and from their phone they send a message, a picture, an effect or a drawing
 to a cube of LED matrices, play **games** on it (Four in a Row, Tic-tac-toe, Simon, Count the colours, Snake, Space Invaders, Pong, Race to the Star), take turns to **play the lights** of the props, **sing** into the phone and make a singing prop sing it, or light up **props of the show** (the wings, the bats,
@@ -359,8 +359,27 @@ This game is fair over the relay: the answer is a number, so it does not matter 
   cube** to switch them all off.
 
 The bridge posts a game on ntfy.sh only when something changes for the phones (a move, a new round, a score), never
-every step. If you ever see "could not post the game board" in the log, ntfy.sh is limiting the bridge, and the phones
-update again a few seconds later.
+every step, and real-time games (Snake, Pong, Space Invaders, the race) every 5 seconds at most.
+
+**ntfy.sh's limits (v19).** ntfy.sh's free service lets each internet address send about 60 messages in a row, then
+about one every 5 to 10 seconds; when that is used up it answers "429 Too Many Requests" for a while. At home, the
+bridge **and every phone on the same Wi-Fi** share one internet address, so testing with your own phones on your Wi-Fi
+uses up the same allowance. Since v19:
+- the bridge sends everything through one "poster" that keeps within its own budget, sends the game board first, never
+  sends the same thing twice, and after a 429 really waits (30 s, 60 s, 120 s…) instead of trying again at once;
+- each phone keeps to its own budget too: steady messages (joystick, taps, race effort) go less often as it runs
+  low, so moves still go through. On a 429 a move or request says "Too many messages right now. Wait a minute and try
+  again."; the Pong and Space Invaders slider just follows less often and says "Busy connection right now" (v22);
+- the control page shows **"ntfy.sh: too many messages… posting again in N s"** while the bridge is waiting.
+- **The "ntfy.sh today" card** on the control page (v23) shows how many messages the bridge posted and received today,
+  how much of one internet address's daily limit that is, the last "too many" answer, and whether the bridge is
+  waiting. When ntfy.sh says the **daily** limit is used up (it asks to wait for hours), the bridge still tries again
+  every 10 minutes and says when it resets; another connection (a phone hotspot, WARP) then works at once.
+- **Only one bridge at a time** (v23): a second bridge started on the same computer says "Another ShowPlay bridge is
+  already running" and stops.
+
+Visitors' phones on **mobile data** have their own internet address and allowance. To test at home, use a phone on
+mobile data, or play slowly.
 
 ## Play the lights (visitors)
 
@@ -409,6 +428,18 @@ The full guide is [../docs/sing.md](../docs/sing.md).
 - **Nothing is kept:** the bridge deletes each recording as soon as it has been played. There is no word filter for
   sound.
 - **Microphone:** the visitors' page must be on HTTPS (GitHub Pages is) for phones to allow the microphone.
+
+## Advent calendar and Decorate the tree (visitors)
+
+Two Christmas extras, set up on **http://localhost:8099/xmas** (or **📅 Advent & 🎄 Tree** at the top of the control
+page). The full guide is `../docs/xmas.md`.
+
+- **📅 Advent calendar:** 24 doors on the visitors' page, one more open each day from 1 December. A door holds an
+  effect or a message for the cube, or a game that opens on the phone. Optionally, a game appears only from the day
+  of its door. **Test: pretend today is door N** lets you try it before December (set it back to 0 for the show).
+- **🎄 Decorate the tree:** pick the tree's models (any models or groups); visitors tap a free spot, pick a colour and
+  hang a bauble that lights up on the real tree. The decorated tree shows for a while after each new bauble (or all
+  the time); when it is full there is a party and it starts again.
 
 ## Props of the show (through EZPlayer)
 
@@ -523,4 +554,8 @@ New in v12: pads, faders and keys for **whoever runs the show**. The full guide 
 - **The MIDI tab shows no device:** `ls /dev/snd/midi*` must list it, and `groups` must include `audio` (see "Mixer, Keys and MIDI controllers").
 - **The Mixer page does not open from a phone:** it uses the same port as the control page (8099), so the same network and firewall rules apply.
 - **No sound from 🎤 Sing:** press **🔊 Test sound** in the Sing card and read the log (see "Sing (visitors)").
-- **Race to the Star does not start:** set up its track on the race page (http://localhost:8099/race), or use the cube track (see "Games").
+- **Race to the Star does not start:** set up its track on the race page (http://localhost:8099/race), or use the cube track (see "Games"). Since v19 the phone says why a game could not start.
+- **The lights show the moves at once but the phones update late, or "HTTP Error 429" in the log:** ntfy.sh is limiting your internet address (see "Games" → ntfy.sh's limits). Update to v19, wait a few minutes, and test with a phone on mobile data.
+- **The phones get every board about 30 s late, with no 429 in the log:** IPv6 does not work on your network and older bridges waited for it on every post. Update to v20 or later, which uses IPv4 first (and since v21 waits at most 3 s for each address).
+- **Only one bridge at a time:** `autostart.bat` starts a hidden bridge, `start_bridge.bat` starts another in a window. Use one or the other. Since v23 a second bridge stops by itself with "Another ShowPlay bridge is already running".
+- **No 📅 Advent or 🎄 Tree tab:** switch them on at http://localhost:8099/xmas and save (see `../docs/xmas.md`).

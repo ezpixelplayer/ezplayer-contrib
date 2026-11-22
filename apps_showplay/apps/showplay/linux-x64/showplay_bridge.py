@@ -25,7 +25,48 @@ import json, os, sys, time, threading, queue, unicodedata, re, socket, secrets, 
 import urllib.request, urllib.parse, urllib.error
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
-VERSION = "v18"
+# IPv4 first (v20). Python tries a server's addresses one after another, waiting up to the whole timeout for each.
+# ntfy.sh has 3 IPv6 addresses: on a network where IPv6 does not really work, every post waited 3 x 10 s before
+# trying IPv4, so the phones got each game board about 30 s late (browsers and EZPlayer try both at once and were fine).
+_getaddrinfo = socket.getaddrinfo
+
+
+def _getaddrinfo_v4_first(*a, **k):
+    return sorted(_getaddrinfo(*a, **k), key=lambda r: r[0] != socket.AF_INET)
+
+
+socket.getaddrinfo = _getaddrinfo_v4_first
+
+# At most 3 s to connect to each address (v21), so even if the first addresses tried do not answer at all, the next
+# ones are tried within seconds instead of after the whole timeout. Once connected, the usual timeout applies to the
+# answer. (http.client looks socket.create_connection up each time it connects, so this covers urllib too.)
+CONNECT_EACH = 3.0
+
+
+def _create_connection(address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None, **kw):
+    host, port = address[0], address[1]
+    err = None
+    for fam, typ, proto, _, sa in socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM):
+        sock = None
+        try:
+            sock = socket.socket(fam, typ, proto)
+            after = socket.getdefaulttimeout() if timeout is socket._GLOBAL_DEFAULT_TIMEOUT else timeout
+            sock.settimeout(CONNECT_EACH if after is None else min(CONNECT_EACH, after))
+            if source_address:
+                sock.bind(source_address)
+            sock.connect(sa)
+            sock.settimeout(after)
+            return sock
+        except OSError as e:
+            err = e
+            if sock is not None:
+                sock.close()
+    raise err if err else OSError("getaddrinfo returned nothing for %s" % host)
+
+
+socket.create_connection = _create_connection
+
+VERSION = "v23"
 PORT = 8099
 RELAY = "https://ntfy.sh/"
 CFG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "showplay_config.json")
@@ -83,6 +124,10 @@ S = {   # settings (kept in showplay_config.json)
     "midi_native": True,  # MIDI: the bridge reads the MIDI devices itself (Windows, Linux, Raspberry Pi)
     "midi_base": 36,      # MIDI: the note that plays the first key (36 = C2, the first pad of most pad controllers)
     "midi_map": {},       # MIDI: learned notes and CCs -> controls of the Mixer and Keys pages
+    "advent": {},         # Advent calendar: on, first day, doors (effect, message or game), unlock games by day, test day
+    "tree": {},           # Decorate the tree: models, number of baubles, wait between baubles, how long it shows…
+    "tree_orn": "",       # Decorate the tree: the baubles hung so far (one digit per spot: 0 = free, 1-8 = colour)
+    "ntfy_day": {},       # ntfy.sh: today's counts (messages posted and received, 429 answers)
 }
 # ready messages (the same as the visitors' page)
 QUICK = {
@@ -151,6 +196,7 @@ def load():
                                                                          {"c4", "ttt", "simon", "count", "snake", "invaders"},
                                                                          {"c4", "ttt", "simon", "count", "snake", "invaders", "pong"}):
         S["game_list"] = list(GAMES)   # settings saved by v13 to v17 had every game of that time on: the new ones too
+    TREE["orn"] = S.get("tree_orn", "") if isinstance(S.get("tree_orn"), str) else ""
     if isinstance(S.get("keys_set"), dict):
         KEYS["set"].update({k: v for k, v in S["keys_set"].items() if isinstance(v, dict)})
     if isinstance(S.get("keys_glob"), dict):
@@ -233,7 +279,7 @@ def ezp_targets():
 def uses_ezp():
     rc = S.get("race") or {}
     return (bool(S.get("props")) or any(f.get("out") == "ezp" for f in S["faces"]) or bool(S.get("sing")) or
-            bool(rc.get("models") or rc.get("pairs")))
+            bool(rc.get("models") or rc.get("pairs")) or bool((S.get("tree") or {}).get("models")))
 
 
 def ezp_watch():
@@ -2360,6 +2406,7 @@ RACE_DEFAULT = {
     "catchup": True,
     "difficulty": "normal", "target": 35, "slide": 0.035, "delay": 1.2, "max_time": 90,
     "leader": True, "party": 8, "countdown": True, "rainbow": True, "bright": 100, "bg": "dim",
+    "style": "auto",             # rope (filled up to the height), climber (a small figure) or auto (climber from 50 pixels tall)
 }
 RACE_BASE = 970              # renderer numbers of the race's tracks and stars
 
@@ -2410,6 +2457,8 @@ def race_clean(b):
             c.update(RACE_PRESETS[b["difficulty"]])
     if b.get("bg") in ("dim", "off"):
         c["bg"] = b["bg"]
+    if b.get("style") in ("auto", "rope", "climber"):
+        c["style"] = b["style"]
     for k in ("mix", "shared", "early", "catchup", "leader", "countdown", "rainbow"):
         if k in b:
             c[k] = bool(b[k])
@@ -2503,6 +2552,11 @@ class RaceTrack:
                 ln = [-1] * g.n                                          # rings: every pixel shows every player
             self.prog.append(p)
             self.lane.append(ln)
+        # how many pixels tall the track is (distinct heights): one step = one pixel, for the smooth head and the climber
+        self.rows = max(2, len({round(x, 3) for pr in self.prog for x in pr}))
+        self.step = 1.0 / (self.rows - 1)
+        style = cfg.get("style", "auto")
+        self.climber = style == "climber" or (style == "auto" and self.rows >= RACE_CLIMBER_ROWS)
 
     def frames(self, players, now, state, winner, cfg, t):
         bright = cfg["bright"] / 100
@@ -2524,8 +2578,8 @@ class RaceTrack:
                     col = hexrgb(pl["c"])
                     if state == "lobby" and pl.get("blink", 0) > now:
                         c = col if int(now * 6) % 2 else None
-                    elif state in ("race", "over") and p <= pl["h"]:
-                        c = col if pl["h"] - p > 0.04 else tuple(min(255, v + 90) for v in col)   # a bright head
+                    elif state in ("race", "over"):
+                        c = self.climb_px(p, pl, col, now, t) or (tuple(v // 14 for v in col) if cfg["bg"] == "dim" else None)
                     elif state == "countdown":
                         c = col if p < (now % 1.0) else None
                     elif cfg["bg"] == "dim":
@@ -2535,6 +2589,39 @@ class RaceTrack:
                     buf[o] = int(c[0] * bright); buf[o + 1] = int(c[1] * bright); buf[o + 2] = int(c[2] * bright)
             out.append(bytes(buf))
         return out
+
+
+RACE_CLIMBER_ROWS = 50       # "auto" style: a climber from this many pixels tall, a rope below it
+
+
+def _scale(col, k):
+    return tuple(min(255, int(v * k)) for v in col)
+
+
+def _race_climb_px(self, p, pl, col, now, t):
+    """the colour of one pixel of a player's lane during the race: a rope, or a little climber on a dim rope"""
+    h, s = pl["h"], self.step
+    if not self.climber:
+        if p <= h - s:                                           # the rope, filled up to the height
+            return col if h - p > 3 * s else _scale(col, 1.35)   # the top 3 pixels a bit brighter: the head
+        if p < h + s:                                            # the pixel the head is in: lights up smoothly (v19)
+            return _scale(col, 1.35 * max(0.0, min(1.0, (h - p) / s + 1.0)))
+        return None
+    d = (h - p) / s                                              # pixels below the climber's head
+    if -1 < d <= 0:                                              # the head, fading in smoothly as it climbs
+        return _scale((255, 230, 190), 1.0 + d)
+    if 0 < d <= 3:                                               # the body
+        return col
+    if 3 < d <= 5:                                               # legs: they move while climbing
+        moving = now - pl.get("e_at", 0) < 2 and pl.get("e", 0) > 0.05
+        on = (int(d) + (int(t * 5) if moving else 0)) % 2 == 0
+        return _scale(col, 0.8 if on else 0.25)
+    if p <= h:                                                   # the rope already climbed: dim
+        return _scale(col, 0.12)
+    return None
+
+
+RaceTrack.climb_px = _race_climb_px
 
 
 class RaceAnim:
@@ -2751,7 +2838,7 @@ class Race:
                     return "not now"
                 self.go()
                 return ""
-            if a == "e":                # effort, about once a second
+            if a == "e":                # effort, about every 2 s
                 e = m.get("e")
                 es = e if isinstance(e, list) else [e]
                 now = time.time()
@@ -2804,7 +2891,7 @@ class Race:
             for p in self.players:
                 if self.test:                                   # the panel's test race: pretend players
                     p["e"], p["e_at"] = max(0.0, min(1.0, 0.55 + 0.35 * math.sin(now * (0.7 + p["slot"] * 0.3 + hash(p["c"]) % 7 * 0.11)))), now
-                fresh = now - p["e_at"] < max(1.6, cfg["delay"] + 0.4)
+                fresh = now - p["e_at"] < max(4.0, cfg["delay"] + 0.4)   # phones send about every 2 s (v19)
                 e = p["e"] if fresh else 0.0
                 if e > 0.05:
                     help_ = 1.0 + (min(0.6, (lead - p["h"]) * 1.5) if cfg["catchup"] else 0.0)
@@ -2814,7 +2901,7 @@ class Race:
                 if p["h"] >= 1.0:
                     self.finish(self.players.index(p), "reached the star")
                     return
-            if now - self.posted_at > 3:                          # the phones see the positions every 3 s
+            if now - self.posted_at > 5:                          # the phones see the positions every 5 s
                 self.posted_at = now
                 self.v += 1
 
@@ -2869,10 +2956,18 @@ class GameHub:
     def __init__(self):
         self.all = {"c4": FourInARow(), "ttt": TicTacToe(), "simon": Simon(), "count": CountColours(), "snake": Snake(), "pong": Pong(), "invaders": Invaders(), "race": Race()}
         self.cur = self.all["c4"]
+        self.note, self.nv = None, 0      # the last refused "new game" / "join", so that phone can say why (v19)
 
     @property
     def v(self):
-        return (self.cur.CODE, self.cur.v)
+        return (self.cur.CODE, self.cur.v, self.nv)
+
+    def refuse(self, m, why):
+        """tells the phone that asked for a new game or to join why it was refused (shown on that phone only)"""
+        if m.get("a") not in ("new", "join") or not isinstance(m.get("tag"), str):
+            return
+        self.note = {"tag": m["tag"][:12], "why": str(why)[:60], "g": str(m.get("g", ""))[:10], "at": int(time.time())}
+        self.nv += 1
 
     @property
     def st(self):
@@ -2882,7 +2977,10 @@ class GameHub:
         return self.cur.sides()
 
     def state(self):
-        return self.cur.state()
+        st = self.cur.state()
+        if self.note and time.time() - self.note["at"] < 120:
+            st = dict(st, note=self.note)
+        return st
 
     def tick(self):
         self.cur.tick()
@@ -2943,24 +3041,29 @@ GAMES = ("c4", "ttt", "simon", "count", "snake", "invaders", "pong", "race")   #
 game = GameHub()
 
 
+GAME_FAST = ("snake", "pong", "invaders", "race")
+GAME_FAST_EVERY = 5.0
+
+
 def game_loop():
-    """runs the game clock and posts the board for the phones (once per change, at most about one post a second)"""
-    posted, fails = -1, 0
+    """runs the game clock and gives the board to the poster: turn games at every move, real-time games every few seconds"""
+    posted, last_key, last_at = -1, None, 0.0
     while True:
         game.tick()
         v = game.v
-        if v != posted and S["topic"]:
+        cur = game.cur
+        thinking = getattr(cur, "st", "") == "playing" and getattr(cur, "cpu_at", 0)   # the computer is about to answer:
+        if v != posted and S["topic"] and not thinking:                                 # one post for both moves
             st = game.state()
-            try:
-                urllib.request.urlopen(urllib.request.Request(RELAY + S["topic"] + "-game", data=json.dumps(st).encode(),
-                                                              headers={"Cache": "yes"}), timeout=10).read()
-                posted, fails = v, 0
-            except Exception as e:
-                fails += 1
-                if fails in (1, 10):
-                    log("could not post the game board:", e)
-                time.sleep(min(10, 2 * fails))
-            time.sleep(0.8)
+            key = (st.get("g"), st.get("st"), st.get("id"), len(st.get("players") or []), (st.get("note") or {}).get("at"))
+            # real-time games change many times a second: the phones get them every few seconds, but at once when
+            # the game starts, ends, someone joins or a request is refused
+            if cur.CODE in GAME_FAST and key == last_key and time.time() - last_at < GAME_FAST_EVERY:
+                time.sleep(0.2)
+                continue
+            same = {k: x for k, x in st.items() if k not in ("at", "left", "v")}
+            poster.post("game", st, same=same)
+            posted, last_key, last_at = v, key, time.time()
         time.sleep(0.2)
 
 
@@ -3394,14 +3497,29 @@ def add(msg, att=None):
         if why and m.get("a") != "tap":
             log("play request refused:", why)
         return
+    if isinstance(m, dict) and m.get("k") == "tree":   # decorate the tree: a bauble on a spot
+        why = tree_msg(m)
+        if why:
+            log("tree request refused:", why)
+            tree_refuse(m, why)
+        return
+    allow = False
+    if isinstance(m, dict) and m.get("k") == "advent":   # a door of the advent calendar: its effect or message
+        msg = advent_msg(m)
+        if not msg:
+            log("advent request refused")
+            return
+        allow = True
     if isinstance(m, dict) and m.get("k") == "game":   # game moves: checked by the game itself (whose turn, which game)
-        if not S.get("games") or m.get("g") not in S.get("game_list", GAMES):
+        if not S.get("games") or m.get("g") not in game_list_now():
+            game.refuse(m, "games are off" if not S.get("games") else "game not on the list")
             return
         why = game.msg(m)
         if why and m.get("a") != "move":
             log("game request refused:", why)
+            game.refuse(m, why)
         return
-    job = check(msg, att=att)
+    job = check(msg, allow_free=allow, att=att)
     if not job:
         log("request refused:", msg[:80])
         return
@@ -3559,7 +3677,7 @@ def render_loop():
                 items.append((i, game_anims[i]))
         else:
             game_anims.clear()
-        items = sing_items(keys_items(mix_items(race_items(items)), t0))   # the Mixer, the Keys and a singer go on top of everything else
+        items = sing_items(keys_items(mix_items(tree_items(race_items(items))), t0))   # the Mixer, the Keys and a singer go on top of everything else
         live = {i for i, _ in items}
         live_models = set()
         for i, a in items:
@@ -3730,27 +3848,526 @@ def show_loop():
 
 
 # ---------------------------------------------------------------------------- internet channel ----
-def publish_status():
+# ---------------------------------------------------------------------------------------- poster ----
+# Everything the bridge posts to ntfy.sh goes through one poster (v19). ntfy.sh's free service gives each internet
+# address a bucket of about 60 requests that refills by about one every 5-10 seconds, and answers "429 Too Many
+# Requests" when it is empty. At home, the bridge and the phones on the same Wi-Fi share that bucket. So the poster:
+#   - keeps only the latest message of each channel (an old game board is never sent after a newer one);
+#   - sends the game first, then the status, then the Play and Sing queues;
+#   - never sends the same thing twice;
+#   - stays within its own budget (POST_BURST, then one every POST_EVERY seconds), leaving room for the phones;
+#   - after a 429, waits (Retry-After, or 30 s, 60 s, 120 s…) instead of trying again at once.
+POST_BURST = 45
+POST_EVERY = 8.0
+POST_PRIO = {"game": 0, "status": 1, "tree": 1, "play": 2, "sing": 2}
+NTFY_DAILY = 17280          # ntfy.sh's free messages a day for each internet address (shared with the phones on the same Wi-Fi)
+NTFY_MAX_WAIT = 600         # never wait longer than this after a 429, even when ntfy.sh asks for hours (v23)
+
+
+class Poster:
+    def __init__(self):
+        self.cv = threading.Condition()
+        self.pending = {}          # channel -> (body, when queued)
+        self.sent = {}             # channel -> last body sent (no duplicates)
+        self.tokens = float(POST_BURST)
+        self.at = time.time()
+        self.block = 0.0           # no posting before this time (after a 429)
+        self.fails = 0
+        self.stats = {"sent": 0, "429": 0, "skipped": 0}
+        self.daily_until = 0.0     # ntfy.sh's daily limit is used up until about this time
+        self.dirty = False
+
+    def day(self):
+        """today's counts, kept in the settings so a restart does not lose them"""
+        d = S.get("ntfy_day") if isinstance(S.get("ntfy_day"), dict) else {}
+        today = time.strftime("%Y-%m-%d")
+        if d.get("day") != today:
+            d = {"day": today, "sent": 0, "rx": 0, "429": 0, "last429": 0}
+            S["ntfy_day"] = d
+        return d
+
+    def count_rx(self):
+        with self.cv:
+            self.day()["rx"] = self.day().get("rx", 0) + 1
+            self.dirty = True
+
+    def post(self, channel, obj, same=None):
+        """queue the latest message of a channel; same = the part that decides whether it changed (default: all of it)"""
+        body = json.dumps(obj).encode()
+        key = json.dumps(same, sort_keys=True).encode() if same is not None else body
+        with self.cv:
+            if self.sent.get(channel) == key and channel not in self.pending:
+                self.stats["skipped"] += 1
+                return
+            self.pending[channel] = (body, key, time.time())
+            self.cv.notify()
+
+    def state(self):
+        with self.cv:
+            d = dict(self.day())
+            return {"queued": sorted(self.pending), "tokens": round(self.tokens, 1), "blocked": max(0, int(self.block - time.time())),
+                    "daily": self.daily_until > time.time(), "daily_until": time.strftime("%H:%M", time.localtime(self.daily_until)) if self.daily_until > time.time() else "",
+                    "today": d, "limit": NTFY_DAILY, **self.stats}
+
+    def run(self):
+        while True:
+            with self.cv:
+                while not self.pending:
+                    self.cv.wait(5)
+                now = time.time()
+                self.tokens = min(POST_BURST, self.tokens + (now - self.at) / POST_EVERY)
+                self.at = now
+                wait = max(self.block - now, 0 if self.tokens >= 1 else (1 - self.tokens) * POST_EVERY)
+                if wait > 0:
+                    self.cv.wait(min(wait, 5))
+                    continue
+                ch = min(self.pending, key=lambda c: (POST_PRIO.get(c, 3), self.pending[c][2]))
+                body, key, _ = self.pending.pop(ch)
+                self.tokens -= 1
+            topic = S["topic"]
+            if not topic:
+                continue
+            try:
+                urllib.request.urlopen(urllib.request.Request(RELAY + topic + "-" + ch, data=body, headers={"Cache": "yes"}), timeout=10).read()
+                with self.cv:
+                    self.sent[ch] = key
+                    self.stats["sent"] += 1
+                    self.day()["sent"] = self.day().get("sent", 0) + 1
+                    self.dirty = True
+                    self.daily_until = 0.0
+                    if self.fails:
+                        log("ntfy.sh accepts messages again")
+                    self.fails = 0
+            except urllib.error.HTTPError as e:
+                with self.cv:
+                    if (ch not in self.pending):          # keep it, unless a newer one came meanwhile
+                        self.pending[ch] = (body, key, time.time())
+                    if e.code == 429:
+                        self.stats["429"] += 1
+                        d = self.day()
+                        d["429"], d["last429"], self.dirty = d.get("429", 0) + 1, int(time.time()), True
+                        ra = e.headers.get("Retry-After") if e.headers else None
+                        asked = int(ra) if ra and str(ra).isdigit() else min(300, 30 * 2 ** self.fails)
+                        wait = min(asked, NTFY_MAX_WAIT)     # try again at least every 10 minutes (another network works at once)
+                        self.fails += 1
+                        self.block = time.time() + wait
+                        self.tokens = 0.0
+                        if asked > 3600:
+                            self.daily_until = time.time() + asked
+                            log("ntfy.sh: the daily limit of this internet address is used up (it resets around %s). Trying again every "
+                                "%d minutes; another connection (a phone hotspot, WARP) works at once" % (time.strftime("%H:%M", time.localtime(self.daily_until)), wait // 60))
+                        else:
+                            log("ntfy.sh says too many messages from this internet address (429): waiting %d s before posting again" % wait)
+                    else:
+                        self.fails += 1
+                        self.block = time.time() + min(60, 5 * self.fails)
+                        log("could not post to ntfy.sh (%s): trying again in %d s" % (e, min(60, 5 * self.fails)))
+            except Exception as e:
+                with self.cv:
+                    if ch not in self.pending:
+                        self.pending[ch] = (body, key, time.time())
+                    self.fails += 1
+                    self.block = time.time() + min(60, 5 * self.fails)
+                    if self.fails in (1, 5, 20):
+                        log("could not post to ntfy.sh (%s): trying again in %d s" % (e, min(60, 5 * self.fails)))
+
+
+poster = Poster()
+
+
+# ------------------------------------------------------------------------------------ advent calendar ----
+# 24 doors (v23). From 1 December, one more door opens each day on the visitors' page; a door holds an effect, a message
+# for the cube or a game. Tapping an open door shows its surprise on the lights (a game door opens that game). With
+# "unlock", a game appears on the page only from the day of its door.
+ADVENT_EMOJI = {"fx": "✨", "text": "💬", "game": "🎮"}
+GAME_NAMES = {"c4": "Four in a Row", "ttt": "Tic-tac-toe", "simon": "Simon", "count": "Count the colours", "snake": "Snake",
+              "invaders": "Space Invaders", "pong": "Pong", "race": "Race to the Star"}
+
+
+def advent_default_doors(theme="xm"):
+    fx = [k for k, _ in FX_LIST.get(theme if theme in FX_LIST else "xm", FX_LIST["xm"])]
+    texts = ["Hello December!", "Ho ho ho!", "Let it snow!", "Santa is coming!", "Happy Holidays!", "Almost Christmas!"]
+    games = ["simon", "ttt", "snake", "invaders", "race"]   # doors 4, 8, 12, 16 and 20
+    out, fi, ti, gi = [], 0, 0, 0
+    for d in range(1, 25):
+        if d == 24:
+            out.append({"k": "text", "t": "MERRY CHRISTMAS!"})
+        elif d % 4 == 0:
+            out.append({"k": "game", "g": games[gi % len(games)]}); gi += 1
+        elif d % 4 == 2:
+            out.append({"k": "text", "t": texts[ti % len(texts)]}); ti += 1
+        else:
+            out.append({"k": "fx", "e": fx[fi % len(fx)]}); fi += 1
+    return out
+
+
+ADVENT_DEFAULT = {"on": False, "month": 12, "first": 1, "days": 24, "unlock": False, "test_day": 0, "doors": None}
+
+
+def advent_cfg():
+    c = dict(ADVENT_DEFAULT)
+    c.update(S.get("advent") or {})
+    doors = c.get("doors") if isinstance(c.get("doors"), list) else None
+    base = advent_default_doors(S.get("theme") or "xm")
+    c["doors"] = [(doors[i] if doors and i < len(doors) and isinstance(doors[i], dict) else base[i]) for i in range(24)]
+    return c
+
+
+def advent_day(c=None):
+    """today's door (1-24); 0 before the first day; days+1 after the last (all doors open)"""
+    c = c or advent_cfg()
+    if isint(c.get("test_day")) and c["test_day"] > 0:
+        return min(c["test_day"], c["days"])
+    t = time.localtime()
+    import datetime
+    today = datetime.date(t.tm_year, t.tm_mon, t.tm_mday)
+    start = datetime.date(t.tm_year, c["month"], c["first"])
+    if (today - start).days < -300:                     # January: last year's calendar
+        start = datetime.date(t.tm_year - 1, c["month"], c["first"])
+    d = (today - start).days + 1
+    return 0 if d < 1 else min(d, c["days"] + 1)
+
+
+def door_label(dr):
+    if dr.get("k") == "fx":
+        return FX_NAMES.get(dr.get("e"), "Effect")
+    if dr.get("k") == "game":
+        return GAME_NAMES.get(dr.get("g"), "Game")
+    return str(dr.get("t", ""))[:24]
+
+
+def advent_public():
+    """what the visitors' page needs: today's door and the doors already open (the next ones stay a surprise)"""
+    c = advent_cfg()
+    if not c["on"]:
+        return None
+    d = advent_day(c)
+    # short, because the whole status must stay under ntfy.sh's 4096 bytes: [emoji, name] or, for a game, ["🎮", its code]
+    doors = [["🎮", dr.get("g", "")] if dr.get("k") == "game" else [ADVENT_EMOJI.get(dr.get("k"), "🎁"), door_label(dr)] for dr in c["doors"][:min(d, c["days"])]]
+    return {"d": d, "n": c["days"], "m": c["month"], "f": c["first"], "doors": doors}
+
+
+def game_list_now():
+    """the games visitors can play right now (with "unlock", a game appears from the day of its door)"""
+    gl = [g for g in GAMES if g in S.get("game_list", GAMES)]
+    c = advent_cfg()
+    if c["on"] and c["unlock"]:
+        d = advent_day(c)
+        later = {dr.get("g") for i, dr in enumerate(c["doors"][:c["days"]]) if dr.get("k") == "game" and i + 1 > d}
+        gl = [g for g in gl if g not in later]
+    return gl
+
+
+def advent_msg(m):
+    """a tapped door -> the request it stands for (a JSON string for check()), or None"""
+    c = advent_cfg()
+    d, n = m.get("d"), advent_day(c)
+    if not c["on"] or not isint(d) or not 1 <= d <= min(n, c["days"]):
+        return None
+    dr = c["doors"][d - 1]
+    z = m.get("z", -1)
+    if dr.get("k") == "fx":
+        return json.dumps({"k": "fx", "e": dr.get("e"), "z": z})
+    if dr.get("k") == "text":
+        return json.dumps({"k": "text", "t": dr.get("t", ""), "c": 4, "z": z})
+    return None                                        # a game door just opens the game on the phone
+
+
+def advent_clean(b):
+    c = advent_cfg()
+    for k in ("on", "unlock"):
+        if k in b:
+            c[k] = bool(b[k])
+    for k, lo, hi in (("month", 1, 12), ("first", 1, 28), ("days", 1, 24), ("test_day", 0, 24)):
+        if isint(b.get(k)) and lo <= b[k] <= hi:
+            c[k] = b[k]
+    if isinstance(b.get("doors"), list) and len(b["doors"]) == 24:
+        doors = []
+        for dr, old in zip(b["doors"], c["doors"]):
+            if isinstance(dr, dict) and dr.get("k") == "fx" and dr.get("e") in FX_NAMES:
+                doors.append({"k": "fx", "e": dr["e"]})
+            elif isinstance(dr, dict) and dr.get("k") == "game" and dr.get("g") in GAMES:
+                doors.append({"k": "game", "g": dr["g"]})
+            elif isinstance(dr, dict) and dr.get("k") == "text" and str(dr.get("t", "")).strip():
+                t = re.sub(r"[^ -~]", "", plain(str(dr["t"])))[:30].strip()
+                doors.append({"k": "text", "t": t} if t and not is_bad(t) else old)
+            else:
+                doors.append(old)
+        c["doors"] = doors
+    return c
+
+
+# ---------------------------------------------------------------------------------- decorate the tree ----
+# Visitors hang baubles on a tree of the show (v23): the bridge picks evenly spread spots on the tree's pixels, each
+# phone picks a free spot and a colour, and the tree shows every bauble hung so far. The decorated tree is shown for a
+# while after each new bauble (or all the time); when it is full there is a party and it starts again (optional).
+TREE_COLS = ["ff2a2a", "ffc83c", "2a7bff", "ffffff", "ff5fc8", "a05bff", "ff8c1a", "3cf0ff"]
+TREE_BASE = 980
+TREE_DEFAULT = {"on": False, "models": [], "spots": 30, "every": 60, "show": 30, "always": False, "bg": "green",
+                "restart": True, "bright": 100}
+TREE = {"orn": "", "last": -1, "last_at": 0.0, "show_until": 0.0, "party_until": 0.0, "v": 0, "note": None, "by": {}}
+tree_shape_cache = {"sig": None, "shape": None}
+
+
+def tree_cfg():
+    c = dict(TREE_DEFAULT)
+    c.update(S.get("tree") or {})
+    return c
+
+
+def tree_clean(b):
+    c = tree_cfg()
+    for k in ("on", "always", "restart"):
+        if k in b:
+            c[k] = bool(b[k])
+    if isinstance(b.get("models"), list):
+        c["models"] = [str(x)[:120] for x in b["models"]][:64]
+    for k, lo, hi in (("spots", 8, 60), ("every", 0, 600), ("show", 10, 300), ("bright", 10, 100)):
+        if isint(b.get(k)) and lo <= b[k] <= hi:
+            c[k] = b[k]
+    if b.get("bg") in ("green", "off"):
+        c["bg"] = b["bg"]
+    return c
+
+
+class TreeShape:
+    """the tree's pixels, the spots for baubles (evenly spread), which pixels belong to which spot, and an outline"""
+    def __init__(self, geoms, n):
+        self.geoms = geoms
+        pts = [(g.u[i], g.v[i]) for g in geoms for i in range(g.n)]
+        AX = 0.6                                           # a tree is taller than wide: across counts a bit less
+        cand = [p for p in pts if 0.05 <= p[1] <= 0.9] or pts
+        if len(cand) > 3000:
+            cand = cand[::len(cand) // 3000 + 1]
+        spots = []
+        if cand:
+            first = min(cand, key=lambda p: (p[0] - 0.5) ** 2 + (p[1] - 0.15) ** 2)
+            spots.append(first)
+            dist = [((p[0] - first[0]) * AX) ** 2 + (p[1] - first[1]) ** 2 for p in cand]
+            while len(spots) < min(n, len(cand)):
+                j = max(range(len(cand)), key=dist.__getitem__)
+                s = cand[j]
+                spots.append(s)
+                dist = [min(dd, ((p[0] - s[0]) * AX) ** 2 + (p[1] - s[1]) ** 2) for dd, p in zip(dist, cand)]
+        self.spots = spots
+        gap = min((math.sqrt(((a[0] - b[0]) * AX) ** 2 + (a[1] - b[1]) ** 2) for i, a in enumerate(spots) for b in spots[i + 1:]), default=0.1)
+        r2 = (max(0.012, gap * 0.42)) ** 2
+        self.map = []
+        for g in geoms:
+            mp = []
+            for i in range(g.n):
+                best, bd = -1, r2
+                for k, s in enumerate(spots):
+                    dd = ((g.u[i] - s[0]) * AX) ** 2 + (g.v[i] - s[1]) ** 2
+                    if dd < bd:
+                        best, bd = k, dd
+                mp.append(best)
+            self.map.append(mp)
+        bands = 10                                          # the outline: widest pixels of 10 bands, for the phones
+        left, right = [], []
+        for b in range(bands):
+            lo, hi = b / bands, (b + 1) / bands
+            us = [p[0] for p in pts if lo <= p[1] <= hi]
+            if us:
+                left.append([round(min(us), 2), round((lo + hi) / 2, 2)])
+                right.append([round(max(us), 2), round((lo + hi) / 2, 2)])
+        self.outline = left + right[::-1]
+
+
+def tree_shape():
+    c = tree_cfg()
+    if not c["models"]:
+        return None
+    sig = (tuple(c["models"]), c["spots"], ezp_state.get("layoutVersion"))
+    if tree_shape_cache["sig"] != sig:
+        geoms = model_geoms({"n": "tree", "models": c["models"], "across": True})
+        tree_shape_cache["shape"] = TreeShape(geoms, c["spots"]) if geoms else None
+        tree_shape_cache["sig"] = sig
+    return tree_shape_cache["shape"]
+
+
+def tree_orn(n):
+    o = TREE["orn"] or S.get("tree_orn", "")
+    o = (o + "0" * n)[:n] if re.fullmatch(r"[0-8]*", o or "") else "0" * n
+    TREE["orn"] = o
+    return o
+
+
+class TreeAnim:
+    """the decorated tree on EZPlayer: a dim tree, the baubles twinkling, the newest one sparkling, a party when full"""
+    def __init__(self, shape):
+        self.shape, self.geoms = shape, shape.geoms
+
+    def frames(self, t):
+        c, now = tree_cfg(), time.time()
+        k = c["bright"] / 100
+        orn = tree_orn(len(self.shape.spots))
+        bg = (0, int(34 * k), int(6 * k)) if c["bg"] == "green" else (0, 0, 0)
+        party = now < TREE["party_until"]
+        out = []
+        for g, mp in zip(self.geoms, self.shape.map):
+            buf = bytearray(g.n * 3)
+            for i in range(g.n):
+                s = mp[i]
+                if party:
+                    col = hsv((g.v[i] * 0.7 - now * 0.5) % 1, 1, k)
+                elif s >= 0 and orn[s] != "0":
+                    base = hexrgb(TREE_COLS[int(orn[s]) - 1])
+                    tw = 0.75 + 0.25 * math.sin(now * 2.3 + s * 1.7)
+                    if s == TREE["last"] and now - TREE["last_at"] < 4 and int(now * 8) % 2:
+                        col = (255, 255, 255)                 # the newest bauble sparkles
+                    else:
+                        col = tuple(int(v * tw * k) for v in base)
+                else:
+                    col = bg
+                o = i * 3
+                buf[o], buf[o + 1], buf[o + 2] = col[0], col[1], col[2]
+            out.append(bytes(buf))
+        return out
+
+
+tree_anim = {"a": None}
+
+
+def tree_items(items):
+    """render_loop: the decorated tree, after a new bauble (or always), under the Mixer, the Keys and the singers"""
+    c = tree_cfg()
+    now = time.time()
+    if not c["on"] or not c["models"] or not (c["always"] or now < TREE["show_until"] or now < TREE["party_until"]):
+        return items
+    try:
+        shape = tree_shape()
+    except Exception as e:
+        log("tree: could not read the tree:", e)
+        return items
+    if not shape:
+        return items
+    if tree_anim["a"] is None or tree_anim["a"].shape is not shape:
+        tree_anim["a"] = TreeAnim(shape)
+    return list(items) + [(TREE_BASE, {"anim": tree_anim["a"], "t0": 0.0})]
+
+
+def tree_msg(m):
+    """a visitor hangs a bauble: {k: tree, i: spot, c: colour 1-8, p, tag}; returns a short reason when refused"""
+    c = tree_cfg()
+    pid, tag = str(m.get("p", "")), str(m.get("tag", ""))
+    if not PID_RE.fullmatch(pid) or not TAG_RE.fullmatch(tag):
+        return "bad player"
+    if not c["on"] or not c["models"]:
+        return "the tree is closed"
+    shape = tree_shape()
+    if not shape:
+        return "the tree is not ready"
+    n = len(shape.spots)
+    i, col = m.get("i"), m.get("c")
+    if not isint(i) or not 0 <= i < n or not isint(col) or not 1 <= col <= len(TREE_COLS):
+        return "bad request"
+    now = time.time()
+    with lock:
+        orn = tree_orn(n)
+        if now < TREE["party_until"]:
+            return "party"
+        if orn[i] != "0":
+            return "taken"
+        wait = c["every"] - (now - TREE["by"].get(pid, 0))
+        if wait > 0:
+            return "wait %d" % math.ceil(wait)
+        TREE["orn"] = orn[:i] + str(col) + orn[i + 1:]
+        TREE["by"][pid] = now
+        TREE["last"], TREE["last_at"], TREE["show_until"] = i, now, now + c["show"]
+        if "0" not in TREE["orn"]:
+            log("tree: full! party on the lights")
+            if c["restart"]:
+                TREE["party_until"] = now + 15
+                TREE["show_until"] = now + 15
+        S["tree_orn"] = TREE["orn"]
+        TREE["v"] += 1
+    log("tree: a bauble on spot %d (%d of %d)" % (i + 1, n - TREE["orn"].count("0"), n))
+    save()
+    return ""
+
+
+def tree_refuse(m, why):
+    if isinstance(m.get("tag"), str):
+        TREE["note"] = {"tag": m["tag"][:12], "why": why[:30], "at": int(time.time())}
+        TREE["v"] += 1
+
+
+def tree_state():
+    c = tree_cfg()
+    shape = tree_shape() if c["on"] and c["models"] else None
+    st = {"on": bool(shape), "v": TREE["v"], "at": int(time.time())}
+    if shape:
+        n = len(shape.spots)
+        st.update(o=tree_orn(n), sp=[[round(u, 2), round(v, 2)] for u, v in shape.spots], ol=shape.outline,
+                  cols=TREE_COLS, every=c["every"], party=time.time() < TREE["party_until"])
+    if TREE["note"] and time.time() - TREE["note"]["at"] < 60:
+        st["note"] = TREE["note"]
+    return st
+
+
+def tree_loop():
+    """posts the tree for the phones when it changes; empties it after the party"""
+    posted = None
+    while True:
+        try:
+            now = time.time()
+            if TREE["party_until"] and now > TREE["party_until"]:
+                with lock:
+                    TREE["party_until"] = 0.0
+                    if "0" not in TREE["orn"]:
+                        TREE["orn"] = "0" * len(TREE["orn"])
+                        S["tree_orn"] = TREE["orn"]
+                        TREE["v"] += 1
+                save()
+            c = tree_cfg()
+            key = (c["on"], tuple(c["models"]), c["spots"], TREE["v"])
+            if S["topic"] and key != posted and (c["on"] or posted is not None):
+                st = tree_state()
+                poster.post("tree", st, same={k: x for k, x in st.items() if k not in ("at", "v")})
+                posted = key
+        except Exception as e:
+            log("tree:", e)
+        time.sleep(0.5)
+
+
+def publish_status(force=False):
     """the visitors' page reads this to know whether requests are on, the sides and their sizes"""
     try:
         on = bool(S["on"] and (S["faces"] or (S.get("props") and ezp_state["ok"])) and
                   (ezp_state["ok"] or not any(f.get("out") == "ezp" for f in S["faces"])))
-        body = json.dumps({"on": on, "faces": [{"n": f.get("n", ""), "w": f["w"], "h": f["h"]} for f in S["faces"]],
-                           "theme": S["theme"], "free": S["free"], "wait": S["wait"], "title": S.get("title", ""), "games": bool(S.get("games")) and bool(S.get("game_list", GAMES)),
-                           "gl": [g for g in GAMES if g in S.get("game_list", GAMES)], "play": play_on(), "sing": sing_on(),
+        st = {"on": on, "faces": [{"n": f.get("n", ""), "w": f["w"], "h": f["h"]} for f in S["faces"]],
+                           "theme": S["theme"], "free": S["free"], "wait": S["wait"], "title": S.get("title", ""), "games": bool(S.get("games")) and bool(game_list_now()),
+                           "gl": game_list_now(), "adv": advent_public(), "tree": tree_cfg()["on"] and bool(tree_cfg()["models"]), "play": play_on(), "sing": sing_on(),
                            "race": {k: race_cfg()[k] for k in ("modes", "colours", "shared", "mix", "max", "min", "early")},
                            "singers": [{"k": k, "n": n, "e": e} for k, n, e, kind, on in sing_list() if on][:30],
-                           "props": [{"n": p["n"], "e": p.get("e", "")} for p in S.get("props", [])] if ezp_state["ok"] else [],
-                           "at": int(time.time())}).encode()
-        urllib.request.urlopen(urllib.request.Request(RELAY + S["topic"] + "-status", data=body, headers={"Cache": "yes"}), timeout=10).read()
+                           "props": [{"n": p["n"], "e": p.get("e", "")} for p in S.get("props", [])] if ezp_state["ok"] else []}
+        # ntfy.sh turns a message over 4096 bytes into a file the page cannot read: drop singers, then props, to fit
+        while len(json.dumps(st).encode()) > 3900 and (st["singers"] or st["props"]):
+            (st["singers"] or st["props"]).pop()
+        same = dict(st, keep=int(time.time() // 1800) if force else 0)   # unchanged status is not posted again, except the half-hourly one
+        st["at"] = int(time.time())
+        poster.post("status", st, same=same)
     except Exception as e:
-        log("could not post the status for the visitors' page:", e)
+        log("could not make the status for the visitors' page:", e)
 
 
 def status_loop():
+    """posts the status at start, whenever it changes (checked every 20 s) and every half hour"""
+    last_force = 0.0
     while True:
-        publish_status()
-        time.sleep(1800)
+        now = time.time()
+        force = now - last_force > 1800
+        if force:
+            last_force = now
+        publish_status(force=force)
+        if poster.dirty:                       # today's ntfy.sh counts, kept in the settings
+            poster.dirty = False
+            try:
+                save()
+            except Exception:
+                pass
+        time.sleep(20)
 
 
 def listen():
@@ -3765,6 +4382,7 @@ def listen():
                     if ev.get("event") != "message":
                         continue
                     since = ev.get("id", since)
+                    poster.count_rx()
                     add(ev.get("message", ""), ev.get("attachment"))
         except Exception as e:
             log("channel disconnected (%s); reconnecting in 5 s" % e)
@@ -4717,7 +5335,7 @@ def play_msg(m):
 
 def play_loop():
     """passes the turn on when it ends, and posts the turn and the queue for the phones"""
-    posted, fails, last_post = -1, 0, 0.0
+    posted = -1
     while True:
         now = time.time()
         if play_on() and not key_geoms and not keys_loading[0]:   # read the models' pixels before the first tap
@@ -4730,18 +5348,10 @@ def play_loop():
                 PLAY["queue"], PLAY["holder"] = [], None
                 PLAY["v"] += 1
             v = PLAY["v"]
-        if S["topic"] and (v != posted or (PLAY["holder"] and now - last_post > 10)) and (play_on() or posted != -2):
+        if S["topic"] and v != posted and (play_on() or posted not in (-1, -2)):   # nothing posted while Play is off and unused
             st = play_state()
-            try:
-                urllib.request.urlopen(urllib.request.Request(RELAY + S["topic"] + "-play", data=json.dumps(st).encode(),
-                                                              headers={"Cache": "yes"}), timeout=10).read()
-                posted, fails, last_post = (v if st["on"] else -2), 0, time.time()
-            except Exception as e:
-                fails += 1
-                if fails in (1, 10):
-                    log("could not post the play turn:", e)
-                time.sleep(min(10, 2 * fails))
-            time.sleep(0.8)
+            poster.post("play", st, same={k: x for k, x in st.items() if k not in ("at", "left", "v")})
+            posted = v if st["on"] else -2
         time.sleep(0.25)
 
 
@@ -5169,7 +5779,7 @@ def sing_play(item):
 
 def sing_loop():
     """plays the queue one recording at a time; reads the singing models; posts the queue for the phones"""
-    posted, fails, last_check = -1, 0, 0.0
+    posted, last_check = -1, 0.0
     while True:
         now = time.time()
         if now - last_check > 30:
@@ -5182,16 +5792,10 @@ def sing_loop():
                 item = SING["queue"].pop(0)
                 SING["busy"] = True
                 SING["v"] += 1
-        if S["topic"] and SING["v"] != posted:
+        if S["topic"] and SING["v"] != posted and (sing_on() or posted not in (-1, -2)):   # nothing while Sing is off and unused
             st = sing_state()
-            try:
-                urllib.request.urlopen(urllib.request.Request(RELAY + S["topic"] + "-sing", data=json.dumps(st).encode(),
-                                                              headers={"Cache": "yes"}), timeout=10).read()
-                posted, fails = st["v"], 0
-            except Exception as e:
-                fails += 1
-                if fails in (1, 10):
-                    log("could not post the singing queue:", e)
+            poster.post("sing", st, same={k: x for k, x in st.items() if k not in ("at", "v")})
+            posted = st["v"] if st["on"] else -2
         if item:   # plays in its own thread, so the queue keeps being posted for the phones while it sings
             def run(it=item):
                 try:
@@ -5245,10 +5849,16 @@ select,input[type=number],input[type=text]{width:100%;min-height:44px;padding:8p
 pre{white-space:pre-wrap;font-size:12px;color:var(--muted);margin:0;max-height:220px;overflow:auto}.warn{color:#ffb36b}
 [hidden]{display:none!important}
 </style></head><body><main>
-<div class="row" style="justify-content:space-between"><h1>ShowPlay</h1><span class="row"><a class="btn" href="/race" style="text-decoration:none;display:inline-flex;align-items:center">🌟 Race</a><a class="btn" href="/mixer" style="text-decoration:none;display:inline-flex;align-items:center">🎛️ Mixer &amp; 🎹 Keys</a></span></div>
+<div class="row" style="justify-content:space-between"><h1>ShowPlay</h1><span class="row"><a class="btn" href="/race" style="text-decoration:none;display:inline-flex;align-items:center">🌟 Race</a><a class="btn" href="/xmas" style="text-decoration:none;display:inline-flex;align-items:center">📅 Advent &amp; 🎄 Tree</a><a class="btn" href="/mixer" style="text-decoration:none;display:inline-flex;align-items:center">🎛️ Mixer &amp; 🎹 Keys</a></span></div>
 <div class="card">
   <label class="big"><input type="checkbox" id="on"> Show the visitors' requests</label>
   <div class="note" id="state"></div>
+</div>
+<div class="card">
+  <div class="ct">ntfy.sh today</div>
+  <div class="note">The visitors' phones and the bridge talk through ntfy.sh. Its free service allows each internet address about 60 messages in a row, then about one every 5–10 s, and about 17,280 a day. Phones on the same Wi-Fi as this computer share that allowance; phones on mobile data have their own.</div>
+  <div class="bar" style="height:12px;border-radius:8px;background:var(--raise);overflow:hidden"><div id="ntBar" style="height:100%;width:0;background:var(--ok)"></div></div>
+  <div class="note" id="ntInfo"></div>
 </div>
 <div class="card">
   <div class="ct">Sides of the cube</div>
@@ -5427,8 +6037,16 @@ $('scan').onclick=async()=>{$('scanMsg').textContent='Looking… (up to 10 s)';c
   return mk('div',{className:'item'},mk('div',{className:'what',textContent:b.name+' · '+b.ip+' · '+b.leds+' LEDs'+(b.w?' · matrix '+b.w+'×'+b.h:'')}),use);}));};
 $('read').onclick=async()=>{let r={ok:false,targets:[]};try{r=await api('models',{ezp:$('ezp').value.trim()});}catch(e){}
  targets=r.targets||[];$('ezpMsg').textContent=r.ok?targets.length+' model(s)':'EZPlayer did not answer: '+(r.msg||'');drawSides();};
+function ntDraw(n){if(!n||!n.today)return;const t=n.today,used=(t.sent||0)+(t.rx||0),pc=Math.min(100,used/n.limit*100);
+ $('ntBar').style.width=Math.max(1,pc)+'%';$('ntBar').style.background=n.daily||n.blocked?'#ff5a5a':pc>70?'#ffc83c':'';
+ let s='<b>'+(t.sent||0)+'</b> posted by the bridge · <b>'+(t.rx||0)+'</b> received from phones (all networks) · about '+pc.toFixed(1)+' % of one internet address\'s daily limit';
+ if(t['429'])s+=' · <b>'+t['429']+'</b> "too many" answer(s), the last at '+new Date(t.last429*1000).toTimeString().slice(0,5);
+ if(n.daily)s+='<br><b>The daily limit of this internet address is used up (it resets around '+n.daily_until+').</b> The bridge tries again every 10 minutes; another connection (a phone hotspot, WARP) works at once.';
+ else if(n.blocked)s+='<br><b>Waiting '+n.blocked+' s before posting again.</b>';
+ else s+='<br>Now: fine, '+Math.floor(n.tokens)+' messages of short-term budget left.';
+ $('ntInfo').innerHTML=s;}
 function render(){
- $('on').checked=st.on;
+ $('on').checked=st.on;ntDraw(st.ntfy);
  const nProps=(st.props||[]).length, nFaces=st.faces.length, usesEzp=nProps>0||st.faces.some(f=>f.out==='ezp');
  const where=[nFaces?nFaces+' side(s) of the cube':'',nProps?nProps+' prop(s)':''].filter(Boolean).join(' and ');
  let line;
@@ -5436,7 +6054,7 @@ function render(){
  else if(!nFaces&&!nProps) line='<span class="pill off">OFF</span> Nothing to show requests on yet: add a side of the cube or a prop below, then Save.';
  else if(!nFaces&&!st.ezpOk) line='<span class="pill off">OFF</span> The props need EZPlayer, which is not answering.';
  else line='<span class="pill on">ON</span> Requests show on '+where+'.'+(nProps&&!st.ezpOk?' The props are hidden until EZPlayer answers.':'');
- $('state').innerHTML=line+(usesEzp?'<br>EZPlayer: '+st.ezpMsg:'')+'<br>bridge '+st.version;
+ $('state').innerHTML=line+(usesEzp?'<br>EZPlayer: '+st.ezpMsg:'')+(st.ntfy&&st.ntfy.blocked?'<br><b>ntfy.sh: too many messages from this internet address, posting again in '+st.ntfy.blocked+' s</b> (phones on mobile data are not affected)':'')+'<br>bridge '+st.version;
  if(!editing){sides=JSON.parse(JSON.stringify(st.faces));drawSides();props=JSON.parse(JSON.stringify(st.props||[]));drawProps();$('sProp').value=st.seconds.prop||20;
   $('ezp').value=st.ezp;$('title').value=st.title||'';$('page').value=st.page||'';
   $('free').checked=st.free;$('theme').value=st.theme;$('sText').value=st.seconds.text;$('sGif').value=st.seconds.gif;$('sDraw').value=st.seconds.draw;$('sFx').value=st.seconds.fx||180;$('wait').value=st.wait||0;$('hold').checked=!!st.hold;$('endDark').checked=!!st.end_dark;$('waitTurn').checked=!!st.wait_turn;$('approve').checked=st.approve;$('games').checked=!!st.games;{const gl=st.game_list||['c4','ttt','simon','count','snake','invaders','pong','race'];$('gC4').checked=gl.includes('c4');$('gTtt').checked=gl.includes('ttt');$('gSimon').checked=gl.includes('simon');$('gCount').checked=gl.includes('count');$('gSnake').checked=gl.includes('snake');$('gInv').checked=gl.includes('invaders');$('gPong').checked=gl.includes('pong');$('gRace').checked=gl.includes('race');}
@@ -5895,6 +6513,7 @@ label.ck{display:inline-flex;gap:8px;align-items:center}input[type=checkbox]{wid
  <label class="ck"><input type="checkbox" id="rainbow"> Rainbow party on the track at the end (off: the winner's colour)</label>
  <div class="sl"><span>Party length</span><input type="range" id="party" min="3" max="20"><span></span></div>
  <div class="sl"><span>Brightness</span><input type="range" id="bright" min="10" max="100"><span></span></div>
+ <div class="row"><span class="note">Climbers look like</span><div class="seg" id="style"><button data-v="auto">Automatic</button><button data-v="rope">Rope</button><button data-v="climber">Climber</button></div><span class="note">Automatic: a little climber on tracks 50 pixels tall or more, a rope on smaller ones</span></div>
  <div class="row"><span class="note">Track background</span><div class="seg" id="bg"><button data-v="dim">Dim lane colours</button><button data-v="off">Off</button></div></div>
 </div>
 <div class="card"><div class="ct">7 · Test and profiles</div>
@@ -5953,7 +6572,7 @@ function drawCols(){$('cols').replaceChildren(...C.colours.map((c,i)=>{const w=d
  inp.oninput=()=>{C.colours[i]=inp.value.slice(1);finCols();};w.append(inp);return w;}));finCols();}
 function finCols(){$('finCol').replaceChildren(...C.colours.map((c,i)=>{const o=document.createElement('option');o.value=c;o.textContent='colour '+(i+1);o.style.background='#'+c;return o;}));}
 function fill(){
- seg('track',C.track);seg('split',C.split);seg('dir',C.dir);seg('difficulty',C.difficulty);seg('bg',C.bg);
+ seg('track',C.track);seg('split',C.split);seg('dir',C.dir);seg('difficulty',C.difficulty);seg('bg',C.bg);seg('style',C.style||'auto');
  $('front').value=Math.round(C.front*100);
  document.querySelectorAll('.mode').forEach(c=>c.checked=C.modes.includes(c.value));
  ['mix','shared','early','catchup','leader','countdown','rainbow'].forEach(k=>$(k).checked=!!C[k]);
@@ -5968,7 +6587,7 @@ function gather(){return {track:segVal('track'),models:C.models,stars:C.stars,pa
  modes:[...document.querySelectorAll('.mode:checked')].map(c=>c.value),mix:$('mix').checked,shared:$('shared').checked,min:+$('min').value,max:+$('max').value,colours:C.colours,lobby:+$('lobby').value,early:$('early').checked,
  levels:Object.fromEntries([...document.querySelectorAll('.lvl')].map(i=>[i.dataset.k,i.value/100])),catchup:$('catchup').checked,
  difficulty:segVal('difficulty'),target:+$('target').value,slide:$('slide').value/500,delay:$('delay').value/10,max_time:+$('max_time').value,
- leader:$('leader').checked,countdown:$('countdown').checked,rainbow:$('rainbow').checked,party:+$('party').value,bright:+$('bright').value,bg:segVal('bg')};}
+ leader:$('leader').checked,countdown:$('countdown').checked,rainbow:$('rainbow').checked,party:+$('party').value,bright:+$('bright').value,bg:segVal('bg'),style:segVal('style')};}
 async function save(){const r=await post(Object.assign({a:'set'},gather()));C=r.cfg;$('saved').textContent='Saved.';setTimeout(()=>{$('saved').textContent='';},2500);return r;}
 $('save').onclick=save;
 $('test').onclick=async()=>{await save();const r=await post({a:'test',n:+$('testN').value});$('testMsg').textContent=r.ok?'Test race on the lights…':r.msg;};
@@ -5985,6 +6604,102 @@ async function live(){try{const s=await (await fetch('/api/race')).json();const 
  $('live').textContent=st.st==='idle'?'No race now':(st.test?'Test: ':'')+st.st+' · '+st.n+' player(s)'+(st.winner!=null&&st.st==='over'?' · winner '+(st.winner+1):'');}catch(e){}}
 load(true).then(models);setInterval(live,1500);
 </script></body></html>"""
+
+XMAS_PAGE = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ShowPlay · Advent calendar & Decorate the tree</title>
+<style>
+:root{--bg:#08140d;--card:#11241a;--raise:#1a3326;--line:#2a4a38;--fg:#fff;--muted:#b9d3c3;--hot:#ffc83c;--ok:#39d353}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif}
+header{position:sticky;top:0;z-index:5;background:#08140dee;border-bottom:1px solid var(--line);padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+header h1{font-size:19px;margin:0}a{color:var(--muted)}.sp{flex:1}
+main{max-width:980px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.ct{font-weight:800;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--hot)}.note{font-size:13px;color:var(--muted)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{min-height:42px;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:var(--raise);color:var(--fg);font:inherit;font-weight:700;cursor:pointer}
+.btn.primary{background:var(--hot);border-color:var(--hot);color:#1a1200}
+select,input[type=text],input[type=number]{min-height:40px;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--raise);color:var(--fg);font:inherit}
+input[type=number]{width:90px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:var(--raise);border:1px solid var(--line);font-size:13px}
+.chip button{border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px}
+label.ck{display:inline-flex;gap:8px;align-items:center}input[type=checkbox]{width:20px;height:20px;accent-color:var(--hot)}
+.doors{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:8px}
+.door{display:grid;grid-template-columns:30px 132px minmax(0,1fr);gap:6px;align-items:center;background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:6px}
+.door b{text-align:center}.door select,.door input{width:100%;min-width:0;min-height:36px}
+.door.today{border-color:var(--hot)}
+svg{background:#061009;border-radius:12px;max-width:260px}
+</style></head><body>
+<header><h1>📅 Advent calendar & 🎄 Decorate the tree</h1><span class="sp"></span><a href="/">Control page</a><a href="/race">Race</a><a href="/mixer">Mixer</a></header>
+<main>
+<div class="card"><div class="ct">📅 Advent calendar</div>
+ <div class="note">From the first day, one more door opens every day on the visitors' page (📅 Advent tab). Tapping an open door shows its surprise on the lights: an effect or a message on the cube, or a game that opens on the phone. Doors not open yet stay a surprise.</div>
+ <label class="ck"><input type="checkbox" id="aOn"> Show the advent calendar to visitors</label>
+ <label class="ck"><input type="checkbox" id="aUnlock"> A game door unlocks its game: the game appears under 🎮 Games only from the day of its door</label>
+ <div class="row"><span class="note">First day</span><input type="number" id="aFirst" min="1" max="28"><select id="aMonth"></select><span class="note">Doors</span><input type="number" id="aDays" min="1" max="24"></div>
+ <div class="row"><span class="note">Test: pretend today is door</span><input type="number" id="aTest" min="0" max="24"><span class="note">(0 = the real date). Today: <b id="aToday"></b></span></div>
+ <div class="row"><button class="btn" id="aDefault">Fill with the default surprises</button></div>
+ <div class="doors" id="doors"></div>
+ <div class="row"><button class="btn primary" id="aSave">Save the calendar</button><span class="note" id="aSaved"></span></div>
+</div>
+<div class="card"><div class="ct">🎄 Decorate the tree</div>
+ <div class="note">Visitors hang baubles on a tree of the show (🎄 Tree tab): each phone picks a free spot and a colour. The decorated tree shows on the lights for a while after each new bauble (or all the time). Any models work: a mega tree, a matrix, a group of mini trees…</div>
+ <label class="ck"><input type="checkbox" id="tOn"> Let visitors decorate the tree</label>
+ <div class="row"><select id="tPick" style="min-width:260px"></select><button class="btn" id="tAdd">Add to the tree</button></div>
+ <div class="row" id="tChips"></div>
+ <div class="row"><span class="note">Baubles</span><input type="number" id="tSpots" min="8" max="60"><span class="note">Each phone waits</span><input type="number" id="tEvery" min="0" max="600"><span class="note">s between baubles</span></div>
+ <div class="row"><span class="note">Show the tree for</span><input type="number" id="tShow" min="10" max="300"><span class="note">s after each new bauble</span><label class="ck"><input type="checkbox" id="tAlways"> All the time</label></div>
+ <div class="row"><span class="note">Brightness</span><input type="number" id="tBright" min="10" max="100"><span class="note">%</span><span class="note">Tree between the baubles</span><select id="tBg"><option value="green">Dim green</option><option value="off">Off</option></select></div>
+ <label class="ck"><input type="checkbox" id="tRestart"> When the tree is full: a party on the lights, then it starts again empty</label>
+ <div class="row"><svg id="tSvg" viewBox="0 0 100 120" width="220" height="264"></svg><div class="note" id="tInfo" style="max-width:420px"></div></div>
+ <div class="row"><button class="btn primary" id="tSave">Save the tree</button><button class="btn" id="tShowNow">Show it on the lights now</button><button class="btn" id="tClear">Take all the baubles off</button><span class="note" id="tSaved"></span></div>
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const post=b=>fetch('/api/xmas',{method:'POST',headers:{'X-Cube':'1'},body:JSON.stringify(b)}).then(r=>r.json());
+let X=null,MODELS=[],GROUPS={},TM=[];
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+$('aMonth').replaceChildren(...MONTHS.map((m,i)=>{const o=document.createElement('option');o.value=i+1;o.textContent=m;return o;}));
+function doorRow(i,d){const r=document.createElement('div');r.className='door'+(X.today===i+1?' today':'');const n=document.createElement('b');n.textContent=i+1;
+ const k=document.createElement('select');[['fx','✨ Effect'],['text','💬 Message'],['game','🎮 Game']].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;k.append(o);});k.value=d.k;
+ const box=document.createElement('div');
+ const draw=()=>{box.replaceChildren();let el;
+  if(k.value==='text'){el=document.createElement('input');el.type='text';el.maxLength=30;el.value=d.k==='text'?d.t:'Merry Christmas!';el.oninput=()=>{d.t=el.value;};d.t=el.value;}
+  else{el=document.createElement('select');const list=k.value==='fx'?X.fx:X.games;list.forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;el.append(o);});
+   const cur=k.value==='fx'?d.e:d.g;if(cur&&list.some(x=>x[0]===cur))el.value=cur;el.onchange=()=>{if(k.value==='fx')d.e=el.value;else d.g=el.value;};if(k.value==='fx')d.e=el.value;else d.g=el.value;}
+  box.append(el);};
+ k.onchange=()=>{d.k=k.value;draw();};draw();r.append(n,k,box);return r;}
+function drawDoors(){$('doors').replaceChildren(...X.advent.doors.map((d,i)=>doorRow(i,d)));}
+function opts(sel){sel.replaceChildren(...[['','— pick —']].concat(Object.keys(GROUPS).sort().map(g=>['g:'+g,'Group: '+g+' ('+GROUPS[g].length+')'])).concat(MODELS.map(m=>['m:'+m,m])).map(([v,n])=>{const o=document.createElement('option');o.value=v;o.textContent=n;return o;}));}
+function expand(v){return v.startsWith('g:')?(GROUPS[v.slice(2)]||[]):v.startsWith('m:')?[v.slice(2)]:[];}
+function chips(){$('tChips').replaceChildren(...TM.map((m,i)=>{const c=document.createElement('span');c.className='chip';c.textContent=m;const x=document.createElement('button');x.textContent='✕';x.onclick=()=>{TM.splice(i,1);chips();};c.append(x);return c;}));
+ if(!TM.length){const n=document.createElement('span');n.className='note';n.textContent='No models yet.';$('tChips').append(n);}}
+$('tAdd').onclick=()=>{expand($('tPick').value).forEach(m=>{if(!TM.includes(m))TM.push(m);});chips();};
+function drawTree(st){const s=$('tSvg');s.replaceChildren();if(!st||!st.on){$('tInfo').textContent=X.tree.models.length?'Save to see the spots (EZPlayer must be connected).':'Pick the models of the tree.';return;}
+ const ns='http://www.w3.org/2000/svg',P=(u,v)=>[10+u*80,112-v*104];
+ const poly=document.createElementNS(ns,'polygon');poly.setAttribute('points',st.ol.map(([u,v])=>P(u,v).join(',')).join(' '));poly.setAttribute('fill','#0f3b1f');s.append(poly);
+ st.sp.forEach(([u,v],i)=>{const c=document.createElementNS(ns,'circle');const [x,y]=P(u,v);c.setAttribute('cx',x);c.setAttribute('cy',y);c.setAttribute('r',3.2);
+  const o=st.o[i];c.setAttribute('fill',o==='0'?'none':'#'+st.cols[+o-1]);c.setAttribute('stroke',o==='0'?'#6a8':'#fff');c.setAttribute('stroke-width','0.6');s.append(c);});
+ const n=st.sp.length,used=n-[...st.o].filter(c=>c==='0').length;$('tInfo').textContent=used+' of '+n+' baubles hung. The spots are spread evenly over the tree\'s pixels.';}
+function fill(){const a=X.advent,t=X.tree;$('aOn').checked=a.on;$('aUnlock').checked=a.unlock;$('aFirst').value=a.first;$('aMonth').value=a.month;$('aDays').value=a.days;$('aTest').value=a.test_day;
+ $('aToday').textContent=X.today===0?'not open yet':X.today>a.days?'all doors open':'door '+X.today;drawDoors();
+ $('tOn').checked=t.on;TM=t.models.slice();chips();$('tSpots').value=t.spots;$('tEvery').value=t.every;$('tShow').value=t.show;$('tAlways').checked=t.always;$('tBright').value=t.bright;$('tBg').value=t.bg;$('tRestart').checked=t.restart;drawTree(X.treeState);}
+async function load(){X=await (await fetch('/api/xmas')).json();fill();}
+$('aSave').onclick=async()=>{X=await post({a:'advent',on:$('aOn').checked,unlock:$('aUnlock').checked,first:+$('aFirst').value,month:+$('aMonth').value,days:+$('aDays').value,test_day:+$('aTest').value,doors:X.advent.doors});fill();$('aSaved').textContent='Saved.';setTimeout(()=>{$('aSaved').textContent='';},2500);};
+$('aDefault').onclick=async()=>{X=await post({a:'advent-default'});fill();};
+$('tSave').onclick=async()=>{X=await post({a:'tree',on:$('tOn').checked,models:TM,spots:+$('tSpots').value,every:+$('tEvery').value,show:+$('tShow').value,always:$('tAlways').checked,bright:+$('tBright').value,bg:$('tBg').value,restart:$('tRestart').checked});fill();$('tSaved').textContent=X.msg||'Saved.';setTimeout(()=>{$('tSaved').textContent='';},4000);};
+$('tShowNow').onclick=async()=>{X=await post({a:'tree-show'});fill();$('tSaved').textContent='On the lights for '+X.tree.show+' s.';};
+$('tClear').onclick=async()=>{if(!confirm('Take all the baubles off the tree?'))return;X=await post({a:'tree-clear'});fill();};
+async function models(){try{const r=await (await fetch('/api/props-models',{method:'POST',headers:{'X-Cube':'1'},body:'{}'})).json();MODELS=(r.models||[]).map(x=>x.model).sort();GROUPS=r.groups||{};opts($('tPick'));}catch(e){}}
+load().then(models);
+</script></body></html>"""
+
+
+def xmas_info(msg=""):
+    return {"advent": advent_cfg(), "today": advent_day(), "tree": tree_cfg(), "treeState": tree_state(),
+            "fx": [[k, n] for k, n in FX_LIST.get(S.get("theme") if S.get("theme") in FX_LIST else "xm", FX_LIST["xm"])],
+            "games": [[g, GAME_NAMES[g]] for g in GAMES if g != "pong"], "msg": msg}
+
 
 URL_RE = re.compile(r"https?://[A-Za-z0-9.\-]+(:\d{1,5})?/?")
 HOST_RE = re.compile(r"[A-Za-z0-9.\-]{1,63}")
@@ -6105,6 +6820,10 @@ class Admin(BaseHTTPRequestHandler):
             return self.send(200, MIXER, "text/html")
         if p == "/race":
             return self.send(200, RACE_PAGE, "text/html")
+        if p == "/xmas":
+            return self.send(200, XMAS_PAGE, "text/html")
+        if p == "/api/xmas":
+            return self.send(200, xmas_info())
         if p == "/api/race":
             r = game.all["race"]
             return self.send(200, {"cfg": race_cfg(), "state": r.state(), "profiles": sorted(S.get("race_profiles") or {}),
@@ -6156,7 +6875,7 @@ class Admin(BaseHTTPRequestHandler):
             return self.send(200, keys_state())
         if p == "/api/state":
             with lock:
-                return self.send(200, dict(S, version=VERSION, ezpOk=ezp_state["ok"], ezpMsg=ezp_state["msg"],
+                return self.send(200, dict(S, version=VERSION, ezpOk=ezp_state["ok"], ezpMsg=ezp_state["msg"], ntfy=poster.state(),
                                            urls={t: qr_url(t) for t in ("hw", "xm", "ev")}, log=logs[-40:], now=now_showing["what"],
                                            queue=jobs.qsize() + len(waiting),
                                            pending=[{k: v for k, v in x.items() if k != "idx"} for x in pending]))
@@ -6222,6 +6941,35 @@ class Admin(BaseHTTPRequestHandler):
                     save()
                 return self.send(200, {"ok": True, "cfg": race_cfg(), "state": r.state(), "profiles": sorted(prof), "sides": [face_name(i) for i in range(len(S["faces"]))]})
             return self.send(200, {"ok": False})
+        if p == "/api/xmas":
+            a, msg = b.get("a"), ""
+            with lock:
+                if a == "advent":
+                    S["advent"] = advent_clean(b)
+                elif a == "advent-default":
+                    c = advent_cfg()
+                    c["doors"] = None
+                    S["advent"] = c
+                elif a == "tree":
+                    old = tree_cfg()
+                    S["tree"] = tree_clean(b)
+                    if (old["models"], old["spots"]) != (S["tree"]["models"], S["tree"]["spots"]):
+                        TREE["orn"], S["tree_orn"] = "", ""          # new spots: the baubles start again
+                        TREE["v"] += 1
+                elif a == "tree-show":
+                    TREE["show_until"] = time.time() + tree_cfg()["show"]
+                elif a == "tree-clear":
+                    TREE["orn"], S["tree_orn"] = "", ""
+                    TREE["v"] += 1
+                save()
+            if a == "tree" and S["tree"]["on"] and S["tree"]["models"]:
+                try:
+                    msg = "Saved: %d spots on the tree." % len(tree_shape().spots) if tree_shape() else "Saved, but the tree's models could not be read (is EZPlayer connected?)."
+                except Exception as e:
+                    msg = "Saved, but the tree could not be read: %s" % e
+            if a in ("advent", "advent-default", "tree", "tree-clear"):
+                threading.Thread(target=publish_status, daemon=True).start()
+            return self.send(200, xmas_info(msg))
         if p == "/api/sing":
             a = b.get("a")
             if a == "set":
@@ -6428,10 +7176,33 @@ class Admin(BaseHTTPRequestHandler):
         self.send(404, {"error": "?"})
 
 
+def another_bridge():
+    """the version of a ShowPlay bridge already answering on this computer's port, or "" (v23: only one at a time)"""
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:%d/api/state" % PORT, timeout=2) as r:
+            return str(json.loads(r.read()).get("version", "?"))
+    except Exception:
+        return ""
+
+
+class OneServer(ThreadingHTTPServer):
+    allow_reuse_address = os.name != "nt"     # on Windows this would let a second bridge share the port (v23)
+
+
 if __name__ == "__main__":
+    other = another_bridge()
+    if other:
+        print("Another ShowPlay bridge (%s) is already running on this computer, so this one stops.\n"
+              "Use only one: autostart.bat starts a hidden one, start_bridge.bat starts one in a window.\n"
+              "To restart, end python / pythonw in Task Manager (or Activity Monitor / kill) first." % other, flush=True)
+        try:
+            time.sleep(8)
+        except KeyboardInterrupt:
+            pass
+        sys.exit(1)
     load()
     log("ShowPlay bridge %s - control page: http://%s:%d" % (VERSION, my_ip(), PORT))
-    for target in (show_loop, render_loop, listen, status_loop, ezp_watch, game_loop, mix_watch, midi_native, play_loop, sing_loop,
+    for target in (poster.run, tree_loop, show_loop, render_loop, listen, status_loop, ezp_watch, game_loop, mix_watch, midi_native, play_loop, sing_loop,
                    lambda: (time.sleep(3), ezp_targets() if S.get("props") else None, prepare_props())):
         threading.Thread(target=target, daemon=True).start()
-    ThreadingHTTPServer(("0.0.0.0", PORT), Admin).serve_forever()
+    OneServer(("0.0.0.0", PORT), Admin).serve_forever()

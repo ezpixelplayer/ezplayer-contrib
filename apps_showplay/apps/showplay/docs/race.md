@@ -1,4 +1,4 @@
-# ShowPlay — Race to the Star (v18)
+# ShowPlay — Race to the Star (v19)
 
 A race for 1 to 8 visitors up a track of lights: a mega tree, a matrix, any model or group of the show, or a side of
 the cube. Each player climbs with their own effort, and the first to reach the top lights the **star** in their colour.
@@ -78,6 +78,14 @@ settings** under Games. Press **Save the race settings** after changing things. 
   - **The star:** pick the star models (any models, several, or none: the top of the track then becomes the star).
 - **A track per player:** pairs of a track and its star, up to 8. **Pair automatically** matches names like
   "TreeMiniMega 1" with "StarMiniMega1".
+
+**Climbers look like** (new in v19), in the effects section:
+- **Rope:** the lane fills up to the player's height, with a brighter head. The top pixel lights up gradually as the
+  climber moves through it, so even a short track climbs smoothly.
+- **Climber:** a little figure (a head, a body and legs that move while the player is climbing) on a dim rope of the
+  height already climbed.
+- **Automatic** (the default): a climber on tracks 50 pixels tall or more, a rope on smaller ones, where a figure
+  would take up too much of the track.
 - **The cube:** pick a side (or all). Lanes are columns, the star is the top two rows. It works without EZPlayer.
 - **Climb direction:**
   - **Up**;
@@ -143,21 +151,24 @@ Very small models (fewer than about 20 pixels in height) work, but the climb is 
 
 ## How climbing works
 
-- **On the phone:** the phone measures the effort and sends it about once a second.
+- **On the phone:** the phone measures the effort and sends it about every 2 seconds (v19; it was every second).
 - **On the bridge:** the bridge climbs 20 times a second with the last effort received:
   - an effort of 0.6 climbs the whole track in the "race length" time;
   - the player's level multiplies it, and so does the help for whoever is behind.
-- **Stopping:** when the effort stops (or the phone goes quiet), the climber waits the "wait before sliding" time,
+- **Stopping:** when the effort stops (or the phone is quiet for 4 seconds), the climber waits the "wait before sliding" time,
   then slides down at the "slide speed".
 - **Winning:** the first to the top wins: the star flashes in their colour and the party starts. Two players reaching
   the top in the same frame: the first who joined wins.
-- **The phones' view:** they get everybody's heights every 3 seconds, and at every change of state.
+- **The phones' view:** they get everybody's heights every 5 seconds, and at once at every change of state.
 
 ## Messages and limits
 
-- **Phones:** each phone sends one effort message about every second (every 1.5 s after 30 s). A shared phone sends
-  both players' efforts in one message. A 40-second race costs each phone about 35 messages.
-- **The bridge:** it posts the race on `<code>-game` at each change of state and every 3 seconds during the race.
+- **Phones:** each phone sends one effort message about every 2 seconds (every 2.5 s after 30 s). A shared phone sends
+  both players' efforts in one message. A 40-second race costs each phone about 18 messages. When a phone's message
+  budget runs low (phones on the same Wi-Fi as the bridge share ntfy.sh's allowance), it sends fewer.
+- **The bridge:** it posts the race on `<code>-game` at each change of state and every 5 seconds during the race,
+  through the poster that keeps within ntfy.sh's limits (see INSTALL.md → Games → ntfy.sh's limits).
+- **Refusals:** when a race cannot start, the phone that asked says why (for example "The race isn't set up yet").
 - **Checks:**
   - efforts are numbers from 0 to 1;
   - a phone's messages closer than 0.3 s apart are ignored;
@@ -169,13 +180,13 @@ In `showplay_config.json`:
 
 | Setting | What it holds |
 | --- | --- |
-| `race` | Track, star, ways to play, players, levels, difficulty and effects (the panel's settings) |
+| `race` | Track, star, ways to play, players, levels, difficulty and effects, including `style` (`auto`, `rope`, `climber`) |
 | `race_profiles` | Saved profiles |
 | `game_list` | Includes `race` when visitors can play it |
 
 ## Troubleshooting
 
-- **"EZPlayer is not answering" or "no track set up"** when a visitor starts a race: set up the track in the panel
+- **"The race isn't set up yet"** on the phone, or **"no track set up"** in the log, when a visitor starts a race: set up the track in the panel
   (section 1), or use the cube track.
 - **A lane looks wrong:** try another split. On a tree, "Side by side" needs the **Front** set.
 - **The climb goes the wrong way:** change the **Climb direction**.
@@ -184,3 +195,7 @@ In `showplay_config.json`:
   - iPhones ask for motion permission when tapping New race or Join, so tap **Allow**;
   - phones without a motion sensor do not offer these ways.
 - **Races are too long or too short:** pick another difficulty, or change the race length.
+- **The climbers jump instead of climbing smoothly:** check that **Climbers look like** is Rope or Automatic on a short
+  track; on a phone on the same Wi-Fi as the bridge, a low message budget sends fewer efforts (test on mobile data).
+- **New race seems to do nothing:** since v19 the phone says why; "Too many messages right now" means ntfy.sh is
+  limiting your internet address for a minute or two.

@@ -1,6 +1,6 @@
 # ShowPlay for Windows — What is in this folder
 
-Every file of the `Windows` folder of ShowPlay v18, what it is for, and whether you need to change it, plus the parts
+Every file of the `Windows` folder of ShowPlay v23, what it is for, and whether you need to change it, plus the parts
 shared with the other versions. To install and set it up, see [INSTALL.md](INSTALL.md).
 
 ```
@@ -41,6 +41,7 @@ Windows/
 | `../CHANGELOG.md` | Every version of ShowPlay, newest first, with what was added, what changed, what was fixed and how it was tested. |
 | `../docs/props.md` | How the Props feature works, step by step: what visitors pick, setting up props, how the effects are drawn and sent to EZPlayer, effects and palettes, troubleshooting. |
 | `../docs/race.md` | Race to the Star (new in v18): the ways to play, the phone, the race panel, tracks and stars, how climbing works, messages, settings, troubleshooting. |
+| `../docs/xmas.md` | Advent calendar and Decorate the tree (new in v23): what visitors see, the doors, the tree's spots and baubles, the settings page, messages, troubleshooting. |
 | `../docs/sing.md` | Sing (new in v17): the 🎤 tab, setting up the singers, the speaker on each platform, how the mouth moves, privacy and limits, settings, troubleshooting. |
 | `../docs/mixer.md` | The Mixer, Keys and MIDI controllers (new in v12): every tab, the Alesis VI25 preset, how the Mixer works with the visitors, the settings, the controls and the API, troubleshooting. |
 
@@ -93,6 +94,16 @@ python.exe to PATH" ticked) and nothing else.
 - **Race to the Star** (new in v18): the race itself (waiting room, countdown, climbing, sliding, levels, help for
   whoever is behind, the finish), its tracks and stars on any models, groups or the cube, and its own settings page
   at `/race` with a test race and saved profiles.
+  Since v19 it also has three looks for the climbers: rope, climber or automatic.
+- **Advent calendar and Decorate the tree** (new in v23): the doors and what they do, games unlocked by day, the
+  tree's spots spread over any models, the baubles and the party when full, and their settings page at `/xmas`.
+- **ntfy.sh today and one bridge at a time** (new in v23): today's message counts on the control page, at most
+  10 minutes of waiting after a 429, and a second bridge that stops by itself.
+- **Poster** (new in v19): everything the bridge posts on ntfy.sh (game board, status, Play and Sing queues) goes
+  through one poster that sends the game first, never sends the same thing twice, keeps within ntfy.sh's limits and
+  waits properly after a "429 Too Many Requests". Since v20 it connects over IPv4 first, so a network with
+  broken IPv6 no longer delays every post by about 30 seconds; since v21 it waits at most 3 s to connect
+  to each address, so a dead IPv4 or IPv6 address costs seconds, not tens of seconds.
 - **Status:** tells the visitors' page what is available (sides, sizes, theme, games, props), using the show code.
 - **Mixer and Keys** (new in v12): a second page, `/mixer`, for whoever runs the show.
   - pads, palettes, faders, hold buttons and 8 scenes drive sides and props live;

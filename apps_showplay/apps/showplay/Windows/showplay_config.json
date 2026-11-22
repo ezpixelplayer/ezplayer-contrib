@@ -1,19 +1,27 @@
 {
- "on": false,
- "topic": "showplay-1a634b75cae8",
+ "on": true,
+ "topic": "showplay-b588d10e2623",
  "title": "MerryOnCherry",
  "page": "https://ezpixelplayer.github.io/ezplayer-contrib/apps_showplay/apps/showplay/visitors-page/",
  "ezp": "http://127.0.0.1:3000",
- "faces": [],
+ "faces": [
+  {
+   "n": "1",
+   "out": "ezp",
+   "w": 25,
+   "h": 60,
+   "model": "MatrixSideDoor HD"
+  }
+ ],
  "end_dark": false,
  "seconds": {
   "text": 20,
   "gif": 12,
   "draw": 15,
-  "fx": 180,
+  "fx": 10,
   "prop": 20
  },
- "theme": "hw",
+ "theme": "xm",
  "approve": false,
  "props": [],
  "wait": 0,
@@ -31,7 +39,74 @@
   "pong",
   "race"
  ],
- "race": {},
+ "race": {
+  "track": "split",
+  "models": [
+   "Matrix KBR Window HD"
+  ],
+  "stars": [
+   "StarPeaceLgR1",
+   "StarPeaceLgR2",
+   "StarPeaceLgR3",
+   "StarPeaceLgR4",
+   "StarPeaceLgR5",
+   "StarPeaceSmR1",
+   "StarPeaceSmR2",
+   "StarPeaceSmR3",
+   "StarPeaceSmR4",
+   "StarPeaceSmR5",
+   "StarInsanePoleR1",
+   "StarInsanePoleR2",
+   "StarInsanePoleR3",
+   "StarInsanePoleR4",
+   "StarInsanePoleR5"
+  ],
+  "pairs": [],
+  "split": "stripes",
+  "front": 0.0,
+  "dir": "up",
+  "side": 0,
+  "modes": [
+   "tap",
+   "voice",
+   "shake",
+   "run"
+  ],
+  "mix": true,
+  "shared": true,
+  "min": 2,
+  "max": 4,
+  "colours": [
+   "ff2a2a",
+   "2a7bff",
+   "39d353",
+   "ffd23f",
+   "a35cff",
+   "ff8a1a",
+   "2ad4ff",
+   "ff5cc8"
+  ],
+  "lobby": 30,
+  "early": true,
+  "levels": {
+   "kid": 1.5,
+   "adult": 1.0,
+   "sport": 0.8
+  },
+  "catchup": true,
+  "difficulty": "normal",
+  "target": 35,
+  "slide": 0.035,
+  "delay": 1.2,
+  "max_time": 90,
+  "leader": false,
+  "party": 8,
+  "countdown": true,
+  "rainbow": true,
+  "bright": 100,
+  "bg": "dim",
+  "style": "auto"
+ },
  "race_profiles": {},
  "cpu_level": "normal",
  "fps": 20,
@@ -50,7 +125,7 @@
  "sing_names": {},
  "play": true,
  "play_secs": 30,
- "play_props": null,
+ "play_props": [],
  "midi_native": true,
  "midi_base": 36,
  "midi_map": {}

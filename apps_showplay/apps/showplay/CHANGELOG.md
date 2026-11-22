@@ -5,6 +5,11 @@ updates the installation guide (`INSTALL.md`) and the contents guide (`CONTENTS.
 
 | Version | Date | In one line |
 | --- | --- | --- |
+| v23 | 2026-11-22 | 📅 Advent calendar and 🎄 Decorate the tree for visitors (own settings page /xmas); ntfy.sh today card, at most 10 minutes of waiting, one bridge at a time |
+| v22 | 2026-11-22 | Space Invaders and Pong sliders send less (only when the finger moves, less often as the phone's message budget runs low) and no longer show "Too many messages" |
+| v21 | 2026-11-22 | The bridge waits at most 3 s to connect to each address, so any network with a dead IPv4 or IPv6 path costs seconds, not tens of seconds |
+| v20 | 2026-11-22 | Fix: the bridge connects to ntfy.sh over IPv4 first, so the phones no longer get each game board about 30 s late on networks where IPv6 does not work |
+| v19 | 2026-11-22 | Phones update fast again: one poster keeps the bridge within ntfy.sh's limits (game board first, real waiting after a 429), phones keep their own budget and say why something failed; race climbers as rope, climber or automatic |
 | v18 | 2026-11-22 | Race to the Star: up to 8 players climb a track of lights by tapping, singing, shaking or running (two can share a phone); the winner lights the star; its own settings page |
 | v17 | 2026-11-22 | Sing: visitors record a song on their phone and it plays at the show while a singing prop moves its mouth (or a prop glows, or the cube shows a face) |
 | v16 | 2026-11-22 | Pong for visitors: one visitor against the computer, with a slower ball and a paddle that glides to where they slide |
@@ -23,6 +28,221 @@ updates the installation guide (`INSTALL.md`) and the contents guide (`CONTENTS.
 | v3 | 2026-11-20 | README: how to set up the controllers and the sides of the cube |
 | v2 | 2026-11-20 | Show name MerryOnCherry on the bridge and the visitors' page |
 | v1 | 2026-11-20 | First version in English: bridge, control page and visitors' page, through EZPlayer overlays |
+
+---
+
+## v23 — Advent calendar, Decorate the tree and ntfy.sh control (2026-11-22)
+
+Two Christmas extras for visitors, with their own settings page (**/xmas**, or **📅 Advent & 🎄 Tree** at the top of
+the control page), and better control of ntfy.sh after the day its daily limit ran out. The full guide for the two
+extras is [docs/xmas.md](docs/xmas.md).
+
+**New: 📅 Advent calendar** (visitors' page, 📅 Advent tab)
+
+| Part | What it does |
+| --- | --- |
+| Countdown | "🎄 N days to Christmas" (before the first day: when the calendar opens) |
+| 24 doors | One more opens each day from 1 December (the first day and month can be changed); today's door glows; the next ones stay closed |
+| ✨ Effect door | Plays that effect on the cube |
+| 💬 Message door | Scrolls that message on the cube (up to 30 letters, word filter) |
+| 🎮 Game door | Opens 🎮 Games with that game picked |
+| Unlock games | Optional: a game with a door appears only from the day of its door |
+| Test day | "Pretend today is door N", to try it before December |
+| Default surprises | Effects, messages, Simon, Tic-tac-toe, Snake, Space Invaders, Race to the Star, and "MERRY CHRISTMAS!" on the 24th |
+
+**New: 🎄 Decorate the tree** (visitors' page, 🎄 Tree tab)
+- Pick the tree's models on /xmas: any models or groups. The bridge spreads the spots evenly over their pixels
+  (8 to 60, 30 by default), leaving out the top and the very bottom.
+- Visitors see a drawing of the tree, tap a free spot, pick one of 8 colours and press **Hang my bauble**.
+- On the lights: a dim green tree (or off) with the baubles twinkling, the newest one sparkling; it shows for a while
+  after each new bauble (30 s by default) or all the time, so the tree plays the show's sequence the rest of the time.
+- Each phone waits between baubles (60 s by default). Someone faster, the wait, or the party: the phone says why.
+- When full: a 15-second rainbow party, then it starts again empty (optional).
+- The baubles stay after a restart. **Show it on the lights now** and **Take all the baubles off** on /xmas.
+- The bridge posts the tree on `<code>-tree`, only when it changes.
+
+**New: ntfy.sh control**
+
+| What | Before | Now (v23) |
+| --- | --- | --- |
+| Today's counts | None | An "ntfy.sh today" card on the control page: messages posted by the bridge, received from phones, the share of one address's daily limit, the last "too many" answer |
+| Daily limit used up | The bridge obeyed ntfy.sh and waited up to 20 hours, even after you changed network | It waits at most 10 minutes, then tries again, and says when the daily limit resets |
+| Two bridges at once | Possible on Windows (both used the same port) | A second bridge says "Another ShowPlay bridge is already running" and stops |
+| Status size | Could grow past ntfy.sh's 4096 bytes with many singers and props | The bridge leaves out the last singers, then props, to stay under it |
+
+**Changed**
+- Control page: **📅 Advent & 🎄 Tree** button; the "ntfy.sh today" card under the ON/OFF card.
+- The bridge needs EZPlayer when a tree is set up (like props and the race).
+
+**Updating from v22**
+1. End every `python` / `pythonw` in Task Manager (search "py"), then start the v23 bridge **once** (`autostart.bat`
+   or `start_bridge.bat`). The v23 folder on the Desktop already has your `showplay_config.json`.
+2. Upload the new `visitors-page/index.html` to GitHub and reload the page on the phones.
+3. Open http://localhost:8099/xmas to switch on the calendar and the tree.
+
+**Tested**
+- Calendar: the default doors; day 5 with "unlock" shows 5 doors and hides Tic-tac-toe, Snake, Space Invaders and
+  the race; door 1 plays its effect and door 2 its message through the normal checks; future doors and game doors
+  send nothing; the real date (22 November) gives "not open yet"; edited doors are cleaned (accents, word filter).
+- Tree on a 32 × 25 mega tree: 30 spots, every spot has pixels; hanging, the wait, a taken spot and a bad colour are
+  refused with their reason; the tree state is 0.9 KB; filling it starts the party, refuses baubles during it and
+  empties the tree afterwards.
+- The biggest status (24 doors, 30 long singer names, 12 props) is trimmed from 4.4 KB to 3.9 KB.
+- ntfy.sh: a 429 asking for 71,528 s waits 599 s, shows the daily limit and the reset time, and clears when a post
+  works; received messages are counted.
+- A second bridge finds the first one and stops.
+- In a browser: the 📅 Advent and 🎄 Tree tabs (doors, a door's effect, a game door opening Simon, hanging a
+  bauble), the /xmas page (saving the calendar and the tree: "Saved: 30 spots on the tree") and the ntfy.sh card,
+  with no script errors. The v18, v19 and v21 tests still pass.
+
+---
+
+## v22 — Gentler sliders in Space Invaders and Pong (2026-11-22)
+
+**Why:** in Space Invaders on a phone on the home Wi-Fi, the page showed "Too many messages right now. Wait a minute
+and try again." during the game. The slider sent the ship's position up to twice a second while the finger moved:
+about 120 messages a minute, while ntfy.sh allows each internet address about 60 in a row and then about one every
+5–10 seconds, shared with the bridge and every other phone on that Wi-Fi.
+
+**Changed (visitors' page only)**
+- The Space Invaders and Pong sliders send only when the finger has really moved (2 % of the strip or more).
+- How often depends on the phone's message budget: every 0.6 s while it is full, every 1.2 s when it is half used,
+  every 2.5 s when it is low, and every 3 s while ntfy.sh asks to wait.
+- A 429 during these games no longer shows the red "Too many messages" line: the ship or paddle just follows less
+  often, and the game line adds "Busy connection right now: it follows a bit later".
+- Snake turns may use a little more of the budget than before (they are short games and each turn matters).
+- Moves and requests (new game, join, quit, pictures, texts) still say "Too many messages…" on a 429.
+
+**Good to know:** phones on mobile data each have their own allowance, so at the show this happens far less than
+when testing at home with several phones on the Wi-Fi.
+
+**Updating from v21**
+1. Upload the new `visitors-page/index.html` to GitHub (the page in your repository), then reload it on the phones.
+2. The bridge has not changed: it still says **v21**, and there is no need to restart it.
+
+**Tested**
+- The page's script parses; the sliders' send rate follows the budget as above.
+
+---
+
+## v21 — At most 3 s per address (2026-11-22)
+
+**Why:** v20 tries IPv4 before IPv6, which fixes networks where IPv6 is broken. The opposite case (IPv4 there but
+not answering, with IPv6 working) would still wait 10 s for each IPv4 address before trying IPv6.
+
+**Changed**
+- The bridge now waits at most **3 seconds** to connect to each address of a server, then tries the next one. Once
+  connected, the usual timeout (10 s) still applies to the answer.
+- Worst case with all three addresses of one kind dead: about 9 s instead of 30 s. Addresses that refuse straight
+  away (no route, connection refused) are skipped at once, as before.
+- EZPlayer (127.0.0.1) and the cube's controllers (DDP over UDP) are not affected.
+
+**Updating from v20**
+1. End every `python` / `pythonw` in Task Manager (search "py").
+2. Run `autostart.bat` from the v21 folder **or** `start_bridge.bat`, not both. The v21 folder on the Desktop already
+   has your `showplay_config.json`; otherwise copy it from the v20 folder first.
+3. The visitors' page has not changed since v19.
+
+**Tested**
+- Two addresses that never answer followed by a working one: connected after 6 s (was 20 s), and the 10 s timeout
+  is back for the answer. A refused connection still fails at once. The v19 poster and loop tests still pass.
+
+---
+
+## v20 — Game boards no longer 30 s late (2026-11-22)
+
+**Why:** after v19, the bridge showed no 429 errors, nothing waiting in its queue and plenty of budget left, yet the
+phones still got every game board about **30 seconds** after the move (the lights on EZPlayer showed it at once).
+The ntfy.sh times showed the same delay on every post: about 31–34 s, and about 60 s when two posts were queued.
+
+**Cause:** ntfy.sh has 3 IPv6 addresses and 3 IPv4 addresses. Python tries a server's addresses **one after
+another**, waiting up to the whole timeout (10 s) for each. On a network where IPv6 is announced but does not really
+work, every post waited 3 × 10 s on the IPv6 addresses before trying IPv4. Browsers and EZPlayer try both at once
+("happy eyeballs"), so the phones and the lights were not affected. The bridge's own connection to the show channel
+took about a minute to open for the same reason.
+
+**Fixed**
+- The bridge now tries IPv4 addresses first, then IPv6. Posts to ntfy.sh go out at once again.
+
+**Also found**
+- Two or three bridges were running at once: `autostart.bat` starts a hidden bridge (and makes it start with
+  Windows), and `start_bridge.bat` starts another one in a window. They shared ntfy.sh's limit, overwrote each other's
+  settings (the status switched between ON and OFF) and the control page talked to either of them. INSTALL.md now
+  says to use one or the other, never both.
+
+**Updating from v19**
+1. End every `python` / `pythonw` in Task Manager (search "py").
+2. Run `autostart.bat` from the v20 folder **or** `start_bridge.bat`, not both. Settings: copy
+   `showplay_config.json` from the v19 folder next to the new `showplay_bridge.py` first, to keep the same show code.
+3. The visitors' page has not changed since v19.
+
+**Tested**
+- With an address list that has IPv6 first, the bridge gets IPv4 first; the v19 poster and loop tests still pass.
+
+---
+
+## v19 — Faster phones, ntfy.sh limits and climber styles (2026-11-22)
+
+**Why:** at the show, the lights showed every move at once but the phones' game board was late, and texts, pictures
+and effects sometimes failed with "It could not be sent". The log showed `HTTP Error 429` (Too Many Requests) from
+ntfy.sh. ntfy.sh's free service allows each internet address about 60 messages in a row, then about one every 5–10
+seconds, and **the bridge and the phones on the same Wi-Fi share one address**. The bridge used to post the game,
+status, Play and Sing channels separately, posted the status twice at start, and retried the Sing queue every 0.3 s
+after a failure, which used the allowance up and kept it empty.
+
+**New: one poster in the bridge**
+
+| What | Before (v18) | Now (v19) |
+| --- | --- | --- |
+| Who posts | 4 separate loops (game, status, Play, Sing) | One poster for everything |
+| Order | Whoever came first | Game board first, then status, then Play and Sing |
+| Old messages | Each change was sent, even if a newer one followed | Only the latest of each channel is sent |
+| Repeats | The status twice at start; unchanged queues again | Nothing is sent twice; the status only when it changes (and every half hour) |
+| Play and Sing when off | Posted anyway | Not posted |
+| Budget | None | 45 in a row, then one every 8 s, leaving room for the phones |
+| After a 429 | Retried every 0.3–10 s (which kept the limit hit) | Waits Retry-After, or 30 s, 60 s, 120 s… and then sends the latest |
+| Real-time games | About one board a second | Every 5 s, and at once when the game starts, ends, someone joins or a request is refused |
+| Turn games against the computer | Your move, then the computer's, as two posts | One post with both moves |
+| Control page | Only log lines | "ntfy.sh: too many messages… posting again in N s" while it waits |
+
+**New: phones keep their own budget**
+- Each phone counts its own messages (30 in a row, then one every 8 s).
+- Steady messages (joystick in Pong and Space Invaders, Snake turns, Play taps, race effort) are skipped when the
+  budget runs low, so moves and requests still go through.
+- On a 429 the phone waits a minute and says **"Too many messages right now. Wait a minute and try again."** instead
+  of "It could not be sent".
+- **Why a game did not start:** when the bridge refuses a new game or a join, the phone that asked says why, for
+  example "The race isn't set up yet. Ask the show to set up the race track." or "Another game is being played".
+- The page checks the show status every 90 s (was 60 s).
+
+**New: climber styles in Race to the Star** (race panel → effects → **Climbers look like**)
+- **Rope:** the lane fills up to the height; the top pixel lights up gradually, so short tracks climb smoothly.
+- **Climber:** a little figure (head, body, moving legs) on a dim rope.
+- **Automatic** (default): climber on tracks 50 pixels tall or more, rope on smaller ones.
+
+**Changed**
+- Race: phones send the effort about every 2 s (was 1 s), and the bridge keeps each effort for 4 s (was 1.6 s), so a
+  race costs each phone about half the messages; phones see the heights every 5 s (was 3 s).
+- Docs: INSTALL.md (all four platforms) explains ntfy.sh's limits under Games and has two new troubleshooting lines;
+  docs/race.md covers the climber styles, the new message numbers and the refusal messages; CONTENTS.md lists the poster.
+
+**Updating from v18**
+1. Replace `showplay_bridge.py` in your platform folder and restart the bridge. Settings are kept; the race gets
+   `style: auto`.
+2. Upload the new `visitors-page/index.html` to GitHub (the page in your repository), then reload it on the phones.
+3. If the log still shows 429 right after updating, ntfy.sh is still counting the earlier messages: wait a few
+   minutes. To test at home, use a phone on mobile data.
+
+**Tested**
+- The poster with a fake ntfy.sh: the game goes before the status and the Play queue; only the newest board is sent;
+  nothing is sent twice; after a 429 with Retry-After it waits, sends nothing meanwhile and then sends the newest
+  board; the budget limits the rate.
+- The real loops together: at start one game and one status post (no Play post while Play is off); a new Four in a
+  Row game posted in 0.1 s; a move against the computer posted once, with both moves, 1.7 s later; a refused race
+  shows the reason to that phone only.
+- Race styles: automatic picks rope at 25 pixels and climber at 60; the rope's head pixel lights up partly; the
+  climber lights its figure at the right height on a dim rope.
+- The v15, v17 and v18 tests still pass (games, Space Invaders, Sing, race).
 
 ---
 
