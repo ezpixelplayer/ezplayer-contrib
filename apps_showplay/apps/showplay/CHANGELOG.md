@@ -5,6 +5,7 @@ updates the installation guide (`INSTALL.md`) and the contents guide (`CONTENTS.
 
 | Version | Date | In one line |
 | --- | --- | --- |
+| v12 | 2026-11-22 | Mixer page (pads, faders, scenes), Keys (one key per model, with velocity and aftertouch) and real MIDI controllers, with an Alesis VI25 preset |
 | v11 | 2026-11-21 | New macOS and Linux x64 folders: ShowPlay now covers the same four platforms as EZPlayer |
 | v10 | 2026-11-21 | Renamed from Light Cube to ShowPlay, with settings, show codes and auto-start carried over |
 | v9 | 2026-11-21 | Package split into a Windows folder and an arm64 (Raspberry Pi) folder, each with its own complete installation and contents guides |
@@ -16,6 +17,109 @@ updates the installation guide (`INSTALL.md`) and the contents guide (`CONTENTS.
 | v3 | 2026-11-20 | README: how to set up the controllers and the sides of the cube |
 | v2 | 2026-11-20 | Show name MerryOnCherry on the bridge and the visitors' page |
 | v1 | 2026-11-20 | First version in English: bridge, control page and visitors' page, through EZPlayer overlays |
+
+---
+
+## v12 — Mixer, Keys and MIDI controllers (2026-11-22)
+
+ShowPlay now has controls for **whoever runs the show**, not only for visitors. The new **Mixer** page works like a
+MIDI controller on a phone, tablet or computer. Its **Keys** mode turns every model of the props into a key to play. A
+**real MIDI controller or keyboard** can play all of it too. Everything is explained in the new guide
+[docs/mixer.md](docs/mixer.md).
+
+**New: the Mixer page** (http://\<bridge-ip\>:8099/mixer, also from the new **🎛️ Mixer & 🎹 Keys** button at the top
+of the control page):
+
+- **Targets:** pick the sides of the cube and the props to drive. Each one keeps its own effect, palette and faders.
+- **Pads:**
+  - the 12 prop effects (they now also work on the cube);
+  - the cube scenes of the visitors' page, for the sides;
+  - a text pad that scrolls any message on the picked sides.
+- **Colours:** the 11 palettes.
+- **Faders:** Master (brightness), Speed (0.2× to 3×), Colour (turns the palette around the colour wheel) and White.
+  They change effects live, without restarting them.
+- **Hold buttons:** ⚡ Flash, 💥 Strobe and ⬛ Blackout, active only while held.
+- **8 scenes:** save and recall everything that is on. They are kept in the settings file.
+- **Giving back:** "Stop the picked" and "Release all". If nobody touches the Mixer for a set time (5 min, 15 min by
+  default, 1 hour or never), everything goes back to the visitors and the show by itself.
+
+**New: Keys** (the Keys tab of the same page):
+
+- **One key per model:** every model of every prop, and every side of the cube, is a key, up to 128 (the MIDI range).
+  A prop made from a group of snowflakes gives one key per snowflake.
+- **Velocity:** pressing higher on a key plays it brighter.
+- **Aftertouch:** sliding the finger while holding changes it live.
+- **Release:** letting go fades it out. Several keys play at once.
+- **Computer keyboard:** 1–0, Q–P, A–L and Z–M play the first 36 keys.
+- **Each key's own settings:** effect, own colour or palette, colour, white and level. They are saved.
+- **All-keys faders:** Master, Attack (0–2 s), Release (0–4 s) and Colour all.
+
+**New: MIDI controllers** (the MIDI tab):
+
+- **Windows:** the bridge reads MIDI devices itself, through winmm (part of Windows).
+- **Linux and Raspberry Pi:** the bridge reads `/dev/snd/midi*` itself. Devices plugged in later are found within
+  5–10 s.
+- **macOS (or any computer):** the Mixer page passes messages on from Chrome or Edge (Web MIDI), opened at
+  `http://localhost:8099/mixer`.
+- **Notes play the keys:** a settable first note, which can also be learned. Velocity sets how bright, aftertouch
+  (polyphonic and channel pressure) makes a held key brighter, and All notes off (CC 123) stops them.
+- **🎓 Learn:** touch any control on the page, then move or press the control on the device. It works for pads,
+  colours, faders, holds, scenes, targets and single keys. Faders and knobs follow the value; pads hold as long as the
+  note.
+- **Default mapping:** CC 7 is Master and CC 1 (modulation wheel) is the colour of the keys.
+- **Preset "Alesis VI25"** (factory settings):
+  - the 25 keys play the Keys;
+  - pads 1–12 are the effects, 13–15 Flash/Strobe/Blackout, 16 Release all;
+  - knobs 1–8 are Master, Speed, Colour, White, Attack, Release, Colour all keys and palette.
+- **Monitor:** the MIDI tab shows the devices read and the last message received.
+
+**Changed:**
+
+- **Visitors wait:** while the Mixer drives a side or prop, visitors' requests and games for it wait, the same as for
+  a game, and start when it is given back. The log says what the Mixer drives.
+- **Overlays:** EZPlayer overlays are now closed model by model, so a key that has faded out gives its model back to
+  the show at once, even while other keys still sound.
+- **New settings** in `showplay_config.json`: `mixer_idle`, `mixer_scenes`, `keys_set`, `keys_glob`, `midi_native`,
+  `midi_base` and `midi_map`. Existing settings files work as they are.
+- **Documents:**
+  - new guide `docs/mixer.md`;
+  - every platform's `INSTALL.md` has a new section, "Mixer, Keys and MIDI controllers", with that platform's MIDI
+    notes and troubleshooting;
+  - every `CONTENTS.md` describes the new parts of the bridge;
+  - the READMEs link the new guide.
+
+**Tested** (against a stand-in EZPlayer with the real MerryOnCherry 2026_Base layout, and a stand-in DDP board):
+
+- **Mixer on the cube and the wings:**
+  - a side and a prop driven together: the side got 20 DDP frames a second, each wing model got EZPlayer overlay
+    frames at 20 a second;
+  - Master at 50 % halved the brightness (max 127);
+  - Flash gave all 255 and Blackout all 0;
+  - cube scenes went to the side only, and text scrolled.
+- **Visitors and the Mixer:** a visitor's request for a driven side waited, and started as soon as the Mixer released
+  it. Overlays closed on release. A saved scene came back.
+- **Keys:**
+  - a wing key at velocity 0.5 gave max 126, aftertouch to full gave 250, and after 0.15 s of a 0.35 s release it gave
+    141;
+  - its overlay closed once faded;
+  - a side key lit the side over DDP;
+  - key settings were saved.
+- **MIDI:**
+  - notes with velocity, polyphonic aftertouch, note off and running status (with a clock byte in between) worked;
+  - CC 7 set Master;
+  - Learn mapped a CC to a pad, and the CC then fired it;
+  - the VI25 preset mapped 25 controls: pad 3 started Rising, pad 15 held Blackout until let go, knob 8 went through
+    the palettes, and the keys started at C3;
+  - a message passed on by the page (Web MIDI path) arrived.
+- **Giving back:** the idle timer gave everything back.
+- **Pages:** the Mixer, Keys and MIDI tabs and the Learn mode were checked in Chromium at desktop and phone width,
+  with no script errors. Holding a key on the page lit its model.
+- **Props for visitors** still work as in v11.
+- **Not tested yet with a real MIDI device:**
+  - The Windows (winmm) and Linux (`/dev/snd`) readers use the standard system interfaces, but were not run with a
+    device plugged in.
+  - The VI25 factory notes for the pads (36–51 on channel 10) are the usual Alesis defaults. If a pad does nothing,
+    the MIDI monitor shows what it sends, and Learn fixes it.
 
 ---
 

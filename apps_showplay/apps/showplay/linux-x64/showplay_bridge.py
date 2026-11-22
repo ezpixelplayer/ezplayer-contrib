@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ShowPlay — v11 (MerryOnCherry)   (called Light Cube up to v9)
+# ShowPlay — v12 (MerryOnCherry)   (called Light Cube up to v9)
 #
 # Visitors play with the lights of a show from their phone: they scan a QR code on the wall and send a message, a
 # picture, an effect or a drawing to a cube of LED matrices, play Four in a Row on it, or light up props of an EZPlayer
@@ -13,15 +13,17 @@
 # overlay API and the request shows on top of the sequence that is playing.
 #
 # Control page, on the home network:  http://<this-computer's-ip>:8099
+# Mixer and Keys (pads and faders for whoever runs the show):  http://<this-computer's-ip>:8099/mixer
+# A MIDI controller or keyboard can play them too (read by this bridge on Windows and Linux, or by the page in Chrome).
 # Uses only the Python 3 standard library (nothing to install). Runs on Windows, macOS and Linux (x64 and arm64).
 # Start:  python showplay_bridge.py  (Windows)   or   python3 showplay_bridge.py  (Linux / Raspberry Pi)
 # Settings are kept in showplay_config.json, next to this file (a cube_config.json from Light Cube is taken over).
 
-import json, os, time, threading, queue, unicodedata, re, socket, secrets, struct, math, random, collections
+import json, os, sys, time, threading, queue, unicodedata, re, socket, secrets, struct, math, random, collections
 import urllib.request, urllib.parse, urllib.error
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
-VERSION = "v11"
+VERSION = "v12"
 PORT = 8099
 RELAY = "https://ntfy.sh/"
 CFG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "showplay_config.json")
@@ -57,6 +59,13 @@ S = {   # settings (kept in showplay_config.json)
     "games": True,        # True = visitors can play four in a row on the cube
     "cpu_level": "normal",   # the computer in four in a row: easy, normal or hard
     "fps": FPS,           # frames per second sent to the lights: 20, or 15 / 10 on a slower computer such as a Raspberry Pi
+    "mixer_idle": 15,     # Mixer: minutes untouched before the lights go back to the visitors and the show (0 = never)
+    "mixer_scenes": [],   # Mixer: 8 saved scenes
+    "keys_set": {},       # Keys: each key's colour, effect and level
+    "keys_glob": {},      # Keys: attack, release and colour of all keys
+    "midi_native": True,  # MIDI: the bridge reads the MIDI devices itself (Windows, Linux, Raspberry Pi)
+    "midi_base": 36,      # MIDI: the note that plays the first key (36 = C2, the first pad of most pad controllers)
+    "midi_map": {},       # MIDI: learned notes and CCs -> controls of the Mixer and Keys pages
 }
 # ready messages (the same as the visitors' page)
 QUICK = {
@@ -121,6 +130,10 @@ def load():
         save()
     elif took_over:
         save()
+    if isinstance(S.get("keys_set"), dict):
+        KEYS["set"].update({k: v for k, v in S["keys_set"].items() if isinstance(v, dict)})
+    if isinstance(S.get("keys_glob"), dict):
+        KEYS.update({k: float(v) for k, v in S["keys_glob"].items() if k in ("attack", "release", "hue") and isinstance(v, (int, float))})
 
 
 def save():
@@ -1668,6 +1681,8 @@ def send_frame(sock, host, L, payload):
 
 
 def face_name(i):
+    if i == KEY_BASE:
+        return "Keys"
     if i >= PROP_BASE:
         p = S.get("props", [])
         return p[i - PROP_BASE]["n"] if i - PROP_BASE < len(p) else "prop"
@@ -1701,7 +1716,9 @@ def render_loop():
                 items.append((i, game_anims[i]))
         else:
             game_anims.clear()
+        items = keys_items(mix_items(items), t0)   # the Mixer and the Keys go on top of everything else
         live = {i for i, _ in items}
+        live_models = set()
         for i, a in items:
             if i >= PROP_BASE:   # a prop: one overlay for each of its models
                 try:
@@ -1711,6 +1728,7 @@ def render_loop():
                     continue
                 for g, buf in zip(a["anim"].geoms, payloads):
                     k = (i, g.model)
+                    live_models.add(k)
                     L = leases.get(k)
                     if L is None:
                         if t0 < retry.get(k, 0):
@@ -1753,7 +1771,7 @@ def render_loop():
                     send_frame(sock, host, L, buf)
             except Exception as e:
                 log("drawing error:", e)
-        for k in [k for k in list(leases) if (k[0] if isinstance(k, tuple) else k) not in live]:
+        for k in [k for k in list(leases) if (k not in live_models if isinstance(k, tuple) else k not in live)]:
             close_lease(leases.pop(k))
         for i in [i for i in list(ddp_live) if i not in live]:   # a side that finished
             ddp_live.discard(i)
@@ -1793,8 +1811,8 @@ def show_loop():
         except queue.Empty:
             pass
         now = time.time()
-        gs = set(game.sides())
-        for i in gs:   # a side with a game on it shows the game; requests for it wait
+        gs = set(game.sides()) | mix_live_nums()
+        for i in gs:   # a side with a game (or driven by the Mixer) shows that; requests for it wait
             busy.pop(i, None)
             shown.pop(i, None)
             with lock:
@@ -1861,7 +1879,9 @@ def show_loop():
             with lock:
                 active.pop(i, None)     # the overlay closes and the side goes back to the show
             log("finished:", face_name(i))
-        now_showing["what"] = " · ".join([shown[i] for i in sorted(shown)] + (["four in a row (%s)" % game.st] if gs else []))
+        mx = sorted(mix_live_nums())
+        now_showing["what"] = " · ".join([shown[i] for i in sorted(shown)] + (["four in a row (%s)" % game.st] if game.sides() else []) +
+                                         (["mixer: " + ", ".join(face_name(i) for i in mx)] if mx else []))
         if not started:
             time.sleep(0.2)
 
@@ -1916,6 +1936,826 @@ def my_ip():
         s.close()
 
 
+# ----------------------------------------------------------------------------------------- mixer ----
+# The Mixer (v12): a page of pads and faders, like a MIDI controller, for whoever runs the show. It is at
+# http://<this-computer's-ip>:8099/mixer and works from a phone or tablet on the same Wi-Fi. Pick one or more targets
+# (sides of the cube, props of the show), hit a pad to start an effect on them, a colour pad to change the palette and
+# move the faders to change speed, colour and brightness live. While the Mixer drives a target, visitors' requests and
+# games for it wait; "Release" gives it back. Every control has a name (pad:fire, pal:ice, fader:speed, hold:flash…)
+# so a physical MIDI controller can later be mapped to the same controls.
+MIX_IDLE = (0, 5, 15, 60)     # minutes without touching the Mixer before it gives everything back (0 = never)
+MIX_HOLDS = ("flash", "strobe", "black")
+MIX_FADERS = ("speed", "hue", "white")
+MIX_DEFAULT = {"on": False, "fx": "wave", "pal": "rainbow", "speed": 0.5, "hue": 0.0, "white": 0.0, "text": ""}
+MIX = {"t": {}, "sel": [], "bright": 1.0, "hold": {}, "touched": 0.0}   # live state (not saved; scenes are)
+mix_objs = {}         # target key -> MixTarget (rebuilt when the sides or props change)
+mix_loading = set()   # props whose pixel positions are being read
+
+
+def mix_targets():
+    """what the Mixer can drive: [(key, number used by the renderer, name, kind)]"""
+    out = [("s%d" % i, i, face_name(i), "side") for i in range(len(S["faces"]))]
+    if ezp_state["ok"]:
+        out += [("p%d" % i, PROP_BASE + i, p["n"], "prop") for i, p in enumerate(S.get("props", []))]
+    return out
+
+
+def mix_key_num(key):
+    return int(key[1:]) + (PROP_BASE if key[0] == "p" else 0)
+
+
+def mix_live_nums():
+    """renderer numbers of the targets the Mixer is driving now"""
+    with lock:
+        return {mix_key_num(k) for k, v in MIX["t"].items() if v.get("on")}
+
+
+def mix_cols(st):
+    """the target's palette, turned by the colour fader and blended towards white by the white fader"""
+    import colorsys
+    cols = PALETTES.get(st["pal"], PALETTES["rainbow"])[1]
+    out = []
+    for c in cols:
+        r, g, b = (x / 255 for x in hexrgb(c))
+        hh, ss, vv = colorsys.rgb_to_hsv(r, g, b)
+        r, g, b = colorsys.hsv_to_rgb((hh + st["hue"]) % 1.0, ss, vv)
+        w = st["white"]
+        out.append("%02x%02x%02x" % tuple(int(255 * (x + (1 - x) * w)) for x in (r, g, b)))
+    return out
+
+
+class MixTarget:
+    """one side or prop driven by the Mixer: its effect follows the Mixer's state frame by frame"""
+    def __init__(self, key, geoms=None, w=0, h=0):
+        self.key, self.w, self.h = key, w, h
+        self.geoms = geoms if geoms is not None else [PropGeom("side", "grid", w * h, [x / max(1, w - 1) for y in range(h) for x in range(w)],
+                                                               [1 - y / max(1, h - 1) for y in range(h) for x in range(w)], w, h)]
+        self.side = geoms is None
+        self.sig = self.look = None
+        self.eng = None
+        self.tm, self.last = 0.0, None
+
+    def _engine(self, st):
+        fx, look = st["fx"], (st["pal"], round(st["hue"], 3), round(st["white"], 3))
+        cols = None
+        if (fx, st["text"] if fx == "t:text" else "") != self.sig:
+            self.sig = (fx, st["text"] if fx == "t:text" else "")
+            cols = mix_cols(st)
+            if fx.startswith("c:") and self.side:
+                self.eng = Fx(self.w, self.h, fx[2:], [hexrgb(c) for c in cols[:2]])
+            elif fx == "t:text" and self.side:
+                self.eng = Text(self.w, self.h, st["text"] or " ", hexrgb(cols[0]))
+            else:
+                self.eng = PropFx(self.geoms, fx if fx in PROP_FX else "wave", cols, 1)
+            self.look = look
+        elif look != self.look:   # only the colours changed: keep the effect running, change its colours
+            self.look = look
+            cols = mix_cols(st)
+            if isinstance(self.eng, PropFx):
+                self.eng.lut = pal_lut(cols, wrap=self.eng.fx != "fire")
+            elif isinstance(self.eng, Fx):
+                self.eng.cols = [hexrgb(c) for c in cols[:2]]
+            elif isinstance(self.eng, Text):
+                self.eng.color = bytes(hexrgb(cols[0]))
+
+    def _step(self, t, st):
+        dt = 0.0 if self.last is None else max(0.0, min(0.2, t - self.last))
+        self.last = t
+        sp = 0.2 * 15 ** st["speed"]     # the speed fader: 0.2x .. 3x
+        self.tm += dt * sp
+        return dt * sp
+
+    def _post(self, buf, n):
+        return mix_scale(buf, n, 1.0)
+
+    def state(self):
+        with lock:
+            return dict(MIX["t"].get(self.key) or MIX_DEFAULT)
+
+    def frame(self, t):       # a side: one picture
+        st = self.state()
+        self._engine(st)
+        dt = self._step(t, st)
+        if isinstance(self.eng, PropFx):
+            buf = self.eng.one(0, self.geoms[0], self.tm, dt)
+        else:
+            buf = self.eng.frame(self.tm)
+        return self._post(buf, self.w * self.h)
+
+    def frames(self, t):      # a prop: one buffer for each of its models
+        st = self.state()
+        self._engine(st)
+        dt = self._step(t, st)
+        return [self._post(self.eng.one(gi, g, self.tm, dt), g.n) for gi, g in enumerate(self.geoms)]
+
+
+def mix_load_prop(key):
+    try:
+        pi = int(key[1:])
+        g = prop_geometry(pi)
+        if g:
+            mix_objs[key] = MixTarget(key, geoms=g)
+        else:
+            log("mixer: prop %s has no models EZPlayer knows" % S["props"][pi]["n"])
+    except Exception as e:
+        log("mixer: could not read the prop's pixel positions:", e)
+    finally:
+        mix_loading.discard(key)
+
+
+def mix_items(items):
+    """render_loop: the targets the Mixer drives replace what they would show"""
+    with lock:
+        live = [k for k, v in MIX["t"].items() if v.get("on")]
+    if not live:
+        return items
+    nums = {}
+    for key in live:
+        n, o = mix_key_num(key), mix_objs.get(key)
+        if key[0] == "s":
+            i = n
+            if i >= len(S["faces"]):
+                continue
+            f = S["faces"][i]
+            if o is None or (o.w, o.h) != (f["w"], f["h"]):
+                o = mix_objs[key] = MixTarget(key, w=f["w"], h=f["h"])
+        elif o is None:
+            if int(key[1:]) < len(S.get("props", [])) and key not in mix_loading:
+                mix_loading.add(key)
+                threading.Thread(target=mix_load_prop, args=(key,), daemon=True).start()
+            continue
+        nums[n] = {"anim": o, "t0": 0.0}
+    return [(i, a) for i, a in items if i not in nums] + list(nums.items())
+
+
+def mix_reset():
+    """the sides or props changed: drop the Mixer's targets and drawings"""
+    with lock:
+        MIX["t"].clear()
+        MIX["sel"] = []
+    mix_objs.clear()
+
+
+def mix_scene_names():
+    sc = S.get("mixer_scenes") or []
+    return [(s or {}).get("name", "") if s else "" for s in (sc + [None] * 8)[:8]]
+
+
+def mix_state():
+    tg = mix_targets()
+    with lock:
+        t = {k: dict(MIX["t"].get(k) or MIX_DEFAULT) for k, _, _, _ in tg}
+        sel = [k for k in MIX["sel"] if k in t]
+        now = time.time()
+        return {"ok": True, "version": VERSION, "targets": [{"k": k, "n": n, "kind": kind} for k, _, n, kind in tg], "t": t, "sel": sel,
+                "bright": MIX["bright"], "hold": [h for h in MIX_HOLDS if MIX["hold"].get(h, 0) > now], "idle": S.get("mixer_idle", 15),
+                "scenes": mix_scene_names(), "ezpOk": ezp_state["ok"], "loading": sorted(mix_loading),
+                "fx": [[k, n] for k, n in PROP_FX.items()], "cube": [[k, n] for k, n in FX_NAMES.items()],
+                "pals": [[k, v[0], v[1]] for k, v in PALETTES.items()]}
+
+
+def mix_action(b):
+    """one press, fader move or hold from the Mixer page (or, later, from a MIDI controller)"""
+    a = b.get("a")
+    now = time.time()
+    with lock:
+        MIX["touched"] = now
+        valid = {k for k, _, _, _ in mix_targets()}
+        sel = [k for k in MIX["sel"] if k in valid]
+
+        def each(fn):
+            for k in sel:
+                st = MIX["t"].setdefault(k, dict(MIX_DEFAULT))
+                fn(st, k)
+        if a == "sel":
+            ks = b.get("keys")
+            if isinstance(ks, list):
+                MIX["sel"] = [k for k in ks if isinstance(k, str) and k in valid][:24]
+        elif a == "pad":
+            fx = str(b.get("fx", ""))
+            if not (fx in PROP_FX or (fx.startswith("c:") and fx[2:] in FX_NAMES)):
+                return False
+            if True:
+                def go(st, k):
+                    if fx.startswith("c:") and k[0] != "s":   # cube effects are drawn on a grid: props keep theirs
+                        return
+                    st.update(fx=fx, on=True)
+                each(go)
+        elif a == "text":
+            t = re.sub(r"[^ -~]", "", plain(str(b.get("t", ""))))[:60].strip()
+            if t:
+                each(lambda st, k: k[0] == "s" and st.update(fx="t:text", text=t, on=True))
+        elif a == "pal":
+            if b.get("pal") in PALETTES:
+                each(lambda st, k: st.update(pal=b["pal"]))
+        elif a == "fader":
+            name, v = b.get("name"), b.get("v")
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                v = max(0.0, min(1.0, float(v)))
+                if name == "bright":
+                    MIX["bright"] = v
+                elif name in MIX_FADERS:
+                    each(lambda st, k: st.update({name: v}))
+        elif a == "hold":
+            name, ms = b.get("name"), b.get("ms", 0)
+            if name in MIX_HOLDS and isint(ms):
+                MIX["hold"][name] = now + min(1500, max(0, ms)) / 1000
+        elif a == "off":
+            each(lambda st, k: st.update(on=False))
+        elif a == "release":
+            for st in MIX["t"].values():
+                st["on"] = False
+            MIX["hold"].clear()
+        elif a == "idle":
+            if b.get("v") in MIX_IDLE:
+                S["mixer_idle"] = b["v"]
+                save()
+        elif a in ("save", "load", "clear") and isint(b.get("n")) and 0 <= b["n"] < 8:
+            sc = (list(S.get("mixer_scenes") or []) + [None] * 8)[:8]
+            n = b["n"]
+            if a == "save":
+                sc[n] = {"name": str(b.get("name", "")).strip()[:16] or "Scene %d" % (n + 1), "bright": MIX["bright"],
+                         "t": {k: dict(v) for k, v in MIX["t"].items() if v.get("on")}}
+                log("mixer: saved", sc[n]["name"])
+            elif a == "clear":
+                sc[n] = None
+            elif sc[n]:
+                MIX["t"] = {k: dict(MIX_DEFAULT, **v) for k, v in sc[n]["t"].items() if k in valid}
+                MIX["bright"] = float(sc[n].get("bright", 1.0))
+                log("mixer: scene", sc[n]["name"])
+            S["mixer_scenes"] = sc
+            save()
+        else:
+            return False
+    return True
+
+
+def mix_watch():
+    """gives everything back when nobody has touched the Mixer for a while (the Mixer page's setting)"""
+    while True:
+        time.sleep(10)
+        idle = S.get("mixer_idle", 15)
+        if idle and mix_live_nums() and time.time() - MIX["touched"] > idle * 60:
+            mix_action({"a": "release"})
+            log("mixer: nobody touched it for %d min, the lights go back to the visitors and the show" % idle)
+
+
+# ------------------------------------------------------------------------------------------ keys ----
+# Keys (v12): every model of every prop, and every side of the cube, becomes a key — up to 128, like the notes of
+# a MIDI keyboard. Press a key and that one model lights up: how hard (velocity) sets how bright, sliding the finger
+# while holding (aftertouch) changes it live, letting go fades it out (release). Each key has its own colour, effect
+# and level; the Attack, Release and Master faders act on all of them. Example: a prop "Snowflakes" made of the group
+# of all the snowflakes gives one key for each snowflake, to play them like a piano.
+KEYS_MAX = 128
+KEY_BASE = 900        # renderer number of the keys' models (one overlay for each model that is sounding)
+KEY_DEFAULT = {"fx": "solid", "pal": "", "hue": 0.0, "white": 0.0, "level": 1.0}
+KEYS = {"down": {}, "env": {}, "set": {}, "attack": 0.0, "release": 0.35, "hue": 0.0}
+key_geoms = {}        # key id -> PropGeom (a model) — filled in the background
+key_objs = {}         # key id -> (signature, effect engine)
+keys_loading = [False]
+
+
+def keys_list():
+    """[(key id, name, kind)]: the sides of the cube, then each model of each prop (each model once)"""
+    out = [("s%d" % i, face_name(i), "side") for i in range(len(S["faces"]))]
+    seen = set()
+    if ezp_state["ok"]:
+        for p in S.get("props", []):
+            for m in p["models"]:
+                if m not in seen:
+                    seen.add(m)
+                    out.append(("m:" + m, m, p["n"]))
+    return out[:KEYS_MAX]
+
+
+def keys_prepare():
+    """reads where the pixels of every key's model are (once; the same reading the props use)"""
+    if keys_loading[0]:
+        return
+    keys_loading[0] = True
+    try:
+        for pi in range(len(S.get("props", []))):
+            try:
+                for g in prop_geometry(pi):
+                    key_geoms.setdefault("m:" + g.model, g)
+            except Exception as e:
+                log("keys: prop %s not ready: %s" % (S["props"][pi]["n"], e))
+    finally:
+        keys_loading[0] = False
+
+
+def keys_reset():
+    with lock:
+        KEYS["down"].clear(); KEYS["env"].clear(); KEYS["set"].clear()
+    key_geoms.clear(); key_objs.clear()
+
+
+def key_setting(k, n):
+    st = dict(KEY_DEFAULT, hue=(n * 0.13) % 1.0)   # keys start with different colours, like a rainbow keyboard
+    st.update(KEYS["set"].get(k) or {})
+    return st
+
+
+def key_cols(st):
+    if st["pal"] in PALETTES:
+        return mix_cols(dict(st, hue=(st["hue"] + KEYS["hue"]) % 1.0 if st["pal"] else st["hue"]))
+    import colorsys
+    out = []
+    for dh, dv in ((0, 1.0), (0.06, 0.8), (-0.06, 0.55)):   # the key's colour and two neighbours, for the moving effects
+        r, g, b = colorsys.hsv_to_rgb((st["hue"] + KEYS["hue"] + dh) % 1.0, 1.0, dv)
+        w = st["white"]
+        out.append("%02x%02x%02x" % tuple(int(255 * (x + (1 - x) * w)) for x in (r, g, b)))
+    return out
+
+
+def key_engine(k, st, geom):
+    sig = (st["fx"], st["pal"], round(st["hue"], 3), round(st["white"], 3), round(KEYS["hue"], 3), geom.n)
+    cur = key_objs.get(k)
+    if cur and cur[0][1:] == sig[1:] and cur[0][0] == sig[0]:
+        return cur[1]
+    if cur and cur[0][0] == sig[0]:      # same effect, new colours: keep it running
+        cur[1].lut = pal_lut(key_cols(st), wrap=st["fx"] != "fire")
+        key_objs[k] = (sig, cur[1])
+        return cur[1]
+    e = PropFx([geom], st["fx"] if st["fx"] in PROP_FX else "solid", key_cols(st), 1)
+    key_objs[k] = (sig, e)
+    return e
+
+
+def keys_levels(now, dt):
+    """moves each key's envelope: up to velocity × aftertouch while held (attack), down to 0 when let go (release)"""
+    out = {}
+    with lock:
+        down, env = KEYS["down"], KEYS["env"]
+        for k in [k for k, d in down.items() if now - d["seen"] > 4]:   # the phone went away while holding a key
+            down.pop(k)
+        a, r = KEYS["attack"], KEYS["release"]
+        for k in set(down) | set(env):
+            cur = env.get(k, 0.0)
+            if k in down:
+                d = down[k]
+                goal = d["vel"] if d.get("after") is None else d["after"]
+                cur = goal if a <= 0.01 else min(goal, cur + dt / a) if cur < goal else max(goal, cur - dt / 0.15)
+            else:
+                cur = 0.0 if r <= 0.01 else cur - dt / r
+            if cur <= 0.003:
+                env.pop(k, None)
+            else:
+                env[k] = cur
+                out[k] = cur
+    return out
+
+
+class KeysAnim:
+    """all the keys' models that are sounding: the renderer sends each one to its own overlay"""
+    def __init__(self):
+        self.geoms, self.tm, self.last, self.ids = [], 0.0, None, []
+
+    def frames(self, t):
+        dt = 0.0 if self.last is None else max(0.0, min(0.2, t - self.last))
+        self.last = t
+        self.tm += dt
+        levels = keys_levels(time.time(), dt)
+        index = {k: n for n, (k, _, _) in enumerate(keys_list())}
+        self.geoms, out = [], []
+        for k, lv in levels.items():
+            if k[0] == "s" or k not in key_geoms or k not in index:
+                continue
+            g = key_geoms[k]
+            st = key_setting(k, index[k])
+            buf = key_engine(k, st, g).one(0, g, self.tm, dt)
+            self.geoms.append(g)
+            out.append(mix_scale(buf, g.n, lv * st["level"]))
+        return out
+
+
+class KeySide:
+    """a side of the cube played as a key"""
+    def __init__(self, k, w, h):
+        self.k, self.w, self.h = k, w, h
+        self.g = PropGeom("side", "grid", w * h, [x / max(1, w - 1) for y in range(h) for x in range(w)],
+                          [1 - y / max(1, h - 1) for y in range(h) for x in range(w)], w, h)
+        self.lv = 0.0
+
+    def frame(self, t):
+        n = int(self.k[1:])
+        st = key_setting(self.k, n)
+        buf = key_engine(self.k, st, self.g).one(0, self.g, t, 0.05)
+        return mix_scale(buf, self.g.n, self.lv * st["level"])
+
+
+def mix_scale(buf, n, k):
+    """a frame at k brightness (0..1), then the Mixer's Master fader and Flash / Strobe / Blackout"""
+    now, hold = time.time(), MIX["hold"]
+    if hold.get("black", 0) > now:
+        return bytes(n * 3)
+    if hold.get("flash", 0) > now or (hold.get("strobe", 0) > now and int(now * 12) % 2 == 0):
+        return b"\xff" * (n * 3)
+    if hold.get("strobe", 0) > now:
+        return bytes(n * 3)
+    k = max(0.0, min(1.0, k * MIX["bright"]))
+    return bytes(buf) if k >= 0.999 else bytes(buf).translate(fade_table(k))
+
+
+keys_anim = KeysAnim()
+key_sides = {}
+
+
+def keys_items(items, t0):
+    """render_loop: the keys that are sounding go on top of everything else"""
+    with lock:
+        busy = bool(KEYS["down"] or KEYS["env"])
+    if not busy:
+        keys_anim.last = None
+        return items
+    if not key_geoms and S.get("props") and not keys_loading[0]:
+        threading.Thread(target=keys_prepare, daemon=True).start()
+    with lock:
+        env = dict(KEYS["env"]); sides = [k for k in set(KEYS["down"]) | set(env) if k[0] == "s"]
+    out = list(items) + [(KEY_BASE, {"anim": keys_anim, "t0": 0.0})]
+    for k in sides:
+        i = int(k[1:])
+        if i >= len(S["faces"]):
+            continue
+        f = S["faces"][i]
+        o = key_sides.get(k)
+        if o is None or (o.w, o.h) != (f["w"], f["h"]):
+            o = key_sides[k] = KeySide(k, f["w"], f["h"])
+        o.lv = env.get(k, 0.0)
+        if o.lv > 0 or k in KEYS["down"]:
+            out = [(n, a) for n, a in out if n != i] + [(i, {"anim": o, "t0": 0.0})]
+    return out
+
+
+def keys_state():
+    lst = keys_list()
+    with lock:
+        return {"ok": True, "keys": [dict(key_setting(k, n), k=k, n=name, g=grp, note=n) for n, (k, name, grp) in enumerate(lst)],
+                "attack": KEYS["attack"], "release": KEYS["release"], "hue": KEYS["hue"], "bright": MIX["bright"],
+                "ready": len(key_geoms), "ezpOk": ezp_state["ok"],
+                "fx": [[k, n] for k, n in PROP_FX.items()], "pals": [[k, v[0], v[1]] for k, v in PALETTES.items()]}
+
+
+def keys_action(b):
+    """note on / aftertouch / note off / settings, from the Keys page (or later from a MIDI keyboard)"""
+    a, k = b.get("a"), b.get("k")
+    now = time.time()
+    num = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)
+    with lock:
+        MIX["touched"] = now
+        if a in ("on", "after", "off", "set"):
+            if not isinstance(k, str) or k not in {x[0] for x in keys_list()}:
+                return False
+        if a == "on":
+            v = max(0.05, min(1.0, float(b["v"]))) if num(b.get("v")) else 0.8
+            KEYS["down"][k] = {"vel": v, "after": None, "seen": float("inf") if b.get("midi") else now}
+        elif a == "after":
+            d = KEYS["down"].get(k)
+            if d:
+                if num(b.get("v")):   # the page: the finger's height on the key sets how bright
+                    d["after"] = max(0.0, min(1.0, float(b["v"])))
+                d["seen"] = now
+        elif a == "off":
+            KEYS["down"].pop(k, None)
+        elif a == "allOff":
+            KEYS["down"].clear()
+        elif a == "set":
+            st = KEYS["set"].setdefault(k, {})
+            if b.get("fx") in PROP_FX:
+                st["fx"] = b["fx"]
+            if b.get("pal") in PALETTES or b.get("pal") == "":
+                st["pal"] = b["pal"]
+            for f in ("hue", "white", "level"):
+                if num(b.get(f)):
+                    st[f] = max(0.0, min(1.0, float(b[f])))
+            S["keys_set"] = KEYS["set"]
+            save()
+        elif a == "glob":
+            for f, hi in (("attack", 2.0), ("release", 4.0), ("hue", 1.0)):
+                if num(b.get(f)):
+                    KEYS[f] = max(0.0, min(hi, float(b[f])))
+            if num(b.get("bright")):
+                MIX["bright"] = max(0.0, min(1.0, float(b["bright"])))
+            S["keys_glob"] = {f: KEYS[f] for f in ("attack", "release", "hue")}
+            save()
+        else:
+            return False
+    return True
+
+
+# ------------------------------------------------------------------------------------------ MIDI ----
+# A real MIDI controller or keyboard plays the same controls as the Mixer and Keys pages. Notes play the keys (note
+# number - first note = key number) with their velocity; aftertouch makes a held key brighter; CC messages (faders,
+# knobs) and notes can be "learned" onto any control of the pages: press Learn, touch the control on the page, then
+# move or press the one on the MIDI device. Where the messages come from:
+#   - Windows: the bridge reads the MIDI devices itself (winmm, part of Windows);
+#   - Linux and Raspberry Pi: the bridge reads /dev/snd/midi* itself (the user must be in the "audio" group);
+#   - any computer (macOS included): the Mixer page in Chrome or Edge, opened at http://localhost:8099/mixer on the
+#     computer the device is plugged into, passes its messages on (Web MIDI).
+MIDI = {"devices": [], "last": "", "learn": "", "at": 0.0}
+MIDI_CC_DEFAULT = {7: "fader:bright", 1: "keys:hue"}   # volume fader -> Master, modulation wheel -> colour of the keys
+# Presets: a ready mapping for a controller. Alesis VI25, factory settings: pads = notes 36-51 on channel 10, knobs =
+# CC 20-27, keys on channel 1 (they play the Keys). If a pad does nothing, the page's MIDI monitor shows what it sends:
+# use Learn on it.
+MIDI_PRESETS = {
+    "vi25": ("Alesis VI25", dict(
+        [("n9:%d" % (36 + i), "pad:" + k) for i, k in enumerate(["flap", "wave", "rise", "spin", "breathe", "sparkle",
+                                                                   "fire", "ripple", "chase", "comet", "confetti", "solid"])] +
+        [("n9:48", "hold:flash"), ("n9:49", "hold:strobe"), ("n9:50", "hold:black"), ("n9:51", "release")] +
+        [("c0:%d" % (20 + i), c) for i, c in enumerate(["fader:bright", "fader:speed", "fader:hue", "fader:white",
+                                                        "keys:attack", "keys:release", "keys:hue", "pals:all"])])),
+}
+
+
+def midi_controls():
+    """every control a MIDI note or CC can be learned onto"""
+    c = ["fader:bright", "fader:speed", "fader:hue", "fader:white", "keys:attack", "keys:release", "keys:hue",
+         "hold:flash", "hold:strobe", "hold:black", "release", "off"]
+    c += ["pad:" + k for k in PROP_FX] + ["cube:" + k for k in FX_NAMES] + ["pal:" + k for k in PALETTES]
+    c += ["scene:%d" % n for n in range(8)] + ["pals:all"] + ["target:" + k for k, _, _, _ in mix_targets()] + ["key:" + k for k, _, _ in keys_list()]
+    return set(c)
+
+
+def midi_desc(st, d1, d2):
+    t, ch = st & 0xF0, (st & 0x0F) + 1
+    names = {0x80: "Note off %d", 0x90: "Note %d", 0xA0: "Aftertouch note %d", 0xB0: "CC %d", 0xD0: "Pressure", 0xE0: "Pitch bend"}
+    s = names.get(t, "Message %02X" % t)
+    s = s % d1 if "%d" in s else s
+    return "%s = %d (channel %d)" % (s, d1 if t == 0xD0 else d2, ch)
+
+
+def midi_press(cid, down, v=1.0):
+    """a learned control pressed (down) or let go"""
+    kind, _, arg = cid.partition(":")
+    if kind == "fader":
+        mix_action({"a": "fader", "name": arg, "v": v})
+    elif kind == "pals":   # a knob going through the palettes
+        mix_action({"a": "pal", "pal": list(PALETTES)[min(len(PALETTES) - 1, int(v * len(PALETTES)))]})
+    elif kind == "keys":
+        keys_action({"a": "glob", arg: v * (2.0 if arg == "attack" else 4.0 if arg == "release" else 1.0)})
+    elif kind == "hold":
+        with lock:
+            MIX["hold"][arg] = time.time() + (3600 if down else 0)
+            MIX["touched"] = time.time()
+    elif kind == "key":
+        if down:
+            keys_action({"a": "on", "k": arg, "v": v, "midi": True})
+        else:
+            keys_action({"a": "off", "k": arg})
+    elif not down:
+        return
+    elif kind == "pad":
+        mix_action({"a": "pad", "fx": arg})
+    elif kind == "cube":
+        mix_action({"a": "pad", "fx": "c:" + arg})
+    elif kind == "pal":
+        mix_action({"a": "pal", "pal": arg})
+    elif kind == "scene":
+        mix_action({"a": "load", "n": int(arg)})
+    elif kind == "target":
+        with lock:
+            sel = list(MIX["sel"])
+        mix_action({"a": "sel", "keys": [k for k in sel if k != arg] if arg in sel else sel + [arg]})
+    elif kind in ("release", "off"):
+        mix_action({"a": kind})
+
+
+def midi_in(st, d1=0, d2=0):
+    """one MIDI message, from the bridge's own reader or from the Mixer page"""
+    t, ch = st & 0xF0, st & 0x0F
+    if t not in (0x80, 0x90, 0xA0, 0xB0, 0xD0):
+        return
+    if t == 0x90 and d2 == 0:
+        t = 0x80
+    MIDI["last"], MIDI["at"] = midi_desc(st, d1, d2), time.time()
+    maps = S.get("midi_map") or {}
+    with lock:
+        learn = MIDI["learn"]
+    if MIDI.get("learnBase") and t == 0x90:
+        MIDI["learnBase"] = False
+        S["midi_base"] = d1
+        save()
+        log("MIDI: note %d now plays the first key" % d1)
+        return
+    if learn and t in (0x90, 0xB0):
+        key = ("n" if t == 0x90 else "c") + "%d:%d" % (ch, d1)
+        with lock:
+            maps = {k: v for k, v in maps.items() if v != learn}
+            maps[key] = learn
+            S["midi_map"] = maps
+            MIDI["learn"] = ""
+            save()
+        log("MIDI: %s is now %s" % (MIDI["last"].split(" =")[0], learn))
+        return
+    if t in (0x90, 0x80):
+        cid = maps.get("n%d:%d" % (ch, d1))
+        if cid:
+            return midi_press(cid, t == 0x90, d2 / 127)
+        lst = keys_list()
+        n = d1 - int(S.get("midi_base", 36))
+        if 0 <= n < len(lst):
+            if t == 0x90:
+                keys_action({"a": "on", "k": lst[n][0], "v": d2 / 127, "midi": True})
+            else:
+                keys_action({"a": "off", "k": lst[n][0]})
+    elif t == 0xA0:            # polyphonic aftertouch: that key brighter, up to full
+        lst = keys_list()
+        n = d1 - int(S.get("midi_base", 36))
+        if 0 <= n < len(lst):
+            midi_after(lst[n][0], d2 / 127)
+    elif t == 0xD0:            # channel pressure: every held key
+        with lock:
+            held = list(KEYS["down"])
+        for k in held:
+            midi_after(k, d1 / 127)
+    elif t == 0xB0:
+        if d1 in (120, 123):   # all sound off / all notes off
+            return keys_action({"a": "allOff"})
+        cid = maps.get("c%d:%d" % (ch, d1)) or (MIDI_CC_DEFAULT.get(d1) if not any(v == MIDI_CC_DEFAULT.get(d1) for v in maps.values()) else None)
+        if cid:
+            kind = cid.split(":")[0]
+            if kind in ("fader", "keys", "pals"):
+                midi_press(cid, True, d2 / 127)
+            else:              # a button sending CC: pressed above the middle
+                midi_press(cid, d2 >= 64, 1.0)
+
+
+def midi_after(k, p):
+    with lock:
+        d = KEYS["down"].get(k)
+        if d:
+            d["after"] = d["vel"] + p * (1 - d["vel"])
+
+
+class MidiParser:
+    """bytes from a MIDI device -> messages (running status, real-time bytes skipped)"""
+    def __init__(self):
+        self.st, self.buf = 0, []
+
+    def feed(self, data):
+        for b in data:
+            if b >= 0xF8:
+                continue
+            if b >= 0x80:
+                self.st, self.buf = (b if b < 0xF0 else 0), []
+                continue
+            if not self.st:
+                continue
+            self.buf.append(b)
+            need = 1 if self.st & 0xF0 in (0xC0, 0xD0) else 2
+            if len(self.buf) == need:
+                midi_in(self.st, self.buf[0], self.buf[1] if need == 2 else 0)
+                self.buf = []
+
+
+def midi_linux():
+    """Linux / Raspberry Pi: reads every /dev/snd/midiC*D* (a device plugged in later is found within 5 s)"""
+    import glob
+    open_ = {}
+
+    def reader(path, f):
+        p = MidiParser()
+        try:
+            while True:
+                data = os.read(f, 64)
+                if not data:
+                    break
+                p.feed(data)
+        except Exception:
+            pass
+        finally:
+            open_.pop(path, None)
+            log("MIDI: device gone (%s)" % path)
+    while True:
+        for path in sorted(glob.glob("/dev/snd/midiC*D*")):
+            if path not in open_:
+                try:
+                    f = os.open(path, os.O_RDONLY)
+                except Exception as e:
+                    if path not in MIDI.get("denied", ()):
+                        MIDI.setdefault("denied", set()).add(path)
+                        log("MIDI: cannot read %s (%s) - add the user to the audio group" % (path, e))
+                    continue
+                name = path
+                try:
+                    c, d = re.findall(r"\d+", os.path.basename(path))[:2]
+                    with open("/proc/asound/card%s/id" % c) as fid:
+                        name = fid.read().strip() + " (" + os.path.basename(path) + ")"
+                except Exception:
+                    pass
+                open_[path] = name
+                log("MIDI: reading", name)
+                threading.Thread(target=reader, args=(path, f), daemon=True).start()
+        MIDI["devices"] = sorted(open_.values())
+        time.sleep(5)
+
+
+def midi_windows():
+    """Windows: opens every MIDI input with winmm (a device plugged in later is found within 10 s)"""
+    import ctypes
+    from ctypes import wintypes
+    mm = ctypes.WinDLL("winmm")
+    PROC = ctypes.WINFUNCTYPE(None, wintypes.HANDLE, wintypes.UINT, ctypes.c_size_t, ctypes.c_size_t, ctypes.c_size_t)
+
+    class CAPS(ctypes.Structure):
+        _fields_ = [("wMid", wintypes.WORD), ("wPid", wintypes.WORD), ("vDriverVersion", wintypes.UINT),
+                    ("szPname", wintypes.WCHAR * 32), ("dwSupport", wintypes.DWORD)]
+
+    def cb(h, msg, inst, p1, p2):
+        if msg == 0x3C3:   # MIM_DATA
+            try:
+                midi_in(p1 & 0xFF, (p1 >> 8) & 0x7F, (p1 >> 16) & 0x7F)
+            except Exception:
+                pass
+    proc = PROC(cb)
+    MIDI["_proc"] = proc   # kept alive while the bridge runs
+    opened = {}
+    while True:
+        names = []
+        for i in range(mm.midiInGetNumDevs()):
+            caps = CAPS()
+            if mm.midiInGetDevCapsW(i, ctypes.byref(caps), ctypes.sizeof(caps)) != 0:
+                continue
+            name = caps.szPname
+            if name not in opened:
+                h = wintypes.HANDLE()
+                if mm.midiInOpen(ctypes.byref(h), i, proc, 0, 0x30000) == 0:   # CALLBACK_FUNCTION
+                    mm.midiInStart(h)
+                    opened[name] = h
+                    log("MIDI: reading", name)
+                elif name not in MIDI.get("busy", ()):
+                    MIDI.setdefault("busy", set()).add(name)
+                    log("MIDI: %s is in use by another program (close it, or use the Mixer page in a browser)" % name)
+            if name in opened:
+                names.append(name)
+        MIDI["devices"] = names
+        time.sleep(10)
+
+
+def midi_native():
+    if not S.get("midi_native", True):
+        return
+    try:
+        if os.name == "nt":
+            midi_windows()
+        elif os.path.isdir("/dev/snd"):
+            midi_linux()
+    except Exception as e:
+        log("MIDI: the bridge cannot read MIDI devices here (%s) - use the Mixer page in Chrome or Edge" % e)
+
+
+def midi_state():
+    maps = S.get("midi_map") or {}
+    def nice(k):
+        return ("Note %s" if k[0] == "n" else "CC %s") % k.split(":")[1] + " (channel %d)" % (int(k[1:].split(":")[0]) + 1)
+    return {"devices": MIDI["devices"], "last": MIDI["last"] if time.time() - MIDI["at"] < 30 else "", "learn": MIDI["learn"],
+            "base": int(S.get("midi_base", 36)), "native": bool(S.get("midi_native", True)), "os": "mac" if sys.platform == "darwin" else os.name,
+            "presets": [[k, v[0]] for k, v in MIDI_PRESETS.items()],
+            "map": [{"k": k, "what": nice(k), "to": v} for k, v in sorted(maps.items(), key=lambda x: x[1])]}
+
+
+def midi_action(b):
+    a = b.get("a")
+    if a == "msg":             # messages passed on by the Mixer page (Web MIDI)
+        d = b.get("d")
+        if isinstance(d, list) and 1 <= len(d) <= 3 and all(isint(x) and 0 <= x <= 255 for x in d):
+            midi_in(*(d + [0, 0])[:3])
+            return True
+        return False
+    with lock:
+        if a == "learn":
+            cid = str(b.get("id", ""))
+            MIDI["learn"] = cid if cid in midi_controls() else ""
+        elif a == "forget":
+            maps = dict(S.get("midi_map") or {})
+            maps.pop(str(b.get("k", "")), None)
+            S["midi_map"] = maps
+            save()
+        elif a == "base":
+            if isint(b.get("v")) and 0 <= b["v"] <= 127:
+                S["midi_base"] = b["v"]
+                save()
+        elif a == "learnBase":
+            MIDI["learn"] = ""
+            MIDI["learnBase"] = True
+        elif a == "preset":
+            if b.get("name") in MIDI_PRESETS:
+                S["midi_map"] = dict(S.get("midi_map") or {}, **MIDI_PRESETS[b["name"]][1])
+                if b["name"] == "vi25":
+                    S["midi_base"] = 48   # the VI25's lowest key with the octave buttons at the middle (C3)
+                save()
+                log("MIDI: preset %s loaded" % MIDI_PRESETS[b["name"]][0])
+        elif a == "clear":
+            S["midi_map"] = {}
+            save()
+        elif a == "native":
+            S["midi_native"] = bool(b.get("v"))
+            save()
+        else:
+            return False
+    return True
+
+
 # ------------------------------------------------------------------------------------ control page ----
 ADMIN = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ShowPlay</title>
@@ -1940,7 +2780,7 @@ select,input[type=number],input[type=text]{width:100%;min-height:44px;padding:8p
 pre{white-space:pre-wrap;font-size:12px;color:var(--muted);margin:0;max-height:220px;overflow:auto}.warn{color:#ffb36b}
 [hidden]{display:none!important}
 </style></head><body><main>
-<h1>ShowPlay</h1>
+<div class="row" style="justify-content:space-between"><h1>ShowPlay</h1><a class="btn" href="/mixer" style="text-decoration:none;display:inline-flex;align-items:center">🎛️ Mixer &amp; 🎹 Keys</a></div>
 <div class="card">
   <label class="big"><input type="checkbox" id="on"> Show the visitors' requests</label>
   <div class="note" id="state"></div>
@@ -2136,6 +2976,245 @@ $('test').onclick=()=>api('test',{t:$('testTxt').value||'Hello!'}).then(refresh)
 refresh();setInterval(()=>{if(!editing)refresh();},3000);
 </script></body></html>"""
 
+MIXER = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ShowPlay Mixer</title>
+<style>
+:root{--bg:#0d0a16;--card:#1a1428;--raise:#261d3a;--line:#3a2d52;--fg:#fff;--muted:#bfb3d4;--hot:#ff7a1a;--ok:#39d353;--learn:#ffd23f}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,sans-serif}
+header{position:sticky;top:0;z-index:5;background:#0d0a16ee;backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+header h1{font-size:18px;margin:0 8px 0 0}a{color:var(--muted)}
+.tab{min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--raise);color:var(--fg);font:inherit;font-weight:700;cursor:pointer}
+.tab.sel{background:var(--hot);border-color:var(--hot);color:#120b1f}.sp{flex:1}
+#learnBtn.sel{background:var(--learn);border-color:var(--learn);color:#120b1f}
+main{max-width:980px;margin:0 auto;padding:12px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.ct{font-weight:800;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.note{font-size:13px;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{min-height:40px;padding:6px 12px;border-radius:12px;border:1px solid var(--line);background:var(--raise);color:var(--fg);font:inherit;font-weight:600;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.chip.sel{outline:3px solid var(--hot);outline-offset:-1px}.dot{width:10px;height:10px;border-radius:50%;background:#4a3d60;flex:none}.dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.pads{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.pad{aspect-ratio:1;border-radius:14px;border:2px solid #2f2445;background:linear-gradient(160deg,#2b2140,#1c152b);color:var(--fg);font:inherit;font-weight:700;font-size:13px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:4px;text-align:center;touch-action:none;user-select:none;-webkit-user-select:none}
+.pad .e{font-size:26px;line-height:1}.pad.lit{border-color:var(--hot);box-shadow:0 0 14px #ff7a1a88,inset 0 0 18px #ff7a1a44}
+.pad:active,.pad.down{transform:scale(.96)}
+.pals{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+.pal{min-height:52px;border-radius:12px;border:2px solid #2f2445;color:#fff;font:inherit;font-weight:800;font-size:12px;text-shadow:0 1px 3px #000;cursor:pointer}
+.pal.lit{border-color:#fff;box-shadow:0 0 12px #fff8}
+.faders{display:flex;gap:14px;justify-content:space-around;flex-wrap:wrap}
+.fader{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:62px;border-radius:12px;padding:4px}
+.fader input{writing-mode:vertical-lr;direction:rtl;height:170px;width:44px;accent-color:var(--hot);touch-action:none}
+.fader b{font-size:12px}.fader span{font-size:12px;color:var(--muted)}
+.holds{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.hold{min-height:64px;border-radius:14px;border:2px solid #2f2445;background:#241b36;color:#fff;font:inherit;font-weight:800;font-size:16px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+.hold.down{background:#fff;color:#000}
+.scenes{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.scene{min-height:52px;border-radius:12px;border:1px dashed var(--line);background:#160f24;color:var(--muted);font:inherit;font-weight:700;cursor:pointer}
+.scene.has{border-style:solid;color:#fff;background:#2b1f45}
+.btn{min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:var(--raise);color:var(--fg);font:inherit;font-weight:700;cursor:pointer}
+.btn.primary{background:var(--hot);border-color:var(--hot);color:#120b1f}.btn.sel{background:var(--learn);color:#120b1f;border-color:var(--learn)}
+input[type=text],input[type=number],select{min-height:44px;padding:8px 12px;border-radius:12px;border:1px solid var(--line);background:var(--raise);color:var(--fg);font:inherit}
+.keys{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:6px}
+.key{position:relative;min-height:96px;border-radius:12px;border:2px solid #2f2445;background:#1c152b;color:#fff;font:inherit;font-size:11px;font-weight:700;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;overflow:hidden;padding:18px 4px 16px;text-align:center;word-break:break-word}
+.key .sw{position:absolute;left:0;right:0;top:0;height:12px}.key .no{position:absolute;right:5px;bottom:3px;font-size:10px;color:var(--muted)}
+.key .lv{position:absolute;left:0;right:0;bottom:0;background:#fff3;pointer-events:none;height:0}
+.key.down{border-color:#fff}.key.sel{outline:3px solid var(--hot)}
+.hue{background:linear-gradient(90deg,red,#ff0,lime,cyan,blue,#f0f,red);height:10px;border-radius:5px}
+[data-mid].learnable{outline:2px dashed var(--learn);outline-offset:2px}
+#bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--learn);color:#120b1f;font-weight:800;padding:10px 14px;text-align:center}
+.mono{font-family:ui-monospace,monospace;background:#000;padding:8px 10px;border-radius:10px;font-size:13px}
+.maprow{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:6px 8px}.maprow .what{flex:1}
+[hidden]{display:none!important}
+</style></head><body>
+<header><h1>🎛️ ShowPlay</h1>
+ <button class="tab sel" data-tab="mix">🎚️ Mixer</button><button class="tab" data-tab="keys">🎹 Keys</button><button class="tab" data-tab="midi">🎛️ MIDI</button>
+ <span class="sp"></span><button class="tab" id="learnBtn" title="Map a MIDI control: press this, touch a control here, then move the one on the device">🎓 Learn</button><a href="/">Control page</a></header>
+<main>
+<!-- ================= MIXER ================= -->
+<section id="t_mix" style="display:flex;flex-direction:column;gap:12px">
+ <div class="card"><div class="ct">1 · Targets</div>
+  <div class="note">Pick what to drive (tap again to unpick). Pads, colours and faders act on what is picked.</div>
+  <div class="row" id="targets"></div>
+  <div class="row"><button class="chip" id="selAll">All</button><button class="chip" id="selNone">None</button><span class="note" id="tgNote"></span></div></div>
+ <div class="card"><div class="row"><span class="ct">2 · Pads</span><span class="sp"></span><button class="chip sel" data-bank="fx">Effects</button><button class="chip" data-bank="cube">Cube scenes</button><button class="chip" data-bank="text">Text</button></div>
+  <div class="pads" id="pads"></div>
+  <div class="row" id="textRow" hidden><input type="text" id="txt" maxlength="60" placeholder="Text for the picked sides" style="flex:1;min-width:160px"><button class="btn primary" id="txtGo">Show</button></div>
+  <div class="note" id="padNote"></div></div>
+ <div class="card"><div class="ct">3 · Colours</div><div class="pals" id="pals"></div></div>
+ <div class="card"><div class="ct">4 · Faders</div><div class="faders" id="faders"></div>
+  <div class="holds"><button class="hold" data-hold="flash" data-mid="hold:flash">⚡ Flash</button><button class="hold" data-hold="strobe" data-mid="hold:strobe">💥 Strobe</button><button class="hold" data-hold="black" data-mid="hold:black">⬛ Blackout</button></div>
+  <div class="note">Hold to use. They act on everything the Mixer and the Keys are driving.</div></div>
+ <div class="card"><div class="row"><span class="ct">5 · Scenes</span><span class="sp"></span><button class="btn" id="saveMode">💾 Save to…</button></div>
+  <div class="scenes" id="scenes"></div><div class="note">A scene keeps every target that is on, with its effect, colours and faders. Tap to bring it back. To keep one: Save to…, then tap a slot (tap a full slot in Save mode to replace it).</div></div>
+ <div class="card"><div class="row"><button class="btn" id="offBtn" data-mid="off">⏹ Stop the picked</button><button class="btn primary" id="relBtn" data-mid="release">↩️ Release all</button><span class="sp"></span>
+  <label class="note">Give back after <select id="idle"><option value="5">5 min</option><option value="15">15 min</option><option value="60">1 hour</option><option value="0">never</option></select> untouched</label></div>
+  <div class="note">While the Mixer drives a target, visitors' requests and games for it wait. Release gives everything back to the visitors and the show.</div></div>
+</section>
+<!-- ================= KEYS ================= -->
+<section id="t_keys" hidden style="display:flex;flex-direction:column;gap:12px">
+ <div class="card"><div class="row"><span class="ct">Keys</span><span class="sp"></span><button class="btn sel" id="kPlay">▶ Play</button><button class="btn" id="kEdit">✏️ Edit keys</button><button class="btn" id="kAllOff">All off</button></div>
+  <div class="note" id="kNote">Each key is one model of your props (or one side of the cube). Press higher on a key to play it harder; slide up and down while holding to change it (aftertouch). On a computer keyboard, 1–0, Q–P, A–L and Z–M play the first 36 keys.</div>
+  <div class="keys" id="keys"></div></div>
+ <div class="card" id="kEditor" hidden><div class="ct" id="kEdName">Key</div>
+  <div class="note">Effect</div><div class="row" id="kFx"></div>
+  <div class="note">Colours</div><div class="row" id="kPal"></div>
+  <div class="faders" id="kFaders"></div>
+  <div class="row"><button class="btn primary" id="kTry">Hold to try</button></div></div>
+ <div class="card"><div class="ct">All keys</div><div class="faders" id="kGlob"></div></div>
+</section>
+<!-- ================= MIDI ================= -->
+<section id="t_midi" hidden style="display:flex;flex-direction:column;gap:12px">
+ <div class="card"><div class="ct">MIDI devices</div>
+  <div id="mDevs" class="note"></div>
+  <label class="row"><input type="checkbox" id="mNative" style="width:22px;height:22px"> <span>The bridge reads the MIDI devices plugged into its computer (Windows, Linux, Raspberry Pi)</span></label>
+  <div class="row"><button class="btn" id="webMidi">Use the MIDI devices of this browser</button><span class="note" id="webMidiMsg"></span></div>
+  <div class="note">On a Mac, or when the bridge cannot read the device: plug the device into this computer, open <b>http://localhost:8099/mixer</b> in Chrome or Edge and press the button above. Keep this page open while you play. Do not use both ways for the same device.</div>
+  <div class="note">Last message received:</div><div class="mono" id="mLast">—</div></div>
+ <div class="card"><div class="ct">Keys</div>
+  <div class="row"><label class="note">Note that plays the first key</label><input type="number" id="mBase" min="0" max="127" style="width:100px"><button class="btn" id="mBaseLearn">Learn: press the lowest key</button></div>
+  <div class="note">Then each note above plays the next key (models in the order of the Keys page). Velocity sets how bright, aftertouch makes a held key brighter.</div></div>
+ <div class="card"><div class="ct">Mapped controls</div>
+  <div class="row" id="mPresets"></div>
+  <div class="note">Learn: press 🎓 Learn at the top, touch any pad, colour, fader, scene, target or key on these pages, then move or press the control on the MIDI device. Faders and knobs (CC) suit faders; pads and buttons suit pads, holds and scenes. Without mapping: CC 7 (volume) = Master, CC 1 (modulation wheel) = colour of the keys.</div>
+  <div id="mMap" style="display:flex;flex-direction:column;gap:6px"></div>
+  <div class="row"><button class="btn" id="mClear">Forget all</button></div></div>
+</section>
+</main>
+<div id="bar" hidden></div>
+<script>
+const $=id=>document.getElementById(id);
+const mk=(t,p,...k)=>{const e=document.createElement(t);Object.assign(e,p||{});e.append(...k);return e;};
+const post=(p,b)=>fetch('/api/'+p,{method:'POST',headers:{'X-Cube':'1'},body:JSON.stringify(b)}).then(r=>r.json()).catch(()=>({}));
+const get=p=>fetch('/api/'+p).then(r=>r.json());
+const EMO={flap:'🦋',wave:'🌊',rise:'⬆️',spin:'🌀',breathe:'💓',sparkle:'✨',fire:'🔥',ripple:'💧',chase:'🏃',comet:'☄️',confetti:'🎉',solid:'🎨',
+ haunted:'🏚️',eyes:'👀',lightning:'⚡',firenoise:'🪄',blackhole:'🕳️',snowfall:'❄️',candy:'🍬',retro:'🎄',twinkle:'⭐',fireworks:'🎆',bursts:'💥',rainbow:'🌈',plasma:'🫧',matrix:'💻',pacifica:'🌊'};
+let tab='mix',M=null,K=null,MI=null,bank='fx',saveMode=false,learn=false,busy=0,kMode='play',kSel=null;
+const grad=c=>'linear-gradient(90deg,'+c.map(x=>'#'+x).join(',')+')';
+function throttle(fn,ms){let t=0,last=null,tm=null;return v=>{last=v;const now=Date.now();if(now-t>=ms){t=now;fn(last);}else{clearTimeout(tm);tm=setTimeout(()=>{t=Date.now();fn(last);},ms-(now-t));}};}
+// ---------- learn
+function learnable(el,id){el.dataset.mid=id;el.addEventListener('click',e=>{if(!learn)return;e.preventDefault();e.stopImmediatePropagation();post('midi',{a:'learn',id}).then(()=>bar('Now move or press the control on the MIDI device for: '+id));},true);
+ el.addEventListener('pointerdown',e=>{if(learn){e.stopImmediatePropagation();}},true);}
+function bar(t){$('bar').hidden=!t;$('bar').textContent=t||'';}
+$('learnBtn').onclick=()=>{learn=!learn;$('learnBtn').classList.toggle('sel',learn);document.querySelectorAll('[data-mid]').forEach(e=>e.classList.toggle('learnable',learn));
+ bar(learn?'Learn: touch a control on this page':'');if(!learn)post('midi',{a:'learn',id:''});};
+document.querySelectorAll('[data-mid]').forEach(e=>learnable(e,e.dataset.mid));
+// ---------- tabs
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('sel',x===b));
+ for(const t of ['mix','keys','midi'])$('t_'+t).hidden=t!==tab;refresh();});
+// ---------- MIXER
+const cur=()=>M.sel.length?M.t[M.sel[0]]:null;
+function mix(b){busy=Date.now();return post('mixer',b).then(()=>get('mixer')).then(r=>{M=r;drawMix(false);});}
+function drawMix(full){
+ $('targets').replaceChildren(...M.targets.map(t=>{const st=M.t[t.k];const c=mk('button',{className:'chip'+(M.sel.includes(t.k)?' sel':'')},mk('span',{className:'dot'+(st.on?' on':'')}),(t.kind==='side'?'🧊 ':'✨ ')+t.n+(M.loading.includes(t.k)?' …':''));
+  c.onclick=()=>{if(learn)return;const s=M.sel.includes(t.k)?M.sel.filter(x=>x!==t.k):M.sel.concat(t.k);mix({a:'sel',keys:s});};learnable(c,'target:'+t.k);return c;}));
+ $('tgNote').textContent=M.targets.length?(M.sel.length?M.sel.length+' picked':'Nothing picked'):'No sides or props yet (set them on the control page'+(M.ezpOk?'':'; props need EZPlayer')+').';
+ const s=cur();
+ if(bank==='text'){$('pads').replaceChildren();$('textRow').hidden=false;}
+ else{$('textRow').hidden=true;const list=bank==='fx'?M.fx:M.cube;
+  $('pads').replaceChildren(...list.map(([k,n])=>{const fx=bank==='fx'?k:'c:'+k;const lit=M.sel.some(x=>M.t[x].on&&M.t[x].fx===fx);
+   const p=mk('button',{className:'pad'+(lit?' lit':'')},mk('span',{className:'e',textContent:EMO[k]||'•'}),n);p.onclick=()=>{if(!learn)mix({a:'pad',fx});};learnable(p,(bank==='fx'?'pad:':'cube:')+k);return p;}));}
+ $('padNote').textContent=bank==='cube'?'Cube scenes are drawn on the sides of the cube only (props keep their effect).':bank==='text'?'Scrolls on the picked sides, in the first colour of their palette.':'Effects work on the sides of the cube and on the props.';
+ $('pals').replaceChildren(...M.pals.map(([k,n,c])=>{const b=mk('button',{className:'pal'+(s&&s.pal===k?' lit':''),textContent:n});b.style.background=grad(c);b.onclick=()=>{if(!learn)mix({a:'pal',pal:k});};learnable(b,'pal:'+k);return b;}));
+ if(full||!fadersBuilt)buildFaders();
+ setF('bright',M.bright);if(s){setF('speed',s.speed);setF('hue',s.hue);setF('white',s.white);}
+ $('scenes').replaceChildren(...M.scenes.map((n,i)=>{const b=mk('button',{className:'scene'+(n?' has':''),textContent:n||('Slot '+(i+1))});
+  b.onclick=()=>{if(learn)return;if(saveMode){const name=prompt('Name of the scene',n||'Scene '+(i+1));if(name===null)return;saveMode=false;$('saveMode').classList.remove('sel');mix({a:'save',n:i,name});}else if(n)mix({a:'load',n:i});};learnable(b,'scene:'+i);return b;}));
+ $('idle').value=String(M.idle);
+ document.querySelectorAll('[data-mid]').forEach(e=>e.classList.toggle('learnable',learn));
+}
+let fadersBuilt=false;const fEls={};
+const FAD=[['bright','Master','all'],['speed','Speed','picked'],['hue','Colour','picked'],['white','White','picked']];
+function buildFaders(){fadersBuilt=true;$('faders').replaceChildren(...FAD.map(([k,n,w])=>{const i=mk('input',{type:'range',min:0,max:1000,value:500});
+  const send=throttle(v=>post('mixer',{a:'fader',name:k,v}),70);i.oninput=()=>{busy=Date.now();send(i.value/1000);};fEls[k]=i;
+  const box=mk('div',{className:'fader'},mk('b',{textContent:n}),i,mk('span',{textContent:w}));learnable(box,'fader:'+k);return box;}));}
+function setF(k,v){if(fEls[k]&&document.activeElement!==fEls[k]&&Date.now()-busy>800)fEls[k].value=Math.round(v*1000);}
+document.querySelectorAll('[data-bank]').forEach(b=>b.onclick=()=>{bank=b.dataset.bank;document.querySelectorAll('[data-bank]').forEach(x=>x.classList.toggle('sel',x===b));drawMix(false);});
+$('selAll').onclick=()=>mix({a:'sel',keys:M.targets.map(t=>t.k)});$('selNone').onclick=()=>mix({a:'sel',keys:[]});
+$('txtGo').onclick=()=>{const t=$('txt').value.trim();if(t)mix({a:'text',t});};
+$('offBtn').onclick=()=>{if(!learn)mix({a:'off'});};$('relBtn').onclick=()=>{if(!learn)mix({a:'release'});};
+$('idle').onchange=()=>mix({a:'idle',v:+$('idle').value});
+$('saveMode').onclick=()=>{saveMode=!saveMode;$('saveMode').classList.toggle('sel',saveMode);};
+function holdBtn(el,on,off){let tm=null;const up=()=>{if(!tm)return;clearInterval(tm);tm=null;el.classList.remove('down');off();};
+ el.addEventListener('pointerdown',e=>{if(learn)return;e.preventDefault();el.setPointerCapture(e.pointerId);el.classList.add('down');on();tm=setInterval(on,400);});
+ el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);el.addEventListener('lostpointercapture',up);}
+document.querySelectorAll('[data-hold]').forEach(b=>holdBtn(b,()=>post('mixer',{a:'hold',name:b.dataset.hold,ms:900}),()=>post('mixer',{a:'hold',name:b.dataset.hold,ms:0})));
+// ---------- KEYS
+const KB='1234567890qwertyuiopasdfghjklzxcvbnm';
+const hsl=(h,w)=>{const l=50+w*50;return 'hsl('+Math.round(h*360)+',100%,'+l+'%)';};
+function kColor(k){const p=K.pals.find(x=>x[0]===k.pal);return p?grad(p[2]):hsl((k.hue+K.hue)%1,k.white);}
+function keysPost(b){busy=Date.now();return post('keys',b);}
+function drawKeys(){
+ $('kNote').hidden=false;
+ if(!K.keys.length){$('keys').replaceChildren(mk('div',{className:'note',textContent:'No keys yet: add props (and their models) or sides of the cube on the control page.'+(K.ezpOk?'':' Props need EZPlayer to be running.')}));return;}
+ $('keys').replaceChildren(...K.keys.map((k,i)=>{const sw=mk('div',{className:'sw'});sw.style.background=kColor(k);const lv=mk('div',{className:'lv'});
+  const el=mk('button',{className:'key'+(kSel===k.k&&kMode==='edit'?' sel':''),title:k.g},sw,k.n,mk('span',{className:'no',textContent:(i<36?KB[i].toUpperCase()+' · ':'')+'#'+(i+1)}),lv);
+  el.dataset.k=k.k;keyPlay(el,k,lv);learnable(el,'key:'+k.k);return el;}));
+ if(kMode==='edit'&&kSel)drawEditor();
+}
+function keyPlay(el,k,lv){let id=null,tm=null,h=0;
+ const lvl=e=>{const r=el.getBoundingClientRect();return Math.max(0.05,Math.min(1,1-(e.clientY-r.top)/r.height));};
+ el.addEventListener('pointerdown',e=>{if(learn)return;e.preventDefault();
+  if(kMode==='edit'){kSel=k.k;drawKeys();return;}
+  id=e.pointerId;el.setPointerCapture(id);h=lvl(e);el.classList.add('down');lv.style.height=(h*100)+'%';keysPost({a:'on',k:k.k,v:h});
+  tm=setInterval(()=>post('keys',{a:'after',k:k.k}),1000);});
+ const af=throttle(v=>post('keys',{a:'after',k:k.k,v}),50);
+ el.addEventListener('pointermove',e=>{if(e.pointerId!==id)return;h=lvl(e);lv.style.height=(h*100)+'%';af(h);});
+ const up=e=>{if(id===null)return;id=null;clearInterval(tm);el.classList.remove('down');lv.style.height=0;keysPost({a:'off',k:k.k});};
+ el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);el.addEventListener('lostpointercapture',up);}
+function drawEditor(){const k=K.keys.find(x=>x.k===kSel);$('kEditor').hidden=!k;if(!k)return;
+ $('kEdName').textContent='Key #'+(k.note+1)+' · '+k.n+' ('+k.g+')';
+ $('kFx').replaceChildren(...K.fx.map(([f,n])=>{const b=mk('button',{className:'chip'+(k.fx===f?' sel':''),textContent:(EMO[f]||'')+' '+n});b.onclick=()=>keysPost({a:'set',k:k.k,fx:f}).then(loadKeys);return b;}));
+ const own=mk('button',{className:'chip'+(!k.pal?' sel':''),textContent:'Own colour'});own.onclick=()=>keysPost({a:'set',k:k.k,pal:''}).then(loadKeys);
+ $('kPal').replaceChildren(own,...K.pals.map(([p,n,c])=>{const b=mk('button',{className:'chip'+(k.pal===p?' sel':''),textContent:n});b.style.background=grad(c);b.style.textShadow='0 1px 3px #000';b.onclick=()=>keysPost({a:'set',k:k.k,pal:p}).then(loadKeys);return b;}));
+ $('kFaders').replaceChildren(...[['hue','Colour'],['white','White'],['level','Level']].map(([f,n])=>{const i=mk('input',{type:'range',min:0,max:1000,value:Math.round(k[f]*1000)});
+  const send=throttle(v=>keysPost({a:'set',k:k.k,[f]:v}),120);i.oninput=()=>{k[f]=i.value/1000;send(k[f]);const el=document.querySelector('.key[data-k="'+CSS.escape(k.k)+'"] .sw');if(el)el.style.background=kColor(k);};
+  i.onchange=()=>loadKeys();return mk('div',{className:'fader'},mk('b',{textContent:n}),i,mk('span',{textContent:f==='hue'?'turn':''}));}));
+}
+holdBtn($('kTry'),()=>{if(kSel)post('keys',{a:'on',k:kSel,v:1}).then(()=>post('keys',{a:'after',k:kSel}));},()=>{if(kSel)post('keys',{a:'off',k:kSel});});
+const KG=[['bright','Master',1],['attack','Attack',2],['release','Release',4],['hue','Colour all',1]];
+function drawGlob(){$('kGlob').replaceChildren(...KG.map(([f,n,hi])=>{const i=mk('input',{type:'range',min:0,max:1000,value:Math.round((K[f]/hi)*1000)});
+  const send=throttle(v=>keysPost({a:'glob',[f]:v*hi}),80);i.oninput=()=>send(i.value/1000);i.onchange=()=>loadKeys();
+  const box=mk('div',{className:'fader'},mk('b',{textContent:n}),i,mk('span',{textContent:f==='attack'?'0–2 s':f==='release'?'0–4 s':''}));learnable(box,f==='bright'?'fader:bright':'keys:'+f);return box;}));}
+$('kPlay').onclick=()=>{kMode='play';$('kPlay').classList.add('sel');$('kEdit').classList.remove('sel');$('kEditor').hidden=true;drawKeys();};
+$('kEdit').onclick=()=>{kMode='edit';$('kEdit').classList.add('sel');$('kPlay').classList.remove('sel');drawKeys();};
+$('kAllOff').onclick=()=>keysPost({a:'allOff'});
+const kbDown=new Set();
+addEventListener('keydown',e=>{if(tab!=='keys'||kMode!=='play'||e.repeat||e.target.tagName==='INPUT'||!K)return;const i=KB.indexOf(e.key.toLowerCase());
+ if(i<0||i>=K.keys.length)return;kbDown.add(i);keysPost({a:'on',k:K.keys[i].k,v:0.85});const el=document.querySelectorAll('.key')[i];if(el)el.classList.add('down');});
+addEventListener('keyup',e=>{const i=KB.indexOf(e.key.toLowerCase());if(!kbDown.has(i)||!K)return;kbDown.delete(i);keysPost({a:'off',k:K.keys[i].k});const el=document.querySelectorAll('.key')[i];if(el)el.classList.remove('down');});
+setInterval(()=>{if(K)kbDown.forEach(i=>post('keys',{a:'after',k:K.keys[i].k}));},1000);
+let keysSig='';
+async function loadKeys(){K=await get('keys');const sig=JSON.stringify(K.keys)+K.hue;if(sig!==keysSig||!$('keys').children.length){keysSig=sig;drawKeys();}drawGlobIfIdle();}
+let globBuilt='';function drawGlobIfIdle(){const s=[K.bright,K.attack,K.release,K.hue].join();if(s!==globBuilt&&!document.querySelector('#kGlob input:active')){globBuilt=s;drawGlob();}}
+// ---------- MIDI
+async function loadMidi(){MI=await get('midi');
+ $('mDevs').textContent=MI.devices.length?'Read by the bridge: '+MI.devices.join(', '):(MI.native?(MI.os==='mac'?'On a Mac the bridge cannot read MIDI devices itself: use the browser button below.':'The bridge sees no MIDI device right now.'):'The bridge does not read MIDI devices (turned off below).');
+ $('mNative').checked=MI.native;$('mLast').textContent=MI.last||'—';if(document.activeElement!==$('mBase'))$('mBase').value=MI.base;
+ $('mPresets').replaceChildren(...MI.presets.map(([k,n])=>{const b=mk('button',{className:'btn',textContent:'Load preset: '+n});b.onclick=()=>post('midi',{a:'preset',name:k}).then(loadMidi);return b;}));
+ $('mMap').replaceChildren(...(MI.map.length?MI.map.map(m=>{const x=mk('button',{className:'btn',textContent:'✕'});x.onclick=()=>post('midi',{a:'forget',k:m.k}).then(loadMidi);
+  return mk('div',{className:'maprow'},mk('div',{className:'what',textContent:m.what+'  →  '+m.to}),x);}):[mk('div',{className:'note',textContent:'Nothing mapped yet.'})]));
+ if(learn&&!MI.learn&&$('bar').textContent.startsWith('Now')){bar('Mapped. Touch another control, or press 🎓 Learn to finish.');}
+}
+$('mNative').onchange=()=>post('midi',{a:'native',v:$('mNative').checked}).then(()=>{loadMidi();alert('Restart the bridge for this to take effect.');});
+$('mBase').onchange=()=>post('midi',{a:'base',v:+$('mBase').value|0}).then(loadMidi);
+$('mBaseLearn').onclick=()=>post('midi',{a:'learnBase'}).then(()=>bar('Press the lowest key you want to use on the MIDI keyboard'));
+$('mClear').onclick=()=>{if(confirm('Forget every mapped control?'))post('midi',{a:'clear'}).then(loadMidi);};
+// Web MIDI: the page passes on the messages of devices plugged into this computer
+$('webMidi').onclick=async()=>{
+ if(!navigator.requestMIDIAccess){$('webMidiMsg').textContent='This browser has no Web MIDI: use Chrome or Edge.';return;}
+ if(!isSecureContext){$('webMidiMsg').textContent='Browsers only allow MIDI on http://localhost: open http://localhost:8099/mixer on the computer the device is plugged into.';return;}
+ try{const acc=await navigator.requestMIDIAccess();const pend=new Map();let tm=null;
+  const flush=()=>{tm=null;pend.forEach(d=>post('midi',{a:'msg',d}));pend.clear();};
+  const hook=()=>{const names=[];acc.inputs.forEach(inp=>{names.push(inp.name);inp.onmidimessage=ev=>{const d=Array.from(ev.data);const t=d[0]&0xF0;
+   if(t===0xA0||t===0xB0||t===0xD0){pend.set(d[0]+':'+(t===0xD0?0:d[1]),d);if(!tm)tm=setTimeout(flush,25);}else if(t===0x80||t===0x90){flush();post('midi',{a:'msg',d});}};});
+   $('webMidiMsg').textContent=names.length?'Passing on: '+names.join(', '):'No MIDI device found in this browser.';};
+  hook();acc.onstatechange=hook;}catch(e){$('webMidiMsg').textContent='MIDI not allowed: '+e;}};
+// ---------- refresh
+async function refresh(){try{
+ if(tab==='mix'&&Date.now()-busy>700){M=await get('mixer');drawMix(false);}
+ if(tab==='keys'&&!document.querySelector('.key.down'))await loadKeys();
+ if(tab==='midi'||learn)await loadMidi();}catch(e){}}
+refresh();setInterval(refresh,1200);
+</script></body></html>"""
+
 URL_RE = re.compile(r"https?://[A-Za-z0-9.\-]+(:\d{1,5})?/?")
 HOST_RE = re.compile(r"[A-Za-z0-9.\-]{1,63}")
 
@@ -2251,6 +3330,16 @@ class Admin(BaseHTTPRequestHandler):
         p = self.path.split("?")[0]
         if p in ("/", "/index.html"):
             return self.send(200, ADMIN, "text/html")
+        if p in ("/mixer", "/keys"):
+            return self.send(200, MIXER, "text/html")
+        if p == "/api/mixer":
+            return self.send(200, mix_state())
+        if p == "/api/midi":
+            return self.send(200, midi_state())
+        if p == "/api/keys":
+            if S.get("props") and ezp_state["ok"] and not key_geoms:
+                threading.Thread(target=keys_prepare, daemon=True).start()
+            return self.send(200, keys_state())
         if p == "/api/state":
             with lock:
                 return self.send(200, dict(S, version=VERSION, ezpOk=ezp_state["ok"], ezpMsg=ezp_state["msg"],
@@ -2264,6 +3353,12 @@ class Admin(BaseHTTPRequestHandler):
         if self.headers.get("X-Cube") != "1":
             return self.send(403, {"error": "forbidden"})
         p, b = self.path, self.body()
+        if p == "/api/mixer":
+            return self.send(200, {"ok": mix_action(b)})
+        if p == "/api/keys":
+            return self.send(200, {"ok": keys_action(b)})
+        if p == "/api/midi":
+            return self.send(200, {"ok": midi_action(b)})
         if p == "/api/models":   # read the models from EZPlayer (with the address typed on the page, not saved yet)
             ezp = str(b.get("ezp") or S["ezp"]).strip()
             if not URL_RE.fullmatch(ezp):
@@ -2302,6 +3397,7 @@ class Admin(BaseHTTPRequestHandler):
                     if fs != S["faces"]:
                         S["faces"] = fs
                         reset_flag.set()
+                        mix_reset(); keys_reset()
                         with lock:
                             active.clear()
                 if isinstance(b.get("props"), list):
@@ -2318,6 +3414,7 @@ class Admin(BaseHTTPRequestHandler):
                     if ps != S.get("props"):
                         S["props"] = ps
                         prop_geoms.clear()
+                        mix_reset(); keys_reset()
                         threading.Thread(target=prepare_props, daemon=True).start()
                 if b.get("theme") in ("hw", "xm", "ev", ""):
                     S["theme"] = b["theme"]
@@ -2386,7 +3483,7 @@ class Admin(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     load()
     log("ShowPlay bridge %s - control page: http://%s:%d" % (VERSION, my_ip(), PORT))
-    for target in (show_loop, render_loop, listen, status_loop, ezp_watch, game_loop,
+    for target in (show_loop, render_loop, listen, status_loop, ezp_watch, game_loop, mix_watch, midi_native,
                    lambda: (time.sleep(3), ezp_targets() if S.get("props") else None, prepare_props())):
         threading.Thread(target=target, daemon=True).start()
     ThreadingHTTPServer(("0.0.0.0", PORT), Admin).serve_forever()

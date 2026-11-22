@@ -1,4 +1,4 @@
-# ShowPlay (v11)
+# ShowPlay (v12)
 
 ShowPlay lets visitors **play with the lights of a show** from their phone. They scan a QR code on the wall, and then
 they can:
@@ -6,6 +6,10 @@ they can:
 - send a message, a picture, an effect or a drawing to a **cube of LED matrices**;
 - play **Four in a Row** on the cube, against the computer or a friend;
 - light up **props of an EZPlayer show** (wings, bats, spinners…) with effects, palettes or their own colours.
+
+Whoever runs the show gets a **Mixer** (new in v12): pads, faders and scenes for the cube and the props, and **Keys**
+that play every model like the note of a keyboard. It works from a phone or tablet, and from a **real MIDI controller
+or keyboard** too (with a ready preset for the Alesis VI25).
 
 ShowPlay is made of two parts:
 
@@ -35,6 +39,7 @@ Each folder has its own complete installation guide (`INSTALL.md`) and a guide t
 | --- | --- |
 | [visitors-page/](visitors-page/) | The page visitors open from the QR code, with the 73-picture pack. It is published on the web once, whichever folder you use |
 | [docs/props.md](docs/props.md) | How the Props feature works |
+| [docs/mixer.md](docs/mixer.md) | The Mixer, Keys and MIDI controllers |
 | [CHANGELOG.md](CHANGELOG.md) | Every version, with what changed and what was tested |
 
 ShowPlay was called **Light Cube** up to v9. Settings and show codes from Light Cube carry over: see "Updating from

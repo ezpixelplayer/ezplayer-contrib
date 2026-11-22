@@ -1,4 +1,4 @@
-# ShowPlay — Installation guide for Raspberry Pi (arm64) (v11)
+# ShowPlay — Installation guide for Raspberry Pi (arm64) (v12)
 
 Visitors scan a QR code on the wall, and from their phone they send a message, a picture, an effect or a drawing
 to a cube of LED matrices, play **Four in a Row** on it, or light up **props of the show** (the wings, the bats,
@@ -319,6 +319,33 @@ Props need **EZPlayer 0.7 or newer** (its overlay API). The full explanation is 
 [../docs/props.md](../docs/props.md). The Props tab only appears for visitors while the bridge can
 reach EZPlayer.
 
+## Mixer, Keys and MIDI controllers
+
+New in v12: pads, faders and keys for **whoever runs the show**. The full guide is
+[../docs/mixer.md](../docs/mixer.md).
+
+- **Open the Mixer:** http://localhost:8099/mixer on this Pi, http://\<this-pi's-ip\>:8099/mixer
+  from a phone or tablet on the same Wi-Fi, or the **🎛️ Mixer & 🎹 Keys** button at the top of the control page.
+- **Mixer tab:**
+  - pick sides and props;
+  - start effects with the pads, change palettes with the colour pads;
+  - Master, Speed, Colour and White faders;
+  - hold Flash, Strobe or Blackout;
+  - save up to 8 scenes.
+- **Keys tab:** every model of your props (and every side) is a key. Press higher to play harder, slide while holding
+  to change it, let go to fade. Each key has its own effect and colour.
+- **Visitors:** while the Mixer drives a side or prop, visitors' requests for it wait. "Release all" gives everything
+  back, and so does the Mixer by itself after 15 minutes untouched (settable).
+- **A real MIDI controller or keyboard** plays the same controls:
+  - notes play the keys, with velocity and aftertouch;
+  - **🎓 Learn** maps any pad, knob or fader of the device onto any control of the page;
+  - the MIDI tab has a ready preset for the **Alesis VI25**.
+- **MIDI on the Raspberry Pi:** the bridge reads MIDI devices plugged into the Pi's USB by itself
+  (`/dev/snd/midi*`), with nothing to install. Plug the device in, and the MIDI tab lists it within 5 seconds. The user
+  that runs the bridge must be in the **audio** group. It is by default on Raspberry Pi OS. Check with `groups`, and if
+  `audio` is missing, run `sudo usermod -aG audio $USER`, then reboot (or `sudo systemctl restart showplay`). A
+  headless Pi needs no browser for this: play the device, and use the Mixer page from a phone to pick targets.
+
 ## Safety
 
 - **Bad words:** free text goes through a filter (English and Portuguese, and it also catches numbers used as
@@ -356,3 +383,5 @@ reach EZPlayer.
   with `journalctl -u ezplayer -n 50`.
 - **The show stutters with EZPlayer on the same Pi:** lower **Frames per second sent to the lights** to 10 (see "Keep
   it smooth on a Pi").
+- **The MIDI tab shows no device:** `ls /dev/snd/midi*` must list it, and `groups` must include `audio` (see "Mixer, Keys and MIDI controllers").
+- **The Mixer page does not open from a phone:** it uses the same port as the control page (8099), so the same network and firewall rules apply.

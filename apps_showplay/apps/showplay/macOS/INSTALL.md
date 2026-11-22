@@ -1,4 +1,4 @@
-# ShowPlay — Installation guide for macOS (v11)
+# ShowPlay — Installation guide for macOS (v12)
 
 Visitors scan a QR code on the wall, and from their phone they send a message, a picture, an effect or a drawing
 to a cube of LED matrices, play **Four in a Row** on it, or light up **props of the show** (the wings, the bats,
@@ -249,6 +249,33 @@ Props need **EZPlayer 0.7 or newer** (its overlay API). The full explanation is 
 [../docs/props.md](../docs/props.md). The Props tab only appears for visitors while the bridge can
 reach EZPlayer.
 
+## Mixer, Keys and MIDI controllers
+
+New in v12: pads, faders and keys for **whoever runs the show**. The full guide is
+[../docs/mixer.md](../docs/mixer.md).
+
+- **Open the Mixer:** http://localhost:8099/mixer on this Mac, http://\<this-mac's-ip\>:8099/mixer
+  from a phone or tablet on the same Wi-Fi, or the **🎛️ Mixer & 🎹 Keys** button at the top of the control page.
+- **Mixer tab:**
+  - pick sides and props;
+  - start effects with the pads, change palettes with the colour pads;
+  - Master, Speed, Colour and White faders;
+  - hold Flash, Strobe or Blackout;
+  - save up to 8 scenes.
+- **Keys tab:** every model of your props (and every side) is a key. Press higher to play harder, slide while holding
+  to change it, let go to fade. Each key has its own effect and colour.
+- **Visitors:** while the Mixer drives a side or prop, visitors' requests for it wait. "Release all" gives everything
+  back, and so does the Mixer by itself after 15 minutes untouched (settable).
+- **A real MIDI controller or keyboard** plays the same controls:
+  - notes play the keys, with velocity and aftertouch;
+  - **🎓 Learn** maps any pad, knob or fader of the device onto any control of the page;
+  - the MIDI tab has a ready preset for the **Alesis VI25**.
+- **MIDI on the Mac:** the bridge cannot read MIDI devices by itself on macOS, so the Mixer page passes them on.
+  Plug the device into the Mac, open **http://localhost:8099/mixer** in **Chrome or Edge** (Safari has no Web MIDI),
+  go to the MIDI tab and press **Use the MIDI devices of this browser**, then allow MIDI when the browser asks. Keep that
+  tab open while you play: other phones can still use the Mixer at the same time. Browsers allow MIDI only on
+  `localhost`, so this must be done on the Mac itself, not from another computer.
+
 ## Safety
 
 - **Bad words:** free text goes through a filter (English and Portuguese, and it also catches numbers used as
@@ -288,3 +315,5 @@ reach EZPlayer.
 - **After updating `showplay_bridge.py`:** open `remove_autostart.command`, then `install_autostart.command`.
 - **See what the bridge is doing (auto-start):** open `~/Library/Logs/ShowPlay/bridge.log`, or look at the log at the
   bottom of the control page.
+- **MIDI does nothing on the Mac:** use Chrome or Edge at http://localhost:8099/mixer, press "Use the MIDI devices of this browser" and keep that tab open.
+- **The Mixer page does not open from a phone:** it uses the same port as the control page (8099), so the same network and firewall rules apply.

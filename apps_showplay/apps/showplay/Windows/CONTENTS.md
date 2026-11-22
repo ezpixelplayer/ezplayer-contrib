@@ -1,6 +1,6 @@
 # ShowPlay for Windows — What is in this folder
 
-Every file of the `Windows` folder of ShowPlay v11, what it is for, and whether you need to change it, plus the parts
+Every file of the `Windows` folder of ShowPlay v12, what it is for, and whether you need to change it, plus the parts
 shared with the other versions. To install and set it up, see [INSTALL.md](INSTALL.md).
 
 ```
@@ -40,6 +40,7 @@ Windows/
 | `../README.md` | A short introduction to ShowPlay and which folder to use. |
 | `../CHANGELOG.md` | Every version of ShowPlay, newest first, with what was added, what changed, what was fixed and how it was tested. |
 | `../docs/props.md` | How the Props feature works, step by step: what visitors pick, setting up props, how the effects are drawn and sent to EZPlayer, effects and palettes, troubleshooting. |
+| `../docs/mixer.md` | The Mixer, Keys and MIDI controllers (new in v12): every tab, the Alesis VI25 preset, how the Mixer works with the visitors, the settings, the controls and the API, troubleshooting. |
 
 ## The bridge — the program that runs on the PC
 
@@ -64,7 +65,8 @@ python.exe to PATH" ticked) and nothing else.
   - times, approval and free text;
   - games;
   - QR codes;
-  - log.
+  - log;
+  - a button to the Mixer.
 - **Show channel:** listens on ntfy.sh for visitors' requests and checks every one of them:
   - only known values are accepted;
   - free text goes through a bad-word filter;
@@ -78,6 +80,13 @@ python.exe to PATH" ticked) and nothing else.
   bats, spinners…) through EZPlayer overlays.
 - **Four in a Row:** keeps the game, plays as the computer (Easy, Normal or Hard) and posts the board for the phones.
 - **Status:** tells the visitors' page what is available (sides, sizes, theme, games, props), using the show code.
+- **Mixer and Keys** (new in v12): a second page, `/mixer`, for whoever runs the show.
+  - pads, palettes, faders, hold buttons and 8 scenes drive sides and props live;
+  - Keys play each model like a note, with velocity, aftertouch, attack and release;
+  - while the Mixer drives a target, visitors' requests for it wait; it gives everything back after a set time
+    untouched.
+- **MIDI** (new in v12): reads MIDI devices itself (winmm).
+  Notes play the keys, Learn maps any note or CC onto any control, and there is a preset for the Alesis VI25.
 
 ## ../visitors-page/ — the page visitors open from the QR code (shared)
 
