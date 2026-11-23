@@ -94,6 +94,20 @@ h1 { margin: 4px 0 0; font-size: 30px; line-height: 1.15; }
 .pcols { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .pcols button { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; font-size: 18px; }
 .pcols button[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 10px #fff8; }
+.fsub { display: flex; flex-direction: column; gap: 12px; }
+.bigbtn { width: 150px; height: 150px; border-radius: 50%; border: 6px solid #fff3; background: radial-gradient(circle at 35% 30%, #ffe27a, #e0a000); font: 800 56px/1 system-ui, sans-serif; cursor: pointer; display: block; margin: 6px auto; box-shadow: 0 6px 24px #e0a00055; }
+.bigbtn.snow { background: radial-gradient(circle at 35% 30%, #d8f2ff, #4a9fe0); box-shadow: 0 6px 24px #4a9fe055; }
+.bigbtn:active, .bigbtn.ring { animation: ring .5s ease; }
+@keyframes ring { 0% { transform: rotate(0); } 25% { transform: rotate(-16deg); } 50% { transform: rotate(14deg); } 75% { transform: rotate(-8deg); } 100% { transform: rotate(0); } }
+.pbn { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 1px; background: #0006; padding: 2px; border-radius: 10px; max-width: 340px; width: 100%; margin: 0 auto; touch-action: manipulation; }
+.pbn div { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font: 700 9px/1 system-ui, sans-serif; color: #0009; cursor: pointer; }
+.pbn div.bg { background: #111; cursor: default; }
+.opts4 { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.opts4 button { min-height: 54px; border-radius: 14px; border: 2px solid var(--line); background: var(--raise); color: var(--fg); font: 700 16px/1.2 system-ui, sans-serif; cursor: pointer; padding: 6px 10px; }
+.opts4 button.right { border-color: #39d353; background: #1f5c2e; }
+.opts4 button.wrong { border-color: #ff5a5a; background: #5c1f1f; }
+.opts4 button.mine { box-shadow: 0 0 0 3px var(--hot) inset; }
+.clue { font: 800 18px/1.35 system-ui, sans-serif; text-align: center; }
 .advc { text-align: center; font-size: 17px; font-weight: 800; }
 .doors { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
 .doors button { aspect-ratio: 1; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--fg); font: 800 16px/1.1 system-ui, sans-serif; cursor: pointer; padding: 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
@@ -109,7 +123,7 @@ h1 { margin: 4px 0 0; font-size: 30px; line-height: 1.15; }
 .tabs button { min-height: 52px; border: 0; border-radius: 14px; background: none; color: var(--muted); font: inherit; font-weight: 700; font-size: 15px; padding: 0 2px; cursor: pointer; }
 .tabs button[aria-selected="true"] { background: var(--raise); color: var(--fg); }
 .lab { font-size: 15px; color: var(--muted); font-weight: 600; }
-input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-size: 19px; }
+input[type=text], input[type=search], input[type=number] { width: 100%; min-height: 52px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-size: 19px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { min-height: 48px; padding: 8px 16px; border-radius: 999px; border: 2px solid var(--line); background: var(--raise); color: var(--fg); font: inherit; font-weight: 600; cursor: pointer; }
 .chip[aria-pressed="true"] { border-color: var(--hot); }
@@ -165,6 +179,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
     <button type="button" role="tab" aria-selected="false" data-tab="sing" id="singTab" hidden>🎤 Sing</button>
     <button type="button" role="tab" aria-selected="false" data-tab="adv" id="advTab" hidden>📅 Advent</button>
     <button type="button" role="tab" aria-selected="false" data-tab="tree" id="treeTab" hidden>🎄 Tree</button>
+    <button type="button" role="tab" aria-selected="false" data-tab="fun" id="funTab" hidden>🎁 Fun</button>
   </div>
 
   <section class="card" id="pText">
@@ -285,11 +300,59 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
     <button class="btn primary" type="button" id="tHang">Hang my bauble</button>
   </section>
 
+  <section class="card" id="pFun" hidden>
+    <div class="lab">🎁 Fun</div>
+    <div class="gpick" id="fPick"></div>
+    <div class="fsub" id="fPhoto" hidden>
+      <p class="note">Get your camera ready! Pick a frame: the lights count 3-2-1, flash, and hold the frame for your photo.</p>
+      <div class="gpick" id="phFrames"></div>
+      <button class="btn primary" type="button" id="phGo">📸 Take a photo</button>
+    </div>
+    <div class="fsub" id="fWheel" hidden>
+      <p class="note">Spin the wheel on the lights and see what you win!</p>
+      <div class="treebox"><svg id="whSvg" viewBox="-52 -56 104 110" role="img" aria-label="The wheel"></svg></div>
+      <button class="btn primary" type="button" id="whGo">🎰 Spin!</button>
+    </div>
+    <div class="fsub" id="fAnimal" hidden>
+      <p class="note">Pick an animal and watch it walk across the lights!</p>
+      <div class="gpick" id="anList"></div>
+      <button class="btn primary" type="button" id="anGo">🐾 Send it</button>
+    </div>
+    <div class="fsub" id="fPaint" hidden>
+      <p class="note">Pick a drawing, pick a colour and tap the areas. The numbers show the colours we suggest, but you can choose any!</p>
+      <div class="gpick" id="pbList"></div>
+      <div class="pbn" id="pbGrid"></div>
+      <div class="swatches" id="pbCols"></div>
+      <button class="btn primary" type="button" id="pbGo">🖍️ Show it on the lights</button>
+    </div>
+    <div class="fsub" id="fBell" hidden>
+      <p class="note" style="text-align:center">Tap the bell to ring it at the show!</p>
+      <button class="bigbtn" type="button" id="beGo" aria-label="Ring the bell">🔔</button>
+    </div>
+    <div class="fsub" id="fSnow" hidden>
+      <p class="note" style="text-align:center">Make it snow at the show!</p>
+      <button class="bigbtn snow" type="button" id="snGo" aria-label="Let it snow">❄️</button>
+    </div>
+    <div class="fsub" id="fHunt" hidden>
+      <div class="advc" id="huHead"></div>
+      <div class="clue" id="huClue"></div>
+      <div id="huBox"></div>
+      <button class="btn primary" type="button" id="huGo">Answer</button>
+      <button class="btn" type="button" id="huReset" style="min-height:40px">Start again</button>
+    </div>
+    <div class="fsub" id="fSong" hidden>
+      <div class="advc" id="soHead"></div>
+      <div class="opts4" id="soOpts"></div>
+      <div class="gbtns" id="soBtns"></div>
+    </div>
+    <div class="gstat" id="fStat" role="status"></div>
+  </section>
+
   <button class="btn primary" type="button" id="send">Show it on the lights!</button>
   <p class="msg" id="msg" role="status"></p>
   <p class="note" id="waitNote" hidden></p>
 </main>
-<script src="gifmaker.js?v=23"></script>
+<script src="gifmaker.js?v=24"></script>
 <script>
 (() => {
 	const $ = id => document.getElementById(id);
@@ -354,17 +417,18 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 
 	// ---- tabs ----
 	let tab = 'text';
-	const panes = { text: $('pText'), gif: $('pGif'), fx: $('pFx'), draw: $('pDraw'), game: $('pGame'), prop: $('pProp'), play: $('pPlay'), sing: $('pSing'), adv: $('pAdv'), tree: $('pTree') };
+	const panes = { text: $('pText'), gif: $('pGif'), fx: $('pFx'), draw: $('pDraw'), game: $('pGame'), prop: $('pProp'), play: $('pPlay'), sing: $('pSing'), adv: $('pAdv'), tree: $('pTree'), fun: $('pFun') };
 	$('tabs').querySelectorAll('button').forEach(b => b.onclick = () => {
 		tab = b.dataset.tab;
 		$('tabs').querySelectorAll('button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
 		Object.entries(panes).forEach(([k, p]) => p.hidden = k !== tab);
-		$('send').hidden = ['game', 'play', 'sing', 'adv', 'tree'].includes(tab); $('waitNote').hidden = ['game', 'play', 'sing', 'adv', 'tree'].includes(tab) || !WAIT_MS;
+		$('send').hidden = ['game', 'play', 'sing', 'adv', 'tree', 'fun'].includes(tab); $('waitNote').hidden = ['game', 'play', 'sing', 'adv', 'tree', 'fun'].includes(tab) || !WAIT_MS;
 		if (tab === 'game') gameOpen();
 		if (tab === 'play') playOpen();
 		if (tab === 'sing') singOpen();
 		if (tab === 'adv') advDraw();
 		if (tab === 'tree') treeOpen();
+		if (tab === 'fun') funOpen();
 		say('');
 	});
 
@@ -1378,11 +1442,183 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		setInterval(() => { if (tab === 'tree') treeDraw(); }, 1000);
 	}
 
+	// ---- 🎁 Fun (v24): photo frame, wheel, animal, paint by numbers, bell, snow, treasure hunt, guess the song ----
+	const FUNS = { photo: ['📸', 'Photo frame'], wheel: ['🎰', 'Wheel'], animal: ['🐾', 'Animals'], paint: ['🖍️', 'Paint'],
+		bell: ['🔔', 'Bell'], snow: ['🌨️', 'Snow'], hunt: ['🔦', 'Treasure hunt'], song: ['🎶', 'Guess the song'] };
+	const FPANE = { photo: 'fPhoto', wheel: 'fWheel', animal: 'fAnimal', paint: 'fPaint', bell: 'fBell', snow: 'fSnow', hunt: 'fHunt', song: 'fSong' };
+	const PBT = {"tree":{"n":"Tree","e":"🎄","g":[".......11.......","......1111......",".......22.......","......2222......",".....223222.....","....22222222....","....22224222....","...2222222222...","...2322222232...","..222222222222..","..222242222422..",".22222222222222.",".......55.......",".......55.......","6666666666666666","6666666666666666"],"c":{"1":4,"2":5,"3":2,"4":6,"5":3,"6":1}},"star":{"n":"Star","e":"⭐","g":[".......11.......",".......11.......","......1111......","......1111......","1111111111111111",".11111222211111.","..111122221111..","...1112222111...","....11222211....","....11111111....","...1111..1111...","...111....111...","..111......111..","..11........11..",".11..........11.","................"],"c":{"1":4,"2":3}},"snowman":{"n":"Snowman","e":"⛄","g":["......1111......","......1111......",".....111111.....","......2222......",".....222222.....",".....224222.....","......2222......",".....555555.....","....33333333....","...3333633333...","...3333333333...","...3333633333...","...3333333333...","....33333333....",".....333333.....","................"],"c":{"1":7,"2":1,"3":1,"4":3,"5":2,"6":6}},"present":{"n":"Present","e":"🎁","g":["................","....33....33....","...3333..3333...","....33333333....","......3333......","..111112211111..","..111112211111..","..111112211111..","..111112211111..","..222222222222..","..111112211111..","..111112211111..","..111112211111..","..111112211111..","..111112211111..","................"],"c":{"1":2,"2":4,"3":5}},"bauble":{"n":"Bauble","e":"🔴","g":[".......33.......",".......33.......","......3333......","......1111......","....11111111....","...1111111111...","..111111111111..","..111111111111..","..222222222222..","..222222222222..","..222222222222..","..111111111111..","..111111111111..","...1111111111...","....11111111....","......1111......"],"c":{"1":2,"2":4,"3":1}},"bell":{"n":"Bell","e":"🔔","g":[".....33..33.....",".....333333.....",".......33.......","......1111......","......1111......",".....111111.....",".....111111.....","....11111111....","....11111111....","...1111111111...","...1111111111...",".11111111111111.",".11111111111111.",".......22.......",".......22.......","................"],"c":{"1":4,"2":3,"3":2}}};
+	let F = { on: [] }, fES = null, fCur = '', fNoteN = 0, fGot = 0, phF = '', anA = '', pbT = 'tree', pbCol = 2, pbFill = {}, soPick = -1, soFor = '';
+	const fSend = (o, low) => relayPost(RELAY + TOPIC, { method: 'POST', body: JSON.stringify(Object.assign({ p: PID, tag: TAG }, o)) }, low || 0);
+	const fStat = t => { $('fStat').textContent = t || ''; };
+	function funPick() {
+		const on = (cfg.fun || []).filter(k => FUNS[k]);
+		if (!on.includes(fCur)) fCur = on[0] || '';
+		$('fPick').replaceChildren(...on.map(k => { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed', String(k === fCur));
+			const e = document.createElement('span'); e.className = 'e'; e.textContent = FUNS[k][0]; b.append(e, FUNS[k][1]); b.onclick = () => { fCur = k; fStat(''); funPick(); }; return b; }));
+		$('fPick').hidden = on.length < 2;
+		for (const [k, id] of Object.entries(FPANE)) $(id).hidden = k !== fCur;
+		funDraw();
+	}
+	function chooser(box, list, cur, set) {
+		box.replaceChildren(...list.map(([k, n, e]) => { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed', String(k === cur));
+			if (e) { const s = document.createElement('span'); s.className = 'e'; s.textContent = e; b.append(s); } b.append(n); b.onclick = () => { set(k); funDraw(); }; return b; }));
+	}
+	function funDraw() {
+		if (fCur === 'photo') { const fr = F.ph || []; if (!fr.some(f => f[0] === phF)) phF = (fr[0] || [''])[0];
+			const EM = { snow: '❄️', hearts: '💖', stars: '⭐', santa: '🎅', rainbow: '🌈' }; chooser($('phFrames'), fr.map(([k, n]) => [k, n, EM[k]]), phF, k => { phF = k; }); }
+		if (fCur === 'wheel') wheelDraw();
+		if (fCur === 'animal') { const al = F.an || []; if (!al.some(a => a[0] === anA)) anA = (al[0] || [''])[0]; chooser($('anList'), al.map(([k, n, e]) => [k, n, e]), anA, k => { anA = k; }); }
+		if (fCur === 'paint') pbDraw();
+		if (fCur === 'snow') { const sn = F.sn; $('snGo').disabled = !sn || sn.busy || !sn.hours || sn.left <= 0;
+			fStat(!sn ? '' : sn.busy ? '❄️ It is snowing right now!' : !sn.hours ? 'Snow is open from ' + sn.from + ':00 to ' + sn.to + ':00.' : sn.left <= 0 ? 'No more snow tonight. Come back tomorrow!' :
+				sn.next > 0 ? 'The snow machine is resting. Try again in about ' + Math.ceil((sn.next - (Date.now() - fGot) / 1000) / 10) * 10 + ' s.' : 'Tap the snowflake!'); }
+		if (fCur === 'hunt') huDraw();
+		if (fCur === 'song') soDraw();
+	}
+	function wheelDraw() {
+		const svg = $('whSvg'), ns = 'http://www.w3.org/2000/svg', sl = F.wh || [], n = sl.length || 1;
+		svg.replaceChildren();
+		sl.forEach(([lab, col], i) => {
+			const a0 = i / n * 2 * Math.PI - Math.PI / 2, a1 = (i + 1) / n * 2 * Math.PI - Math.PI / 2, R = 48;
+			const p = document.createElementNS(ns, 'path');
+			p.setAttribute('d', `M0 0 L${R * Math.cos(a0)} ${R * Math.sin(a0)} A${R} ${R} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${R * Math.cos(a1)} ${R * Math.sin(a1)} Z`);
+			p.setAttribute('fill', '#' + col); p.setAttribute('stroke', '#fff'); p.setAttribute('stroke-width', '0.8'); svg.append(p);
+			const am = (a0 + a1) / 2, t = document.createElementNS(ns, 'text');
+			t.setAttribute('x', 30 * Math.cos(am)); t.setAttribute('y', 30 * Math.sin(am)); t.setAttribute('font-size', n > 8 ? '4.2' : '5'); t.setAttribute('text-anchor', 'middle');
+			t.setAttribute('dominant-baseline', 'middle'); t.setAttribute('fill', col === 'ffffff' || col === 'ffd23f' ? '#222' : '#fff'); t.setAttribute('font-weight', '700');
+			t.setAttribute('transform', `rotate(${am * 180 / Math.PI + (Math.cos(am) < 0 ? 180 : 0)} ${30 * Math.cos(am)} ${30 * Math.sin(am)})`); t.textContent = lab.length > 11 ? lab.slice(0, 10) + '…' : lab; svg.append(t);
+		});
+		const ptr = document.createElementNS(ns, 'polygon'); ptr.setAttribute('points', '-5,-55 5,-55 0,-45'); ptr.setAttribute('fill', '#fff'); svg.append(ptr);
+	}
+	function pbDraw() {
+		const T = PBT[pbT];
+		chooser($('pbList'), Object.entries(PBT).map(([k, v]) => [k, v.n, v.e]), pbT, k => { pbT = k; pbFill = {}; });
+		const cells = [], seen = {};
+		T.g.forEach((row, y) => [...row].forEach((ch, x) => {
+			const d = document.createElement('div');
+			if (ch === '.') d.className = 'bg';
+			else {
+				d.style.background = pbFill[ch] !== undefined ? '#' + PAL[pbFill[ch]] : '#e8e8e8';
+				if (!seen[ch] && pbFill[ch] === undefined) { seen[ch] = 1; d.textContent = T.c[ch]; }
+				d.onclick = () => { pbFill[ch] = pbCol; pbDraw(); };
+			}
+			cells.push(d);
+		}));
+		$('pbGrid').replaceChildren(...cells);
+		$('pbCols').replaceChildren(...PAL.slice(1).map((h, i) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'sw'; b.style.background = '#' + h;
+			b.style.position = 'relative'; b.textContent = i + 1; b.style.color = '#0009'; b.style.fontWeight = '800';
+			b.setAttribute('aria-label', 'Colour ' + (i + 1)); b.setAttribute('aria-pressed', String(i + 1 === pbCol)); b.onclick = () => { pbCol = i + 1; pbDraw(); }; return b; }));
+		const regs = new Set(T.g.join('').replace(/\./g, '')); $('pbGo').disabled = closed;
+		fStat(Object.keys(pbFill).length >= regs.size ? 'All coloured! Send it to the lights.' : 'Coloured ' + Object.keys(pbFill).length + ' of ' + regs.size + ' areas.');
+	}
+	function pbPicture() {               // the drawing at the size of the side, with an area number for each pixel
+		const [w, h] = sizeNow(), T = PBT[pbT], s = Math.min(w, h) / 16, ox = Math.floor((w - 16 * s) / 2), oy = Math.floor((h - 16 * s) / 2);
+		const ids = {}, px = [], rg = []; let nid = 0;
+		for (const ch of T.g.join('')) if (ch !== '.' && !ids[ch]) ids[ch] = '123456789abcdefghijklmnopqrstuvwxyz'[nid++];
+		for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+			const gx = Math.floor((x - ox) / s), gy = Math.floor((y - oy) / s), ch = gx >= 0 && gx < 16 && gy >= 0 && gy < 16 ? T.g[gy][gx] : '.';
+			if (ch === '.') { px.push(0); rg.push('0'); } else { px.push(pbFill[ch] !== undefined ? pbFill[ch] : +T.c[ch]); rg.push(ids[ch]); }
+		}
+		return { w, h, px: px.join(''), r: rg.join('') };
+	}
+	let huAt = 0;
+	const huKey = () => 'cubeHunt' + (F.hv || '');
+	const huDone = () => { try { return JSON.parse(localStorage.getItem(huKey()) || '[]'); } catch (e) { return []; } };
+	function huDraw() {
+		const cl = F.hu || [], done = huDone(), i = cl.findIndex((c, k) => !done.includes(k));
+		$('huReset').hidden = !done.length;
+		if (!cl.length) return;
+		if (i < 0) { $('huHead').textContent = '🏆 Treasure found!'; $('huClue').textContent = 'You solved all ' + cl.length + ' clues. Well done!'; $('huBox').replaceChildren(); $('huGo').hidden = true; return; }
+		$('huGo').hidden = false; $('huGo').disabled = closed;
+		if (huAt !== i || !$('huBox').firstChild) {
+			huAt = i; $('huHead').textContent = '🔦 Clue ' + (i + 1) + ' of ' + cl.length; $('huClue').textContent = cl[i][0];
+			let el;
+			if (cl[i][1] === 'prop') { el = document.createElement('div'); el.className = 'chips';
+				(cfg.props || []).forEach((p, k) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = (p.e || '✨') + ' ' + p.n; b.dataset.v = k;
+					b.onclick = () => { el.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true'); }; el.append(b); });
+			} else { el = document.createElement('input'); el.className = 'txt'; el.type = cl[i][1] === 'number' ? 'number' : 'text'; el.inputMode = cl[i][1] === 'number' ? 'numeric' : 'text'; el.maxLength = 30; el.placeholder = 'Your answer'; el.style.width = '100%'; }
+			$('huBox').replaceChildren(el);
+		}
+	}
+	$('huGo').onclick = async () => {
+		const box = $('huBox').firstChild; if (!box) return;
+		const a = box.tagName === 'INPUT' ? box.value.trim() : (box.querySelector('[aria-pressed=true]') || {}).dataset?.v;
+		if (a === undefined || a === '') { say('Write or pick your answer first.', 'err'); return; }
+		try { await fSend({ k: 'hunt', i: huAt, a: String(a) }); fStat('Checking…'); } catch (e) { sayErr(e); }
+	};
+	$('huReset').onclick = () => { try { localStorage.removeItem(huKey()); } catch (e) {} huAt = -1; huDraw(); fStat(''); };
+	function soDraw() {
+		const q = F.so || { st: 'idle' }, me = (q.pl || []).indexOf(TAG), left = Math.max(0, q.left - Math.floor((Date.now() - fGot) / 1000));
+		const btn = (t, f, pri) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn' + (pri ? ' primary' : ''); b.textContent = t; b.onclick = f; return b; };
+		$('soOpts').replaceChildren(); $('soBtns').replaceChildren();
+		if (soFor !== q.id + ':' + q.n) { soFor = q.id + ':' + q.n; soPick = -1; }
+		if (q.st === 'idle' || (q.st === 'over' && me < 0)) {
+			$('soHead').textContent = '🎶 Guess the song'; fStat('Listen to a few seconds of a song at the show and pick its title. Up to 8 players!');
+			$('soBtns').append(btn('Start a round', () => fSend({ k: 'song', a: 'new' }).then(() => fStat('Starting…')).catch(sayErr), true));
+		} else if (q.st === 'lobby') {
+			$('soHead').textContent = '🎶 Players: ' + q.pl.length + ' / 8';
+			fStat(me >= 0 ? 'You are in! The round starts in ' + left + ' s.' : 'A round starts in ' + left + ' s. Join now!');
+			if (me < 0) $('soBtns').append(btn('Join the round', () => fSend({ k: 'song', a: 'join', id: q.id }).then(() => fStat('Joining…')).catch(sayErr), true));
+		} else if (q.st === 'question' || q.st === 'reveal') {
+			$('soHead').textContent = '🎶 Song ' + q.n + ' of ' + q.of + (q.st === 'question' ? ' · ' + left + ' s' : '');
+			q.opts.forEach((t, i) => { const b = btn(t, () => { if (me < 0 || soPick >= 0 || q.st !== 'question') return; soPick = i; fSend({ k: 'song', a: 'ans', id: q.id, n: q.n, c: i }).catch(sayErr); soDraw(); });
+				if (q.st === 'reveal') b.className = i === q.right ? 'right' : i === soPick ? 'wrong' : ''; if (i === soPick) b.classList.add('mine'); $('soOpts').append(b); });
+			fStat(me < 0 ? 'A round is on. You can play in the next one!' : q.st === 'reveal' ? (soPick === q.right ? '🎉 Right!' : 'It was: ' + q.opts[q.right]) : soPick >= 0 ? 'Answer sent. Wait for the others…' : 'Listen and pick the title!');
+		} else if (q.st === 'over') {
+			const order = q.pl.map((t, i) => [t, q.sc[i]]).sort((a, b) => b[1] - a[1]), pos = order.findIndex(x => x[0] === TAG);
+			$('soHead').textContent = '🏆 Round over'; fStat((pos === 0 ? '🥇 You won' : pos === 1 ? '🥈 Second place' : pos === 2 ? '🥉 Third place' : 'Place ' + (pos + 1)) + ' with ' + order[pos][1] + ' points!');
+			$('soBtns').append(btn('Play again', () => fSend({ k: 'song', a: 'new' }).catch(sayErr), true));
+		}
+	}
+	const FWHY = { closed: 'This is closed right now.', 'bad request': 'That did not work. Please try again.', size: 'Pick one side at the top for your painting.',
+		hours: 'Snow is not open at this time.', snowing: 'It is snowing already!', night: 'No more snow tonight. Come back tomorrow!', busy: 'A round is already on.',
+		'cannot join': 'You cannot join this round now.', full: 'The round is full (8 players).', late: 'Too late for that one!' };
+	function fNotes(st) {
+		for (const n of (st.notes || [])) {
+			if (n.tag !== TAG || n.n <= fNoteN) continue;
+			fNoteN = n.n;
+			if (n.k === 'hunt' && n.why === 'right') { const d = huDone(); if (!d.includes(n.i)) d.push(n.i); try { localStorage.setItem(huKey(), JSON.stringify(d)); } catch (e) {}
+				say(n.last ? '🏆 You found the treasure! Watch the lights!' : '✅ Right! Watch the lights, then the next clue.', 'ok'); huAt = -1; continue; }
+			if (n.k === 'hunt' && n.why === 'wrong') { say('❌ Not quite. Try again!', 'err'); fStat(''); continue; }
+			if (n.why === 'ok') { say(n.k === 'snow' ? '❄️ Let it snow! Watch the show!' : 'On its way to the lights! Watch the show ✨', 'ok'); continue; }
+			if (n.why.startsWith('wait ')) { say('You can do this again in ' + n.why.slice(5) + ' s.', 'err'); continue; }
+			say(FWHY[n.why] || 'That did not work (' + n.why + ').', 'err');
+		}
+	}
+	function fApply(st) {
+		if (!st || (F.v && st.v < F.v)) return;
+		F = st; fGot = Date.now(); fNotes(st);
+		if (tab === 'fun') funDraw();
+	}
+	$('phGo').onclick = () => { if (closed) { say('The lights are not taking requests right now.', 'err'); return; } fSend({ k: 'photo', f: phF, z: face }).then(() => fStat('Sent! Get ready for 3-2-1…')).catch(sayErr); };
+	$('whGo').onclick = () => { if (closed) { say('The lights are not taking requests right now.', 'err'); return; } fSend({ k: 'wheel', z: face }).then(() => fStat('Sent! Watch the wheel spin…')).catch(sayErr); };
+	$('anGo').onclick = () => { if (closed) { say('The lights are not taking requests right now.', 'err'); return; } fSend({ k: 'animal', a: anA, z: face }).then(() => fStat('Sent! Watch it walk…')).catch(sayErr); };
+	$('pbGo').onclick = () => {
+		if (closed) { say('The lights are not taking requests right now.', 'err'); return; }
+		if (!Object.keys(pbFill).length) { say('Colour some areas first.', 'err'); return; }
+		const pic = pbPicture(); fSend(Object.assign({ k: 'paint', z: face, n: PBT[pbT].n }, pic)).then(() => fStat('Sent!')).catch(sayErr);
+	};
+	$('beGo').onclick = () => { const b = $('beGo'); b.classList.remove('ring'); void b.offsetWidth; b.classList.add('ring'); fSend({ k: 'bell' }, 6).catch(sayErr); };
+	$('snGo').onclick = () => fSend({ k: 'snow' }).then(() => fStat('Asking for snow…')).catch(sayErr);
+	function funOpen() {
+		funPick();
+		if (fES || !TOPIC) return;
+		fetch(RELAY + TOPIC + '-fun/json?poll=1&since=latest').then(r => r.text()).then(t => {
+			const ev = t.trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(e => e && e.event === 'message').pop();
+			if (ev) { try { const st = JSON.parse(ev.message); fNoteN = Math.max(fNoteN, ...(st.notes || []).map(n => n.n)); fApply(st); } catch (e) {} }
+		}).catch(() => {});
+		try {
+			fES = new EventSource(RELAY + TOPIC + '-fun/sse');
+			fES.onmessage = e => { try { const ev = JSON.parse(e.data); if (ev.event === 'message') fApply(JSON.parse(ev.message)); } catch (er) {} };
+		} catch (e) {}
+		setInterval(() => { if (tab === 'fun' && (fCur === 'song' || fCur === 'snow')) funDraw(); }, 1000);
+	}
+
 	// ---- state of the lights (posted by the bridge on "<code>-status") ----
 	const apply = () => {
-		$('gameTab').hidden = !cfg.games; $('propTab').hidden = !(cfg.props && cfg.props.length); $('playTab').hidden = !cfg.play; $('singTab').hidden = !cfg.sing; $('advTab').hidden = !cfg.adv; $('treeTab').hidden = !cfg.tree;
-		const nt = 4 + (cfg.games ? 1 : 0) + (cfg.props && cfg.props.length ? 1 : 0) + (cfg.play ? 1 : 0) + (cfg.sing ? 1 : 0) + (cfg.adv ? 1 : 0) + (cfg.tree ? 1 : 0);
-		$('tabs').classList.toggle('five', nt === 5); $('tabs').classList.toggle('six', nt === 6 || nt === 7 || nt === 9);
+		$('gameTab').hidden = !cfg.games; $('propTab').hidden = !(cfg.props && cfg.props.length); $('playTab').hidden = !cfg.play; $('singTab').hidden = !cfg.sing; $('advTab').hidden = !cfg.adv; $('treeTab').hidden = !cfg.tree; $('funTab').hidden = !(cfg.fun || []).length;
+		const nt = 4 + (cfg.games ? 1 : 0) + (cfg.props && cfg.props.length ? 1 : 0) + (cfg.play ? 1 : 0) + (cfg.sing ? 1 : 0) + (cfg.adv ? 1 : 0) + (cfg.tree ? 1 : 0) + ((cfg.fun || []).length ? 1 : 0);
+		$('tabs').classList.toggle('five', nt === 5); $('tabs').classList.toggle('six', nt === 6 || nt === 7 || nt >= 9);
 		if (tab === 'adv') advDraw();
 		if (typeof drawProps === 'function') drawProps();
 		setKick(); drawFaces(); drawQuick(); drawGifs(); drawFx(); buildGrid(); if (txtS.draw) txtS.draw(); updPrev(); $('closed').hidden = !TOPIC || !closed; tick(); };
@@ -1393,7 +1629,7 @@ input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 1
 		if (st && Array.isArray(st.faces) && st.faces.length) cfg.faces = st.faces.slice(0, 8).map(f => ({ n: String(f.n || '').slice(0, 20), w: Math.max(1, Math.min(128, f.w | 0)), h: Math.max(1, Math.min(128, f.h | 0)) }));
 		if (st) { cfg.theme = URL_THEME || (['hw', 'xm', 'ev', ''].includes(st.theme) ? st.theme : ''); cfg.free = !!st.free; cfg.title = String(st.title || '').slice(0, 40); cfg.games = !!st.games; cfg.play = !!st.play; cfg.race = st.race && typeof st.race === 'object' ? st.race : null; cfg.sing = !!st.sing && Array.isArray(st.singers) && st.singers.length > 0;
 			cfg.singers = Array.isArray(st.singers) ? st.singers.slice(0, 30).map(x => ({ k: String(x.k || '').slice(0, 130), n: String(x.n || '').slice(0, 28), e: String(x.e || '🎤').slice(0, 4) })) : []; cfg.gl = Array.isArray(st.gl) ? st.gl.filter(g => GAMES[g]) : ['c4']; cfg.props = Array.isArray(st.props) ? st.props.slice(0, 12).map(p => ({ n: String(p.n || '').slice(0, 24), e: String(p.e || '✨').slice(0, 4) })) : []; WAIT_MS = Math.max(0, Math.min(600, st.wait | 0)) * 1000;
-			cfg.adv = st.adv && typeof st.adv === 'object' && Array.isArray(st.adv.doors) ? st.adv : null; cfg.tree = !!st.tree; }
+			cfg.adv = st.adv && typeof st.adv === 'object' && Array.isArray(st.adv.doors) ? st.adv : null; cfg.tree = !!st.tree; cfg.fun = Array.isArray(st.fun) ? st.fun : []; if (tab === 'fun') funPick(); }
 		if (face >= cfg.faces.length) face = -1;
 		apply();
 	}).catch(() => {});
