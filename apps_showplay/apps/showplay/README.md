@@ -1,4 +1,4 @@
-# ShowPlay (v23)
+# ShowPlay (v24)
 
 ShowPlay lets visitors **play with the lights of a show** from their phone. They scan a QR code on the wall, and then
 they can:

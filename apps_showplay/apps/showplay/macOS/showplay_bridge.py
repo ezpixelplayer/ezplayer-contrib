@@ -21,7 +21,7 @@
 # Start:  python showplay_bridge.py  (Windows)   or   python3 showplay_bridge.py  (Linux / Raspberry Pi)
 # Settings are kept in showplay_config.json, next to this file (a cube_config.json from Light Cube is taken over).
 
-import json, os, sys, time, threading, queue, unicodedata, re, socket, secrets, struct, math, random, collections
+import json, os, sys, time, threading, queue, unicodedata, re, socket, secrets, struct, math, random, collections, hashlib
 import urllib.request, urllib.parse, urllib.error
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
@@ -66,7 +66,7 @@ def _create_connection(address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_a
 
 socket.create_connection = _create_connection
 
-VERSION = "v23"
+VERSION = "v24"
 PORT = 8099
 RELAY = "https://ntfy.sh/"
 CFG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "showplay_config.json")
@@ -128,6 +128,7 @@ S = {   # settings (kept in showplay_config.json)
     "tree": {},           # Decorate the tree: models, number of baubles, wait between baubles, how long it shows…
     "tree_orn": "",       # Decorate the tree: the baubles hung so far (one digit per spot: 0 = free, 1-8 = colour)
     "ntfy_day": {},       # ntfy.sh: today's counts (messages posted and received, 429 answers)
+    "fun": {},            # the 🎁 Fun extras (v24): photo, wheel, animal, paint, bell, snow, hunt, song
 }
 # ready messages (the same as the visitors' page)
 QUICK = {
@@ -3458,6 +3459,8 @@ def make_anims(kind, info, idx):
         if (dec[0], dec[1]) != (info["w"], info["h"]):
             raise ValueError("the GIF is not the size of the side")
     out = {}
+    if kind in ("photo", "wheel", "animal", "paint", "song", "bell"):
+        return fun_anims(kind, info, idx)
     if kind == "prop":
         geoms = prop_geometry(info["pi"])
         if not geoms:
@@ -3503,6 +3506,19 @@ def add(msg, att=None):
             log("tree request refused:", why)
             tree_refuse(m, why)
         return
+    if isinstance(m, dict) and m.get("k") in ("bell", "snow", "hunt", "song"):   # the 🎁 Fun extras that are not shown in turn
+        why = fun_msg(m)
+        if why and not (m.get("k") == "song" and m.get("a") == "ans"):
+            log("%s request refused: %s" % (m.get("k"), why))
+        return
+    fun_ready_job = None
+    if isinstance(m, dict) and m.get("k") in FUN_FACE:        # photo, wheel, animal, paint: shown on the cube in turn
+        fun_ready_job, why = fun_job(m)
+        if not fun_ready_job:
+            log("%s request refused: %s" % (m.get("k"), why))
+            fun_note(m, why)
+            return
+        fun_note(m, "ok")
     allow = False
     if isinstance(m, dict) and m.get("k") == "advent":   # a door of the advent calendar: its effect or message
         msg = advent_msg(m)
@@ -3519,7 +3535,7 @@ def add(msg, att=None):
             log("game request refused:", why)
             game.refuse(m, why)
         return
-    job = check(msg, allow_free=allow, att=att)
+    job = fun_ready_job or check(msg, allow_free=allow, att=att)
     if not job:
         log("request refused:", msg[:80])
         return
@@ -3816,12 +3832,12 @@ def show_loop():
             except Exception as e:
                 log("the request could not be prepared:", e)
                 continue
-            what = ("animation: %s%s" % (info["src"], " + " + info["t"] if info.get("t") else "") if kind == "gifx" else
+            what = info["what"] + " (" + info.get("where", "") + ")" if info.get("what") else ("animation: %s%s" % (info["src"], " + " + info["t"] if info.get("t") else "") if kind == "gifx" else
                     ("prop %s: %s, %s" % (info["where"], info["n"], info["pal"]) if kind == "prop" else
                      "drawing" if kind == "draw" else "identify" if kind == "ident" else {"text": "text", "gif": "picture", "fx": "effect"}[kind] + ": " +
                      (info.get("t") or info.get("f") or info.get("n") or ""))) + " (" + info.get("where", "") + ")"
             log("showing", what)
-            until = time.time() + (10 if kind == "ident" else max(3, int(S["seconds"].get("gif" if kind == "gifx" else kind, 15))))
+            until = time.time() + (info["secs"] if info.get("secs") else 10 if kind == "ident" else max(3, int(S["seconds"].get("gif" if kind == "gifx" else kind, 15))))
             t0 = time.time()
             with lock:
                 for i, an in anims.items():
@@ -3859,7 +3875,7 @@ def show_loop():
 #   - after a 429, waits (Retry-After, or 30 s, 60 s, 120 s…) instead of trying again at once.
 POST_BURST = 45
 POST_EVERY = 8.0
-POST_PRIO = {"game": 0, "status": 1, "tree": 1, "play": 2, "sing": 2}
+POST_PRIO = {"game": 0, "status": 1, "tree": 1, "fun": 1, "play": 2, "sing": 2}
 NTFY_DAILY = 17280          # ntfy.sh's free messages a day for each internet address (shared with the phones on the same Wi-Fi)
 NTFY_MAX_WAIT = 600         # never wait longer than this after a 429, even when ntfy.sh asks for hours (v23)
 
@@ -4331,6 +4347,923 @@ def tree_loop():
         time.sleep(0.5)
 
 
+# ======================================================================================= fun (v24) ====
+# Eight extras for visitors, all on the 🎁 Fun tab of their page and set up on /fun:
+#   📸 Photo frame, 🎰 Wheel of fortune, 🐾 Pick an animal, 🖍️ Paint by numbers (on the cube, through the queue),
+#   🔔 Ring the bell (speaker + a prop or the cube), 🌨️ Snow on request (a relay through a web address),
+#   🔦 Treasure hunt (clues and answers), 🎶 Guess the song (a round for up to 8 players, songs from the "songs" folder).
+# The bridge posts what the phones need on "<code>-fun": the lists, the round of Guess the song, and short notes for
+# a phone (why something was refused, whether an answer was right).
+FUN_KEYS = ("photo", "wheel", "animal", "paint", "bell", "snow", "hunt", "song")
+FUN_FACE = ("photo", "wheel", "animal", "paint")      # shown on the cube, through the normal queue
+PHOTO_FRAMES = [("snow", "Snowflakes"), ("hearts", "Hearts"), ("stars", "Stars"), ("santa", "Santa"), ("rainbow", "Rainbow")]
+ANIMALS = [("penguin", "Penguin", "🐧"), ("reindeer", "Reindeer", "🦌"), ("snowman", "Snowman", "⛄"),
+           ("bear", "Polar bear", "🐻‍❄️"), ("robin", "Robin", "🐦")]
+WHEEL_COLS = ["ff2a2a", "ffd23f", "39d353", "2bb7ff", "9b5cff", "ff7a1a", "ff4fd8", "ffffff", "ff2a2a", "39d353", "2bb7ff", "ffd23f"]
+WHEEL_DEFAULT = [{"k": "fx", "v": "snowfall"}, {"k": "text", "v": "Merry Christmas!"}, {"k": "colour", "v": "ff2a2a"},
+                 {"k": "fx", "v": "fireworks"}, {"k": "again", "v": ""}, {"k": "fx", "v": "twinkle"},
+                 {"k": "colour", "v": "39d353"}, {"k": "text", "v": "Ho ho ho!"}]
+HUNT_DEFAULT = [{"q": "How many reindeer pull Santa's sleigh (without Rudolph)?", "k": "number", "a": "8"},
+                {"q": "What do you put on top of the Christmas tree?", "k": "word", "a": "star"},
+                {"q": "What is the snowman's nose made of?", "k": "word", "a": "carrot"}]
+FUN_DEFAULT = {
+    "photo": {"on": False, "frames": [k for k, _ in PHOTO_FRAMES], "hold": 8, "every": 30},
+    "wheel": {"on": False, "slices": WHEEL_DEFAULT, "result": 12, "every": 30},
+    "animal": {"on": False, "animals": [k for k, _, _ in ANIMALS], "cross": 6, "every": 20},
+    "paint": {"on": False, "hold": 15, "every": 30},
+    "bell": {"on": False, "flash": "cube", "prop": 0, "every": 10, "volume": 80},
+    "snow": {"on": False, "on_url": "", "off_url": "", "run": 10, "gap": 120, "night": 20, "from": 17, "to": 23, "cube": True},
+    "hunt": {"on": False, "clues": HUNT_DEFAULT, "order": True},
+    "song": {"on": False, "clip": 6, "rounds": 5, "answer": 12, "volume": 90},
+}
+FUN = {"v": 0, "by": {}, "notes": [], "snow_runs": [], "snow_busy": False, "snow_next": 0.0, "songs": None, "songs_at": 0.0}
+AUDIO_LOCK = threading.Lock()
+SONGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "songs")
+
+
+def fun_cfg(key=None):
+    raw = S.get("fun") if isinstance(S.get("fun"), dict) else {}
+    out = {}
+    for k, d in FUN_DEFAULT.items():
+        c = dict(d)
+        if isinstance(raw.get(k), dict):
+            c.update({kk: vv for kk, vv in raw[k].items() if kk in d})
+        out[k] = c
+    return out[key] if key else out
+
+
+def _num(b, key, lo, hi, cur):
+    v = b.get(key)
+    return v if isint(v) and lo <= v <= hi else cur
+
+
+def fun_clean(key, b):
+    """the settings of one extra from the /fun page, checked"""
+    c = fun_cfg(key)
+    if "on" in b:
+        c["on"] = bool(b["on"])
+    if key == "photo":
+        if isinstance(b.get("frames"), list):
+            c["frames"] = [k for k, _ in PHOTO_FRAMES if k in b["frames"]] or [PHOTO_FRAMES[0][0]]
+        c["hold"], c["every"] = _num(b, "hold", 3, 30, c["hold"]), _num(b, "every", 0, 600, c["every"])
+    elif key == "wheel":
+        if isinstance(b.get("slices"), list):
+            sl = []
+            for x in b["slices"][:12]:
+                if not isinstance(x, dict):
+                    continue
+                k, v = x.get("k"), str(x.get("v", ""))
+                if k == "fx" and v in FX_NAMES:
+                    sl.append({"k": k, "v": v})
+                elif k == "text":
+                    t = re.sub(r"[^ -~]", "", plain(v))[:30].strip()
+                    if t and not is_bad(t):
+                        sl.append({"k": k, "v": t})
+                elif k == "colour" and re.fullmatch(r"[0-9a-fA-F]{6}", v):
+                    sl.append({"k": k, "v": v.lower()})
+                elif k == "again":
+                    sl.append({"k": k, "v": ""})
+            if len(sl) >= 2:
+                c["slices"] = sl
+        c["result"], c["every"] = _num(b, "result", 4, 60, c["result"]), _num(b, "every", 0, 600, c["every"])
+    elif key == "animal":
+        if isinstance(b.get("animals"), list):
+            c["animals"] = [k for k, _, _ in ANIMALS if k in b["animals"]] or [ANIMALS[0][0]]
+        c["cross"], c["every"] = _num(b, "cross", 3, 20, c["cross"]), _num(b, "every", 0, 600, c["every"])
+    elif key == "paint":
+        c["hold"], c["every"] = _num(b, "hold", 5, 60, c["hold"]), _num(b, "every", 0, 600, c["every"])
+    elif key == "bell":
+        if b.get("flash") in ("cube", "prop", "none"):
+            c["flash"] = b["flash"]
+        c["prop"] = _num(b, "prop", 0, 199, c["prop"])
+        c["every"], c["volume"] = _num(b, "every", 0, 600, c["every"]), _num(b, "volume", 5, 100, c["volume"])
+    elif key == "snow":
+        for k in ("on_url", "off_url"):
+            if k in b:
+                u = str(b[k]).strip()[:300]
+                c[k] = u if u == "" or re.match(r"https?://[^\s]+$", u) else c[k]
+        c["run"], c["gap"] = _num(b, "run", 2, 120, c["run"]), _num(b, "gap", 10, 3600, c["gap"])
+        c["night"] = _num(b, "night", 1, 500, c["night"])
+        c["from"], c["to"] = _num(b, "from", 0, 23, c["from"]), _num(b, "to", 0, 24, c["to"])
+        if "cube" in b:
+            c["cube"] = bool(b["cube"])
+    elif key == "hunt":
+        if isinstance(b.get("clues"), list):
+            cl = []
+            for x in b["clues"][:10]:
+                if not isinstance(x, dict):
+                    continue
+                q = str(x.get("q", "")).strip()[:90]
+                k, a = x.get("k"), str(x.get("a", "")).strip()[:30]
+                if not q or is_bad(q) or k not in ("prop", "word", "number") or not a:
+                    continue
+                if k == "number" and not re.fullmatch(r"-?\d{1,6}", a):
+                    continue
+                if k == "prop" and not (a.isdigit() and int(a) < len(S.get("props", []))):
+                    continue
+                cl.append({"q": q, "k": k, "a": a})
+            c["clues"] = cl
+        if "order" in b:
+            c["order"] = bool(b["order"])
+    elif key == "song":
+        c["clip"], c["rounds"] = _num(b, "clip", 3, 15, c["clip"]), _num(b, "rounds", 3, 10, c["rounds"])
+        c["answer"], c["volume"] = _num(b, "answer", 6, 30, c["answer"]), _num(b, "volume", 5, 100, c["volume"])
+    return c
+
+
+def song_list(force=False):
+    """the songs for Guess the song: WAV files in the "songs" folder next to the bridge -> [(title, path, seconds)]"""
+    import wave
+    if FUN["songs"] is not None and not force and time.time() - FUN["songs_at"] < 60:
+        return FUN["songs"]
+    out = []
+    try:
+        names = sorted(os.listdir(SONGS_DIR))
+    except Exception:
+        names = []
+    for n in names:
+        if not n.lower().endswith(".wav"):
+            continue
+        p = os.path.join(SONGS_DIR, n)
+        try:
+            with wave.open(p) as w:
+                if w.getsampwidth() not in (1, 2) or w.getnchannels() not in (1, 2):
+                    continue
+                secs = w.getnframes() / float(w.getframerate())
+        except Exception:
+            continue
+        title = re.sub(r"\s+", " ", os.path.splitext(n)[0].replace("_", " ")).strip()[:40]
+        if title and secs >= 4:
+            out.append((title, p, secs))
+    FUN["songs"], FUN["songs_at"] = out, time.time()
+    return out
+
+
+def fun_ready():
+    """the extras visitors can use now (for the status)"""
+    c, out = fun_cfg(), []
+    for k in FUN_KEYS:
+        if not c[k]["on"]:
+            continue
+        if k in FUN_FACE and not S["faces"]:
+            continue
+        if k == "snow" and not c[k]["on_url"]:
+            continue
+        if k == "hunt" and not c[k]["clues"]:
+            continue
+        if k == "song" and (len(song_list()) < 4 or not S["faces"]):
+            continue
+        out.append(k)
+    return out
+
+
+def fun_note(m, why, k=None, **extra):
+    """a short note for the phone that asked (posted on <code>-fun)"""
+    tag = m.get("tag")
+    if not isinstance(tag, str) or not TAG_RE.fullmatch(tag):
+        return
+    with lock:
+        FUN["notes"] = [n for n in FUN["notes"] if time.time() - n["at"] < 60][-5:]
+        FUN["notes"].append(dict({"tag": tag, "k": k or m.get("k"), "why": why, "at": int(time.time()), "n": FUN["v"] + 1}, **extra))
+        FUN["v"] += 1
+
+
+def fun_wait(pid, key, every):
+    """seconds this phone still has to wait before using this extra again (0 = go), and remembers the use"""
+    now = time.time()
+    left = every - (now - FUN["by"].get((pid, key), 0))
+    if left > 0:
+        return math.ceil(left)
+    FUN["by"][(pid, key)] = now
+    if len(FUN["by"]) > 3000:
+        FUN["by"] = {k: v for k, v in FUN["by"].items() if now - v < 3600}
+    return 0
+
+
+def fun_who(m):
+    pid, tag = str(m.get("p", "")), str(m.get("tag", ""))
+    return pid if PID_RE.fullmatch(pid) and TAG_RE.fullmatch(tag) else None
+
+
+def fun_sides(m):
+    z = m.get("z", -1)
+    if not S["faces"] or not isint(z) or z < -1 or z >= len(S["faces"]):
+        return None, ""
+    idx = list(range(len(S["faces"]))) if z == -1 else [z]
+    where = "all sides" if z == -1 or len(S["faces"]) == 1 else (S["faces"][z].get("n") or "side %d" % (z + 1))
+    return idx, where
+
+
+def fun_job(m):
+    """a cube extra -> ((kind, sides, info), "") or (None, why)"""
+    key = m.get("k")
+    c = fun_cfg(key)
+    if not c["on"] or key not in fun_ready():
+        return None, "closed"
+    pid = fun_who(m)
+    if not pid:
+        return None, "bad request"
+    idx, where = fun_sides(m)
+    if idx is None:
+        return None, "bad request"
+    info = {"where": where}
+    if key == "photo":
+        f = m.get("f")
+        if f not in c["frames"]:
+            return None, "bad request"
+        info.update(f=f, hold=c["hold"], secs=3 + 0.8 + c["hold"], what="photo frame: " + dict(PHOTO_FRAMES)[f])
+    elif key == "wheel":
+        sl = c["slices"]
+        pick = random.randrange(len(sl))
+        res = c["result"] if sl[pick]["k"] != "again" else 3
+        info.update(slices=sl, pick=pick, secs=6.5 + res, res=res, what="wheel of fortune: " + wheel_label(sl[pick]))
+    elif key == "animal":
+        a = m.get("a")
+        if a not in c["animals"]:
+            return None, "bad request"
+        n = len(idx)
+        info.update(a=a, cross=c["cross"], secs=n * c["cross"] + 2.2, what="animal: " + {x: y for x, y, _ in ANIMALS}[a])
+    elif key == "paint":
+        p, r = str(m.get("px", "")), str(m.get("r", ""))
+        w, h = m.get("w"), m.get("h")
+        faces = [S["faces"][i] for i in idx]
+        if not isint(w) or not isint(h) or any(f["w"] != w or f["h"] != h for f in faces):
+            return None, "size"
+        if len(p) != w * h or len(r) != w * h or not re.fullmatch(r"[0-8]+", p) or not re.fullmatch(r"[0-9a-z]+", r):
+            return None, "bad request"
+        nreg = len(set(r) - {"0"})
+        info.update(w=w, h=h, p=p, r=r, hold=c["hold"], secs=min(12, nreg * 0.45) + c["hold"], what="paint by numbers: " + str(m.get("n", ""))[:20])
+    wait = fun_wait(pid, key, c["every"])
+    if wait:
+        return None, "wait %d" % wait
+    return (key, idx, info), ""
+
+
+def wheel_label(s):
+    if s["k"] == "fx":
+        return FX_NAMES.get(s["v"], s["v"])
+    if s["k"] == "text":
+        return s["v"]
+    if s["k"] == "colour":
+        names = {"ff2a2a": "Red", "39d353": "Green", "2bb7ff": "Blue", "ffd23f": "Gold", "ffffff": "White", "9b5cff": "Purple",
+                 "ff7a1a": "Orange", "ff4fd8": "Pink"}
+        return names.get(s["v"], "A colour") + " lights"
+    return "Spin again!"
+
+
+# --------------------------------------------------------------------- the cube's animations ----
+def big_glyph(anim, ch, cx, cy, sc, col):
+    """one 8x16 character, scaled, centred on (cx, cy)"""
+    g = (ord(ch) - 32) * 16
+    x0, y0 = cx - 4 * sc, cy - 8 * sc
+    for r in range(16):
+        bits = FONT16[g + r]
+        if not bits:
+            continue
+        for cxx in range(8):
+            if bits & (0x80 >> cxx):
+                for dy in range(sc):
+                    for dx in range(sc):
+                        anim.px(x0 + cxx * sc + dx, y0 + r * sc + dy, col)
+
+
+class PhotoFrame(Anim):
+    """a frame around the side, a 3-2-1 countdown, a white flash, then the frame for the photo"""
+    def __init__(self, w, h, style, hold):
+        super().__init__(w, h)
+        self.style, self.hold = style, hold
+        self.bw = max(1, min(w, h) // 7)
+        self.r = random.Random(7)
+        self.ring = [(x, y) for y in range(h) for x in range(w) if min(x, y, w - 1 - x, h - 1 - y) < self.bw]
+
+    def frame_px(self, t):
+        w, h, bw = self.w, self.h, self.bw
+        for n, (x, y) in enumerate(self.ring):
+            d = min(x, y, w - 1 - x, h - 1 - y)
+            tw = 0.55 + 0.45 * math.sin(t * 3 + n * 1.7)
+            if self.style == "snow":
+                c = (int(150 * tw), int(200 * tw), 255) if (n * 7) % 5 else (255, 255, 255)
+            elif self.style == "hearts":
+                c = (255, int(40 + 60 * tw), int(110 + 60 * tw)) if (x + y) % 3 else (255, 255, 255)
+            elif self.style == "stars":
+                c = (255, int(190 * tw), 0) if (n * 13) % 7 else (int(255 * tw), int(255 * tw), int(200 * tw))
+            elif self.style == "santa":
+                c = (255, 255, 255) if d == bw - 1 and bw > 1 else (230, 0, 0)
+                if (x < bw * 2 or x >= w - bw * 2) and (y < bw * 2 or y >= h - bw * 2) and d < bw:
+                    c = (0, 170, 40) if (x + y) % 2 else (255, 0, 0)
+            else:
+                c = hsv(((x + y) / (w + h) - t * 0.3) % 1)
+            self.px(x, y, c)
+
+    def frame(self, t):
+        self.buf[:] = bytes(len(self.buf))
+        if t < 3:                                         # 3, 2, 1
+            self.frame_px(t)
+            n = 3 - int(t)
+            sc = max(1, (min(self.w, self.h) - 2 * self.bw) // 17)
+            k = 1 - (t % 1) * 0.5
+            big_glyph(self, str(n), self.w // 2, self.h // 2, sc, (int(255 * k), int(255 * k), int(255 * k)))
+        elif t < 3.25:                                    # the flash
+            self.buf[:] = b"\xff" * len(self.buf)
+        elif t < 3.8:
+            v = int(255 * (1 - (t - 3.25) / 0.55))
+            self.buf[:] = bytes([v]) * len(self.buf)
+            self.frame_px(t)
+        else:
+            self.frame_px(t)
+        return self.buf
+
+
+class WheelAnim(Anim):
+    """a wheel that spins, slows down and stops on a slice, then that slice's surprise"""
+    def __init__(self, w, h, slices, pick):
+        super().__init__(w, h)
+        self.slices, self.pick, self.n = slices, pick, len(slices)
+        self.T = 5.0
+        turns = random.randint(4, 6)          # whole turns, so the wheel ends on the picked slice
+        self.total = turns * 2 * math.pi + (2 * math.pi) - (pick + 0.5) * (2 * math.pi / self.n)
+        self.cx, self.cy = (w - 1) / 2, (h - 1) / 2 + 0.5
+        self.R = min(w, h) / 2 - 0.5
+        self.cells = []
+        for y in range(h):
+            for x in range(w):
+                dx, dy = x - self.cx, y - self.cy
+                d = math.hypot(dx, dy)
+                if d <= self.R:
+                    self.cells.append((x, y, math.atan2(dx, -dy) % (2 * math.pi), d))
+        s = slices[pick]
+        if s["k"] == "fx":
+            self.res = Fx(w, h, s["v"])
+        elif s["k"] == "text":
+            self.res = Text(w, h, s["v"], (255, 255, 255))
+        elif s["k"] == "again":
+            self.res = Text(w, h, "SPIN AGAIN!", (255, 210, 60))
+        else:
+            self.res = None
+            self.col = hexrgb(s["v"])
+
+    def frame(self, t):
+        if t >= self.T + 1.5:                              # the surprise
+            tt = t - self.T - 1.5
+            if self.res is not None:
+                return self.res.frame(tt)
+            k = 0.6 + 0.4 * math.sin(tt * 3)
+            self.buf[:] = bytes(int(v * k) for v in self.col) * (self.w * self.h)
+            return self.buf
+        x = min(1.0, t / self.T)
+        ang = self.total * (1 - (1 - x) ** 3)
+        seg = 2 * math.pi / self.n
+        self.buf[:] = bytes(len(self.buf))
+        blink = t > self.T and int(t * 6) % 2
+        for px, py, a, d in self.cells:
+            i = int(((a - ang) % (2 * math.pi)) / seg) % self.n
+            c = hexrgb(WHEEL_COLS[i % len(WHEEL_COLS)])
+            if d > self.R - 1.0:
+                c = (255, 255, 255)
+            elif t > self.T and i != self.pick:
+                c = tuple(v // 5 for v in c)
+            elif blink and i == self.pick:
+                c = (255, 255, 255)
+            self.px(px, py, c)
+        cx = int(round(self.cx))                            # the pointer at the top
+        for k in range(max(1, self.h // 10)):
+            for dx in range(-k, k + 1):
+                self.px(cx + dx, k, (255, 255, 255))
+        self.px(int(self.cx), int(self.cy), (255, 255, 255))
+        return self.buf
+
+
+SPRITES = {     # 12-wide pixel animals facing right; two frames (legs); '.' = nothing
+    "penguin": (["....kkkk....", "...kkkkkk...", "..kkwkkwkk..", "..kkkookkk..", ".kkkwwwwkkk.", ".kkwwwwwwkk.",
+                 "kkkwwwwwwkkk", ".kkwwwwwwkk.", "..kwwwwwwk..", "..kkwwwwkk..", "...kkkkkk...", "..oo....oo.."],
+                ["....kkkk....", "...kkkkkk...", "..kkwkkwkk..", "..kkkookkk..", ".kkkwwwwkkk.", ".kkwwwwwwkk.",
+                 "kkkwwwwwwkkk", ".kkwwwwwwkk.", "..kwwwwwwk..", "..kkwwwwkk..", "...kkkkkk...", "...oo..oo..."]),
+    "reindeer": (["........b.b.", ".........bb.", "........bbb.", "........bbkb", ".......bbbbr", "bbbbbbbbbb..",
+                  "bbbbbbbbbb..", "bbbbbbbbb...", ".bbbbbbbb...", ".b.b...b.b..", ".b..b..b..b.", ".d..d..d..d."],
+                 ["........b.b.", ".........bb.", "........bbb.", "........bbkb", ".......bbbbr", "bbbbbbbbbb..",
+                  "bbbbbbbbbb..", "bbbbbbbbb...", ".bbbbbbbb...", "..bb...bb...", "..bb...bb...", "..dd...dd..."]),
+    "snowman": (["....kkkk....", "....kkkk....", "...kkkkkk...", "....wwww....", "...wkwwkw...", "...wwwoow...",
+                 "....wwww....", "..wwwwwwww..", ".wwwwkwwwww.", ".wwwwwwwwww.", ".wwwwkwwwww.", "..wwwwwwww.."],
+                ["............", "....kkkk....", "....kkkk....", "...kkkkkk...", "....wwww....", "...wkwwkw...",
+                 "...wwwoow...", "....wwww....", "..wwwwwwww..", ".wwwwkwwwww.", ".wwwwwwwwww.", "..wwwwwwww.."]),
+    "bear": (["............", "............", "............", ".........ww.", "........wwkw", "........wwwk",
+              "wwwwwwwwwww.", "wwwwwwwwwww.", "wwwwwwwwwww.", ".wwwwwwwwww.", ".ww.ww..ww.w", ".ww.ww..ww.w"],
+             ["............", "............", "............", ".........ww.", "........wwkw", "........wwwk",
+              "wwwwwwwwwww.", "wwwwwwwwwww.", "wwwwwwwwwww.", ".wwwwwwwwww.", "..ww.ww.ww..", "..ww.ww.ww.."]),
+    "robin": (["............", "............", "............", "............", "......bbb...", ".....bbbbk..",
+               ".....bbbbbo.", "..bbbrrrbb..", ".bbbrrrrbb..", "..bbrrrrb...", "...bbbbb....", "....o..o...."],
+              ["............", "............", "............", "......bbb...", ".....bbbbk..", ".....bbbbbo.",
+               "..bbbrrrbb..", ".bbbrrrrbb..", "..bbrrrrb...", "...bbbbb....", "....o..o....", "............"]),
+}
+SPRITE_COLS = {"k": (50, 60, 110), "w": (255, 255, 255), "o": (255, 140, 0), "b": (140, 80, 30), "d": (60, 30, 10),
+               "r": (255, 30, 20)}
+
+
+class AnimalAnim(Anim):
+    """an animal walks across the sides, one after another, and does a little hop on the last one"""
+    def __init__(self, w, h, animal, order, n, cross):
+        super().__init__(w, h)
+        self.fr, self.order, self.n, self.cross = SPRITES[animal], order, n, cross
+        self.sc = max(1, h // 16)
+        self.sw, self.sh = 12 * self.sc, 12 * self.sc
+        self.ground = max(1, h // 10)
+        self.r = random.Random(order)
+        self.flakes = [(self.r.random(), self.r.random(), self.r.uniform(0.15, 0.35)) for _ in range(max(4, w * h // 40))]
+
+    def frame(self, t):
+        w, h = self.w, self.h
+        for y in range(h):                                  # a night sky and snowy ground
+            c = (255, 255, 255) if y >= h - self.ground else (0, 0, int(8 + 30 * y / h))
+            self.buf[y * w * 3:(y + 1) * w * 3] = bytes(c) * w
+        for fx, fy, sp in self.flakes:
+            self.px(int(fx * w), int((fy + t * sp) % 1 * (h - self.ground)), (150, 150, 170))
+        trick, hop_at = 2.0, (self.n - 0.5) * self.cross        # the hop: half way through the last side
+        tt = t if t < hop_at else hop_at if t < hop_at + trick else t - trick
+        hop = 0
+        if hop_at <= t < hop_at + trick:
+            hop = int(abs(math.sin((t - hop_at) / trick * 3 * math.pi)) * self.sh * 0.5)
+        p = tt / self.cross                                  # 0..n: where the animal is
+        u = p - self.order
+        x = int(u * (w + self.sw)) - self.sw
+        if -self.sw < x < w:
+            f = self.fr[int(t * 4) % 2 if hop == 0 else 0]
+            y0 = h - self.ground - self.sh - hop
+            for r, row in enumerate(f):
+                for cc, ch in enumerate(row):
+                    if ch != ".":
+                        for dy in range(self.sc):
+                            for dx in range(self.sc):
+                                self.px(x + cc * self.sc + dx, y0 + r * self.sc + dy, SPRITE_COLS[ch])
+            if hop:
+                for _ in range(3):
+                    self.px(x + self.r.randrange(self.sw), y0 - self.r.randrange(1, 3), (255, 230, 80))
+        return self.buf
+
+
+class PaintAnim(Anim):
+    """a painting by numbers: the outline first, then each area fills in turn"""
+    def __init__(self, w, h, p, r):
+        super().__init__(w, h)
+        self.p, self.r = p, r
+        self.order = sorted(set(r) - {"0"})
+
+    def frame(self, t):
+        shown = set(self.order[:int(t / 0.45) + 1])
+        b = self.buf
+        for i, (ch, rg) in enumerate(zip(self.p, self.r)):
+            c = PAL[int(ch)]
+            if rg != "0" and rg not in shown:
+                c = "151515"
+            b[i * 3:i * 3 + 3] = bytes(hexrgb(c))
+        return b
+
+
+class SongPulse(Anim):
+    """the lights moving to a song: bars that follow its loudness"""
+    def __init__(self, w, h, env, hue):
+        super().__init__(w, h)
+        self.env, self.hue = env, hue
+
+    def frame(self, t):
+        i = min(len(self.env) - 1, int(t * 30)) if self.env else 0
+        lv = self.env[i] if self.env and t * 30 < len(self.env) else 0.0
+        w, h, b = self.w, self.h, self.buf
+        b[:] = bytes(len(b))
+        for x in range(w):
+            hh = int(h * lv * (0.55 + 0.45 * math.sin(x * 0.9 + t * 7)))
+            c = hsv((self.hue + x / w * 0.3 + t * 0.1) % 1, 1, 1)
+            for y in range(h - hh, h):
+                o = (y * w + x) * 3
+                b[o:o + 3] = bytes(c)
+        return b
+
+
+class BellFlash(Anim):
+    """a golden flash for the bell"""
+    def frame(self, t):
+        k = max(0.0, 1 - t / 1.6) * (0.6 + 0.4 * math.cos(t * 18))
+        self.buf[:] = bytes((int(255 * k), int(190 * k), int(40 * k))) * (self.w * self.h)
+        return self.buf
+
+
+def fun_anims(kind, info, idx):
+    """make_anims for the extras"""
+    out = {}
+    for n, i in enumerate(idx):
+        f = S["faces"][i]
+        w, h = f["w"], f["h"]
+        if kind == "photo":
+            out[i] = PhotoFrame(w, h, info["f"], info["hold"])
+        elif kind == "wheel":
+            out[i] = WheelAnim(w, h, info["slices"], info["pick"])
+        elif kind == "animal":
+            out[i] = AnimalAnim(w, h, info["a"], n, len(idx), info["cross"])
+        elif kind == "paint":
+            out[i] = PaintAnim(w, h, info["p"], info["r"])
+        elif kind == "song":
+            out[i] = SongPulse(w, h, info["env"], info.get("hue", 0.0)) if info.get("env") is not None else Text(w, h, info["t"], hexrgb(info.get("c", "ffd23f")))
+        elif kind == "bell":
+            out[i] = BellFlash(w, h)
+    return out
+
+
+# ------------------------------------------------------------------------------------ the bell ----
+def bell_wav():
+    """the bell's sound: bell.wav next to the bridge, or a bell made here (at the bell's volume)"""
+    import tempfile
+    import array
+    own = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bell.wav")
+    if os.path.exists(own):
+        return own, False
+    rate, secs = 22050, 1.8
+    vol = fun_cfg("bell")["volume"] / 100
+    a = array.array("h")
+    parts = ((1.0, 1.0), (2.76, 0.55), (5.4, 0.3), (8.93, 0.18))
+    for n in range(int(rate * secs)):
+        t = n / rate
+        v = sum(amp * math.sin(2 * math.pi * 880 * mul * t) * math.exp(-t * (2.2 + mul * 0.9)) for mul, amp in parts)
+        a.append(int(max(-1, min(1, v / 2.1)) * 32000 * vol))
+    fd, path = tempfile.mkstemp(suffix=".wav", prefix="showplay-bell-")
+    os.close(fd)
+    wav_write(path, rate, a, 1.0)
+    return path, True
+
+
+def bell_ring():
+    if not AUDIO_LOCK.acquire(blocking=False):
+        return
+    path, tmp = None, False
+    try:
+        path, tmp = bell_wav()
+        play_audio(path)
+    except Exception as e:
+        log("bell: could not ring:", e)
+    finally:
+        AUDIO_LOCK.release()
+        if tmp and path:
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+
+
+def bell_msg(m):
+    c = fun_cfg("bell")
+    if "bell" not in fun_ready():
+        return "closed"
+    pid = fun_who(m)
+    if not pid:
+        return "bad request"
+    wait = fun_wait(pid, "bell", c["every"])
+    if wait:
+        return "wait %d" % wait
+    threading.Thread(target=bell_ring, daemon=True).start()
+    if c["flash"] == "prop" and c["prop"] < len(S.get("props", [])):
+        p = S["props"][c["prop"]]
+        enqueue("prop", [PROP_BASE + c["prop"]], {"pi": c["prop"], "e": "sparkle", "cols": ["ffd23f", "ffffff", "ff9a00"], "s": 2,
+                                                   "n": "Sparkle", "pal": "bell", "where": p["n"], "secs": 3})
+    elif c["flash"] == "cube" and S["faces"]:
+        enqueue("bell", list(range(len(S["faces"]))), {"where": "all sides", "secs": 2, "what": "the bell"})
+    log("bell: ding dong!")
+    return ""
+
+
+# ------------------------------------------------------------------------------------- the snow ----
+def snow_call(url):
+    if url:
+        urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "ShowPlay"}), timeout=6).read(2000)
+
+
+def snow_run(secs, test=False):
+    c = fun_cfg("snow")
+    FUN["snow_busy"] = True
+    FUN["v"] += 1
+    try:
+        snow_call(c["on_url"])
+        log("snow: on for %d s%s" % (secs, " (test)" if test else ""))
+        time.sleep(secs)
+    except Exception as e:
+        log("snow: the machine could not be switched on:", e)
+    finally:
+        try:
+            snow_call(c["off_url"])
+        except Exception as e:
+            log("snow: the machine could not be switched off:", e)
+        FUN["snow_busy"] = False
+        FUN["v"] += 1
+
+
+def snow_night_key():
+    return time.strftime("%Y-%m-%d", time.localtime(time.time() - 12 * 3600))   # a night runs from noon to noon
+
+
+def snow_state():
+    c = fun_cfg("snow")
+    now = time.time()
+    h = time.localtime().tm_hour
+    hours_ok = c["from"] <= h < c["to"] if c["from"] < c["to"] else (h >= c["from"] or h < c["to"])
+    runs = [x for x in FUN["snow_runs"] if x[0] == snow_night_key()]
+    return {"busy": FUN["snow_busy"], "next": max(0, int(FUN["snow_next"] - now)), "hours": hours_ok,
+            "left": max(0, c["night"] - len(runs)), "from": c["from"], "to": c["to"]}
+
+
+def snow_msg(m):
+    c = fun_cfg("snow")
+    if "snow" not in fun_ready():
+        return "closed"
+    if not fun_who(m):
+        return "bad request"
+    st = snow_state()
+    if not st["hours"]:
+        return "hours"
+    if st["busy"]:
+        return "snowing"
+    if st["next"] > 0:
+        return "wait %d" % st["next"]
+    if st["left"] <= 0:
+        return "night"
+    FUN["snow_runs"] = [x for x in FUN["snow_runs"] if x[0] == snow_night_key()] + [(snow_night_key(), time.time())]
+    FUN["snow_next"] = time.time() + c["run"] + c["gap"]
+    threading.Thread(target=snow_run, args=(c["run"],), daemon=True).start()
+    if c["cube"] and S["faces"]:
+        enqueue("fx", list(range(len(S["faces"]))), {"e": "snowfall", "n": "Falling snow", "cols": None, "where": "all sides", "secs": c["run"] + 2})
+    FUN["v"] += 1
+    return ""
+
+
+# ----------------------------------------------------------------------------- treasure hunt ----
+def hunt_msg(m):
+    c = fun_cfg("hunt")
+    if "hunt" not in fun_ready():
+        return "closed", {}
+    pid = fun_who(m)
+    i, a = m.get("i"), str(m.get("a", ""))[:30]
+    if not pid or not isint(i) or not 0 <= i < len(c["clues"]):
+        return "bad request", {}
+    wait = fun_wait(pid, "hunt", 3)
+    if wait:
+        return "wait %d" % wait, {"i": i}
+    cl = c["clues"][i]
+    if cl["k"] == "number":
+        ok = re.fullmatch(r"\s*-?\d{1,6}\s*", a) is not None and int(a) == int(cl["a"])
+    elif cl["k"] == "prop":
+        ok = a.isdigit() and int(a) == int(cl["a"])
+    else:
+        norm = lambda s: re.sub(r"[^a-z0-9]", "", plain(s).lower())
+        ok = norm(a) != "" and norm(a) == norm(cl["a"])
+    last = i == len(c["clues"]) - 1
+    if ok:
+        if last and S["faces"]:
+            enqueue("fx", list(range(len(S["faces"]))), {"e": "fireworks", "n": "Fireworks", "cols": None, "where": "all sides", "secs": 10,
+                                                         "what": "treasure found!"})
+        elif cl["k"] == "prop" and int(cl["a"]) < len(S.get("props", [])):
+            pi = int(cl["a"])
+            enqueue("prop", [PROP_BASE + pi], {"pi": pi, "e": "confetti", "cols": PALETTES["rainbow"][1], "s": 2, "n": "Confetti",
+                                               "pal": "rainbow", "where": S["props"][pi]["n"], "secs": 5})
+        elif S["faces"]:
+            enqueue("fx", list(range(len(S["faces"]))), {"e": "bursts" if "bursts" in FX_NAMES else "fireworks", "n": "Well done",
+                                                         "cols": None, "where": "all sides", "secs": 5, "what": "treasure hunt: clue %d" % (i + 1)})
+        log("treasure hunt: clue %d right%s" % (i + 1, " - treasure found!" if last else ""))
+    return "", {"i": i, "ok": ok, "last": last}
+
+
+# ---------------------------------------------------------------------------- guess the song ----
+class SongQuiz:
+    """a round of Guess the song: lobby, then N songs (clip on the speaker, 4 titles on the phones), then a podium"""
+    LOBBY = 15
+
+    def __init__(self):
+        self.st, self.id, self.players, self.scores, self.answers = "idle", "", [], {}, {}
+        self.n, self.of, self.opts, self.right, self.until, self.picked = 0, 0, [], -1, 0, []
+        self.thread = None
+
+    def state(self):
+        return {"st": self.st, "id": self.id, "pl": [p[1] for p in self.players], "sc": [self.scores.get(p[0], 0) for p in self.players],
+                "n": self.n, "of": self.of, "opts": self.opts, "right": self.right if self.st in ("reveal", "over") else -1,
+                "left": max(0, int(self.until - time.time())), "ans": len(self.answers)}
+
+    def changed(self):
+        FUN["v"] += 1
+
+    def msg(self, m):
+        pid, tag = fun_who(m), str(m.get("tag", ""))
+        a = m.get("a")
+        if not pid or "song" not in fun_ready():
+            return "closed"
+        with lock:
+            if a == "new":
+                if self.st not in ("idle", "over"):
+                    return "busy"
+                self.st, self.id = "lobby", secrets.token_hex(3)
+                self.players, self.scores, self.answers = [(pid, tag)], {pid: 0}, {}
+                self.until = time.time() + self.LOBBY
+                self.changed()
+                self.thread = threading.Thread(target=self.run, daemon=True)
+                self.thread.start()
+                log("guess the song: a round is starting")
+                return ""
+            if a == "join":
+                if self.st != "lobby" or m.get("id") != self.id:
+                    return "cannot join"
+                if any(p[0] == pid for p in self.players):
+                    return ""
+                if len(self.players) >= 8:
+                    return "full"
+                self.players.append((pid, tag))
+                self.scores[pid] = 0
+                self.changed()
+                return ""
+            if a == "ans":
+                if self.st != "question" or m.get("id") != self.id or m.get("n") != self.n:
+                    return "late"
+                if not any(p[0] == pid for p in self.players) or pid in self.answers:
+                    return "late"
+                c = m.get("c")
+                if not isint(c) or not 0 <= c < len(self.opts):
+                    return "bad request"
+                self.answers[pid] = (c, time.time())
+                self.changed()
+                return ""
+        return "bad request"
+
+    def show(self, info, secs):
+        if S["faces"]:
+            enqueue("song", list(range(len(S["faces"]))), dict(info, where="all sides", secs=secs))
+
+    def run(self):
+        try:
+            self._run()
+        except Exception as e:
+            log("guess the song:", e)
+        finally:
+            with lock:
+                if self.st != "over":
+                    self.st = "idle"
+                self.changed()
+
+    def _run(self):
+        c = fun_cfg("song")
+        while time.time() < self.until:
+            time.sleep(0.3)
+        songs = song_list()
+        if len(songs) < 4:
+            return
+        picks = random.sample(range(len(songs)), min(c["rounds"], len(songs)))
+        with lock:
+            self.of = len(picks)
+        for qn, si in enumerate(picks, 1):
+            title, path, secs = songs[si]
+            others = random.sample([j for j in range(len(songs)) if j != si], 3)
+            opts = [si] + others
+            random.shuffle(opts)
+            clip, env = song_clip(path, secs, c["clip"], c["volume"] / 100)
+            with lock:
+                self.st, self.n, self.answers = "question", qn, {}
+                self.opts = [songs[j][0] for j in opts]
+                self.right = opts.index(si)
+                self.until = time.time() + c["answer"]
+                self.changed()
+            self.show({"env": env, "hue": random.random(), "what": "guess the song: song %d" % qn}, c["clip"] + 0.5)
+            threading.Thread(target=self.play, args=(clip,), daemon=True).start()
+            while time.time() < self.until and len(self.answers) < len(self.players):
+                time.sleep(0.2)
+            with lock:
+                start = self.until - c["answer"]
+                for pid, (ch, at) in self.answers.items():
+                    if ch == self.right:
+                        self.scores[pid] = self.scores.get(pid, 0) + 100 + int(max(0, c["answer"] - (at - start)) * 5)
+                self.st, self.until = "reveal", time.time() + 5
+                self.changed()
+            self.show({"env": None, "t": title, "c": "ffd23f", "what": "guess the song: " + title}, 5)
+            time.sleep(5)
+        with lock:
+            self.st, self.until = "over", time.time() + 60
+            best = max(self.players, key=lambda p: self.scores.get(p[0], 0))
+            self.changed()
+        self.show({"env": None, "t": "WINNER %d POINTS!" % self.scores.get(best[0], 0), "c": "39d353", "what": "guess the song: podium"}, 8)
+        log("guess the song: round over")
+
+    def play(self, path):
+        with AUDIO_LOCK:
+            try:
+                play_audio(path)
+            except Exception as e:
+                log("guess the song: could not play:", e)
+        try:
+            os.remove(path)
+        except Exception:
+            pass
+
+
+def song_clip(path, secs, clip, volume):
+    """cuts a clip of a song (from about a third of it) to a mono 16-bit WAV; returns (path, loudness 30 times a second)"""
+    import wave
+    import array
+    import tempfile
+    with wave.open(path) as w:
+        ch, sw, rate = w.getnchannels(), w.getsampwidth(), w.getframerate()
+        start = min(max(0.0, secs / 3), max(0.0, secs - clip))
+        w.setpos(int(start * rate))
+        raw = w.readframes(int(clip * rate))
+    if sw == 2:
+        a = array.array("h", raw)
+        if sys.byteorder == "big":
+            a.byteswap()
+    else:
+        a = array.array("h", ((b - 128) << 8 for b in raw))
+    if ch == 2:
+        a = array.array("h", ((a[i] + a[i + 1]) // 2 for i in range(0, len(a) - 1, 2)))
+    step = max(1, rate // 30)
+    env = []
+    for i in range(0, len(a), step):
+        seg = a[i:i + step:4]
+        env.append(math.sqrt(sum(x * x for x in seg) / max(1, len(seg))) / 32768)
+    peak = max(env + [1e-6])
+    env = [min(1.0, v / peak * 1.1) for v in env]
+    fd, out = tempfile.mkstemp(suffix=".wav", prefix="showplay-song-")
+    os.close(fd)
+    wav_write(out, rate, a, volume)
+    return out, env
+
+
+quiz = SongQuiz()
+
+
+# ------------------------------------------------------------------------- messages and state ----
+def fun_msg(m):
+    """a Fun request that is not shown through the queue: bell, snow, hunt, song (notes the phone when needed)"""
+    k = m.get("k")
+    if k == "bell":
+        why = bell_msg(m)
+        if why:
+            fun_note(m, why)
+        return why
+    if k == "snow":
+        why = snow_msg(m)
+        fun_note(m, why or "ok")
+        return why
+    if k == "hunt":
+        why, extra = hunt_msg(m)
+        fun_note(m, why or ("right" if extra.get("ok") else "wrong"), **extra)
+        return why
+    if k == "song":
+        why = quiz.msg(m)
+        if why and m.get("a") != "ans":
+            fun_note(m, why)
+        return why
+    return "bad request"
+
+
+def fun_public():
+    """what the phones need for the Fun tab (posted on <code>-fun when it changes)"""
+    c, ready = fun_cfg(), fun_ready()
+    st = {"on": ready, "v": FUN["v"], "at": int(time.time())}
+    if "photo" in ready:
+        st["ph"] = [[k, n] for k, n in PHOTO_FRAMES if k in c["photo"]["frames"]]
+    if "wheel" in ready:
+        st["wh"] = [[wheel_label(s)[:18], WHEEL_COLS[i % len(WHEEL_COLS)]] for i, s in enumerate(c["wheel"]["slices"])]
+    if "animal" in ready:
+        st["an"] = [[k, n, e] for k, n, e in ANIMALS if k in c["animal"]["animals"]]
+    if "bell" in ready:
+        st["be"] = c["bell"]["every"]
+    if "snow" in ready:
+        st["sn"] = snow_state()
+    if "hunt" in ready:
+        cl = c["hunt"]["clues"]
+        st["hu"] = [[x["q"], x["k"]] for x in cl]
+        st["hv"] = hashlib.md5(json.dumps(cl, sort_keys=True).encode()).hexdigest()[:6]
+    if "song" in ready:
+        st["so"] = quiz.state()
+    notes = [n for n in FUN["notes"] if time.time() - n["at"] < 60]
+    if notes:
+        st["notes"] = notes[-6:]
+    return st
+
+
+def fun_loop():
+    """posts the Fun tab's state for the phones when it changes (and the countdowns of Guess the song)"""
+    posted = None
+    while True:
+        try:
+            ready = fun_ready()
+            key = (tuple(ready), FUN["v"], json.dumps(S.get("fun", {}), sort_keys=True))
+            if S["topic"] and (ready or posted is not None) and key != posted:
+                st = fun_public()
+                poster.post("fun", st, same={k: x for k, x in st.items() if k not in ("at", "v")})
+                posted = key
+        except Exception as e:
+            log("fun:", e)
+        time.sleep(0.5)
+
+
+def fun_info(msg=""):
+    songs = song_list(force=True)
+    return {"fun": fun_cfg(), "ready": fun_ready(), "frames": PHOTO_FRAMES, "animals": [[k, n, e] for k, n, e in ANIMALS],
+            "fx": [[k, n] for k, n in FX_LIST.get(S.get("theme") if S.get("theme") in FX_LIST else "xm", FX_LIST["xm"])],
+            "props": [p["n"] for p in S.get("props", [])], "songs": [[t, round(s)] for t, _, s in songs], "songs_dir": SONGS_DIR,
+            "snow": snow_state(), "msg": msg}
+
+
 def publish_status(force=False):
     """the visitors' page reads this to know whether requests are on, the sides and their sizes"""
     try:
@@ -4338,7 +5271,7 @@ def publish_status(force=False):
                   (ezp_state["ok"] or not any(f.get("out") == "ezp" for f in S["faces"])))
         st = {"on": on, "faces": [{"n": f.get("n", ""), "w": f["w"], "h": f["h"]} for f in S["faces"]],
                            "theme": S["theme"], "free": S["free"], "wait": S["wait"], "title": S.get("title", ""), "games": bool(S.get("games")) and bool(game_list_now()),
-                           "gl": game_list_now(), "adv": advent_public(), "tree": tree_cfg()["on"] and bool(tree_cfg()["models"]), "play": play_on(), "sing": sing_on(),
+                           "gl": game_list_now(), "adv": advent_public(), "tree": tree_cfg()["on"] and bool(tree_cfg()["models"]), "fun": fun_ready(), "play": play_on(), "sing": sing_on(),
                            "race": {k: race_cfg()[k] for k in ("modes", "colours", "shared", "mix", "max", "min", "early")},
                            "singers": [{"k": k, "n": n, "e": e} for k, n, e, kind, on in sing_list() if on][:30],
                            "props": [{"n": p["n"], "e": p.get("e", "")} for p in S.get("props", [])] if ezp_state["ok"] else []}
@@ -5849,7 +6782,7 @@ select,input[type=number],input[type=text]{width:100%;min-height:44px;padding:8p
 pre{white-space:pre-wrap;font-size:12px;color:var(--muted);margin:0;max-height:220px;overflow:auto}.warn{color:#ffb36b}
 [hidden]{display:none!important}
 </style></head><body><main>
-<div class="row" style="justify-content:space-between"><h1>ShowPlay</h1><span class="row"><a class="btn" href="/race" style="text-decoration:none;display:inline-flex;align-items:center">🌟 Race</a><a class="btn" href="/xmas" style="text-decoration:none;display:inline-flex;align-items:center">📅 Advent &amp; 🎄 Tree</a><a class="btn" href="/mixer" style="text-decoration:none;display:inline-flex;align-items:center">🎛️ Mixer &amp; 🎹 Keys</a></span></div>
+<div class="row" style="justify-content:space-between"><h1>ShowPlay</h1><span class="row"><a class="btn" href="/race" style="text-decoration:none;display:inline-flex;align-items:center">🌟 Race</a><a class="btn" href="/xmas" style="text-decoration:none;display:inline-flex;align-items:center">📅 Advent &amp; 🎄 Tree</a><a class="btn" href="/fun" style="text-decoration:none;display:inline-flex;align-items:center">🎁 Fun</a><a class="btn" href="/mixer" style="text-decoration:none;display:inline-flex;align-items:center">🎛️ Mixer &amp; 🎹 Keys</a></span></div>
 <div class="card">
   <label class="big"><input type="checkbox" id="on"> Show the visitors' requests</label>
   <div class="note" id="state"></div>
@@ -6067,7 +7000,8 @@ function render(){
  $('pend').replaceChildren(...st.pending.map(p=>{const d=mk('div',{className:'item'});const w=mk('div',{className:'what'});
   if(p.kind==='draw'){const c=mk('canvas',{width:p.info.w,height:p.info.h});c.style.width=(p.info.w*5)+'px';const g=c.getContext('2d');[...p.info.p].forEach((v,i)=>{if(v!=='0'){g.fillStyle='#'+['000000','ffffff','ff2a2a','ff7a1a','ffd23f','39d353','2bb7ff','9b5cff','ff4fd8'][+v];g.fillRect(i%p.info.w,Math.floor(i/p.info.w),1,1);}});w.append(c);}
   else if(p.kind==='gifx'){const im=mk('img',{src:p.info.url,width:p.info.w*5});im.style.imageRendering='pixelated';im.style.background='#000';w.append(im,mk('div',{textContent:'Animation: '+p.info.src+(p.info.t?' + "'+p.info.t+'"':'')}));}
-  else w.textContent=(p.kind==='text'?'Text: '+p.info.t:p.kind==='fx'?'Effect: '+p.info.n:'Picture: '+p.info.f);if(p.info.where)w.append(mk('div',{className:'note',textContent:p.info.where}));
+  else if(p.kind==='paint'){const c=mk('canvas',{width:p.info.w,height:p.info.h});c.style.width=(p.info.w*5)+'px';const g=c.getContext('2d');[...p.info.p].forEach((v,i)=>{if(v!=='0'){g.fillStyle='#'+['000000','ffffff','ff2a2a','ff7a1a','ffd23f','39d353','2bb7ff','9b5cff','ff4fd8'][+v];g.fillRect(i%p.info.w,Math.floor(i/p.info.w),1,1);}});w.append(c,mk('div',{textContent:p.info.what}));}
+  else w.textContent=(p.info.what?p.info.what[0].toUpperCase()+p.info.what.slice(1):p.kind==='text'?'Text: '+p.info.t:p.kind==='fx'?'Effect: '+p.info.n:'Picture: '+p.info.f);if(p.info.where)w.append(mk('div',{className:'note',textContent:p.info.where}));
   const ok=mk('button',{className:'btn primary',textContent:'Show'});ok.onclick=()=>api('approve',{id:p.id}).then(refresh);
   const no=mk('button',{className:'btn',textContent:'Refuse'});no.onclick=()=>api('reject',{id:p.id}).then(refresh);
   d.append(w,ok,no);return d;}));
@@ -6695,6 +7629,126 @@ load().then(models);
 </script></body></html>"""
 
 
+FUN_PAGE = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ShowPlay · Fun extras</title>
+<style>
+:root{--bg:#0d0a18;--card:#191430;--raise:#251e44;--line:#3a3062;--fg:#fff;--muted:#c7bfe6;--hot:#ffc83c;--ok:#39d353}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif}
+header{position:sticky;top:0;z-index:5;background:#0d0a18ee;border-bottom:1px solid var(--line);padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+header h1{font-size:19px;margin:0}a{color:var(--muted)}.sp{flex:1}
+main{max-width:980px;margin:0 auto;padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.ct{font-weight:800;font-size:15px;color:var(--hot)}.note{font-size:13px;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{min-height:40px;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:var(--raise);color:var(--fg);font:inherit;font-weight:700;cursor:pointer}
+.btn.primary{background:var(--hot);border-color:var(--hot);color:#1a1200}
+select,input[type=text],input[type=number]{min-height:38px;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--raise);color:var(--fg);font:inherit}
+input[type=number]{width:84px}input[type=text]{min-width:0}
+label.ck{display:inline-flex;gap:7px;align-items:center}input[type=checkbox]{width:19px;height:19px;accent-color:var(--hot)}
+.list{display:flex;flex-direction:column;gap:6px}.list .row>input[type=text]{flex:1}
+.ready{font-size:12px;padding:3px 8px;border-radius:999px;background:var(--raise);border:1px solid var(--line)}.ready.on{background:#1f5c2e;border-color:#39d353}
+.wide{grid-column:1/-1}
+</style></head><body>
+<header><h1>🎁 Fun extras</h1><span class="sp"></span><a href="/">Control page</a><a href="/xmas">Advent &amp; Tree</a><a href="/race">Race</a><a href="/mixer">Mixer</a></header>
+<main>
+<div class="card wide"><div class="note">Each extra appears on the visitors' page under <b>🎁 Fun</b> when it is switched on and ready. The first four play on the cube in turn, like a message or an effect (and wait for approval when approval is on). "Each phone waits" stops one phone from asking again and again.</div></div>
+
+<div class="card" data-k="photo"><div class="row"><span class="ct">📸 Photo frame</span><span class="sp"></span><span class="ready"></span></div>
+ <div class="note">A frame on the cube, a 3-2-1 countdown, a white flash, then the frame holds for the picture.</div>
+ <label class="ck"><input type="checkbox" data-f="on"> On</label>
+ <div class="row" data-f="frames"></div>
+ <div class="row"><span class="note">Hold the frame</span><input type="number" data-f="hold" min="3" max="30"><span class="note">s · Each phone waits</span><input type="number" data-f="every" min="0" max="600"><span class="note">s</span></div>
+ <div class="row"><button class="btn primary" data-save>Save</button><span class="note" data-msg></span></div></div>
+
+<div class="card" data-k="wheel"><div class="row"><span class="ct">🎰 Wheel of fortune</span><span class="sp"></span><span class="ready"></span></div>
+ <div class="note">A wheel spins on the cube and stops on a slice: an effect, a message, a colour, or "spin again". 2 to 12 slices, all equally likely.</div>
+ <label class="ck"><input type="checkbox" data-f="on"> On</label>
+ <div class="list" data-f="slices"></div><div class="row"><button class="btn" data-add>Add a slice</button></div>
+ <div class="row"><span class="note">The surprise lasts</span><input type="number" data-f="result" min="4" max="60"><span class="note">s · Each phone waits</span><input type="number" data-f="every" min="0" max="600"><span class="note">s</span></div>
+ <div class="row"><button class="btn primary" data-save>Save</button><span class="note" data-msg></span></div></div>
+
+<div class="card" data-k="animal"><div class="row"><span class="ct">🐾 Pick an animal</span><span class="sp"></span><span class="ready"></span></div>
+ <div class="note">The animal walks across the sides one after another (all sides, or the one the visitor picked) and does a little hop on the last one.</div>
+ <label class="ck"><input type="checkbox" data-f="on"> On</label>
+ <div class="row" data-f="animals"></div>
+ <div class="row"><span class="note">Seconds to cross a side</span><input type="number" data-f="cross" min="3" max="20"><span class="note">· Each phone waits</span><input type="number" data-f="every" min="0" max="600"><span class="note">s</span></div>
+ <div class="row"><button class="btn primary" data-save>Save</button><span class="note" data-msg></span></div></div>
+
+<div class="card" data-k="paint"><div class="row"><span class="ct">🖍️ Paint by numbers</span><span class="sp"></span><span class="ready"></span></div>
+ <div class="note">Visitors colour a ready-made drawing (tree, star, snowman, present, bauble, bell). On the cube each area fills in turn, then the picture holds.</div>
+ <label class="ck"><input type="checkbox" data-f="on"> On</label>
+ <div class="row"><span class="note">Hold the picture</span><input type="number" data-f="hold" min="5" max="60"><span class="note">s · Each phone waits</span><input type="number" data-f="every" min="0" max="600"><span class="note">s</span></div>
+ <div class="row"><button class="btn primary" data-save>Save</button><span class="note" data-msg></span></div></div>
+
+<div class="card" data-k="bell"><div class="row"><span class="ct">🔔 Ring the bell</span><span class="sp"></span><span class="ready"></span></div>
+ <div class="note">A bell rings on this computer's speaker (bell.wav next to the bridge, or a bell made here) and something flashes in gold.</div>
+ <label class="ck"><input type="checkbox" data-f="on"> On</label>
+ <div class="row"><span class="note">Flash</span><select data-f="flash"><option value="cube">The cube</option><option value="prop">A prop</option><option value="none">Nothing</option></select><select data-f="prop"></select></div>
+ <div class="row"><span class="note">Volume</span><input type="number" data-f="volume" min="5" max="100"><span class="note">% · Each phone waits</span><input type="number" data-f="every" min="0" max="600"><span class="note">s</span></div>
+ <div class="row"><button class="btn primary" data-save>Save</button><button class="btn" data-act="bell-test">Ring it now</button><span class="note" data-msg></span></div></div>
+
+<div class="card" data-k="snow"><div class="row"><span class="ct">🌨️ Snow on request</span><span class="sp"></span><span class="ready"></span></div>
+ <div class="note">The bridge opens a web address to switch the snow (or bubble) machine on, and another to switch it off: a relay on an ESP32, a Shelly, a Tasmota plug, WLED… For example <code>http://192.168.1.50/relay/0?turn=on</code>.</div>
+ <label class="ck"><input type="checkbox" data-f="on"> On</label>
+ <div class="row"><span class="note" style="width:90px">Switch on</span><input type="text" data-f="on_url" style="flex:1" placeholder="http://…"></div>
+ <div class="row"><span class="note" style="width:90px">Switch off</span><input type="text" data-f="off_url" style="flex:1" placeholder="http://…"></div>
+ <div class="row"><span class="note">Run</span><input type="number" data-f="run" min="2" max="120"><span class="note">s · Rest between runs</span><input type="number" data-f="gap" min="10" max="3600"><span class="note">s</span></div>
+ <div class="row"><span class="note">At most</span><input type="number" data-f="night" min="1" max="500"><span class="note">runs a night · from</span><input type="number" data-f="from" min="0" max="23"><span class="note">h to</span><input type="number" data-f="to" min="0" max="24"><span class="note">h</span></div>
+ <label class="ck"><input type="checkbox" data-f="cube"> Falling snow on the cube while it snows</label>
+ <div class="row"><button class="btn primary" data-save>Save</button><button class="btn" data-act="snow-test">Test for 3 s</button><span class="note" data-msg></span></div></div>
+
+<div class="card" data-k="hunt"><div class="row"><span class="ct">🔦 Treasure hunt</span><span class="sp"></span><span class="ready"></span></div>
+ <div class="note">Clues on the phones; the answer is a word, a number, or a prop of the show (the visitor taps it). A right answer lights that prop, or the cube; after the last clue: fireworks. Up to 10 clues.</div>
+ <label class="ck"><input type="checkbox" data-f="on"> On</label>
+ <label class="ck"><input type="checkbox" data-f="order"> Clues one after another (off: the visitor picks any clue)</label>
+ <div class="list" data-f="clues"></div><div class="row"><button class="btn" data-add>Add a clue</button></div>
+ <div class="row"><button class="btn primary" data-save>Save</button><span class="note" data-msg></span></div></div>
+
+<div class="card" data-k="song"><div class="row"><span class="ct">🎶 Guess the song</span><span class="sp"></span><span class="ready"></span></div>
+ <div class="note">A round for up to 8 phones: a few seconds of a song on the speaker while the cube moves to it, 4 titles on the phones, points for right and fast answers, then a podium. Put at least 4 WAV files in the <b>songs</b> folder next to the bridge; the file name is the title (e.g. <code>Jingle Bells.wav</code>). Use songs you are allowed to play in public.</div>
+ <label class="ck"><input type="checkbox" data-f="on"> On</label>
+ <div class="note" data-songs></div>
+ <div class="row"><span class="note">Clip</span><input type="number" data-f="clip" min="3" max="15"><span class="note">s · Songs a round</span><input type="number" data-f="rounds" min="3" max="10"><span class="note">· Time to answer</span><input type="number" data-f="answer" min="6" max="30"><span class="note">s</span></div>
+ <div class="row"><span class="note">Volume</span><input type="number" data-f="volume" min="5" max="100"><span class="note">%</span></div>
+ <div class="row"><button class="btn primary" data-save>Save</button><button class="btn" data-act="songs-reload">Look for songs again</button><span class="note" data-msg></span></div></div>
+</main>
+<script>
+const post=b=>fetch('/api/fun',{method:'POST',headers:{'X-Cube':'1'},body:JSON.stringify(b)}).then(r=>r.json());
+let X=null;const W={};
+const mk=(t,p)=>Object.assign(document.createElement(t),p||{});
+function opts(sel,list,cur){sel.replaceChildren(...list.map(([v,n])=>mk('option',{value:v,textContent:n})));if(cur!==undefined)sel.value=cur;}
+function checks(box,list,cur){box.replaceChildren(...list.map(([v,n,e])=>{const l=mk('label',{className:'ck'});const c=mk('input',{type:'checkbox',value:v,checked:cur.includes(v)});l.append(c,(e?e+' ':'')+n);return l;}));}
+function sliceRow(s){const r=mk('div',{className:'row'});const k=mk('select');opts(k,[['fx','✨ Effect'],['text','💬 Message'],['colour','🎨 Colour'],['again','🔁 Spin again']],s.k);
+ const box=mk('span');box.style.flex='1';box.style.display='flex';
+ const draw=()=>{box.replaceChildren();let el=null;if(k.value==='fx'){el=mk('select');opts(el,X.fx,s.v);}else if(k.value==='text'){el=mk('input',{type:'text',maxLength:30,value:s.k==='text'?s.v:'Merry Christmas!'});el.style.flex='1';}else if(k.value==='colour'){el=mk('input',{type:'color',value:'#'+(s.k==='colour'?s.v:'ff2a2a')});}
+  if(el){el.dataset.v='1';box.append(el);}};k.onchange=()=>{draw();};draw();
+ const x=mk('button',{className:'btn',textContent:'✕'});x.onclick=()=>r.remove();r.append(k,box,x);r.get=()=>{const el=box.querySelector('[data-v]');return{k:k.value,v:el?(k.value==='colour'?el.value.slice(1):el.value):''};};return r;}
+function clueRow(c){const r=mk('div',{className:'row'});const q=mk('input',{type:'text',maxLength:90,value:c.q||'',placeholder:'The clue'});q.style.flex='1 1 100%';
+ const k=mk('select');opts(k,[['word','Answer: a word'],['number','Answer: a number'],['prop','Answer: a prop']],c.k||'word');
+ const box=mk('span');box.style.flex='1';box.style.display='flex';
+ const draw=()=>{box.replaceChildren();let el;if(k.value==='prop'){el=mk('select');opts(el,X.props.map((n,i)=>[String(i),n]),c.k==='prop'?c.a:'0');if(!X.props.length)el.append(mk('option',{value:'',textContent:'(no props set up)'}));}else{el=mk('input',{type:k.value==='number'?'number':'text',value:c.k===k.value?c.a:'',placeholder:'The answer'});el.style.flex='1';el.style.width='auto';}
+  el.dataset.v='1';box.append(el);};k.onchange=draw;draw();
+ const x=mk('button',{className:'btn',textContent:'✕'});x.onclick=()=>r.remove();r.append(q,k,box,x);r.get=()=>({q:q.value,k:k.value,a:String(box.querySelector('[data-v]').value||'')});return r;}
+function fill(){for(const card of document.querySelectorAll('[data-k]')){const k=card.dataset.k,c=X.fun[k];
+  const rd=card.querySelector('.ready');rd.textContent=X.ready.includes(k)?'✔ on the visitors\' page':c.on?'not ready':'off';rd.classList.toggle('on',X.ready.includes(k));
+  for(const el of card.querySelectorAll('[data-f]')){const f=el.dataset.f;
+   if(f==='frames')checks(el,X.frames,c.frames);else if(f==='animals')checks(el,X.animals,c.animals);
+   else if(f==='slices')el.replaceChildren(...c.slices.map(sliceRow));else if(f==='clues')el.replaceChildren(...c.clues.map(clueRow));
+   else if(f==='prop'){opts(el,X.props.map((n,i)=>[i,n]),c.prop);if(!X.props.length)el.append(mk('option',{value:0,textContent:'(no props set up)'}));}
+   else if(el.type==='checkbox')el.checked=!!c[f];else el.value=c[f];}
+  const sg=card.querySelector('[data-songs]');if(sg)sg.innerHTML=X.songs.length?'<b>'+X.songs.length+' songs found:</b> '+X.songs.map(s=>s[0]+' ('+s[1]+' s)').join(', ')+(X.songs.length<4?' — at least 4 are needed.':''):'<b>No songs found</b> in '+X.songs_dir;}}
+function read(card){const b={};for(const el of card.querySelectorAll('[data-f]')){const f=el.dataset.f;
+  if(f==='frames'||f==='animals')b[f]=[...el.querySelectorAll('input:checked')].map(i=>i.value);
+  else if(f==='slices'||f==='clues')b[f]=[...el.children].map(r=>r.get());
+  else if(el.type==='checkbox')b[f]=el.checked;else if(el.type==='number'||f==='prop')b[f]=+el.value;else b[f]=el.value;}return b;}
+for(const card of document.querySelectorAll('[data-k]')){const k=card.dataset.k,msg=card.querySelector('[data-msg]');
+ card.querySelector('[data-save]').onclick=async()=>{X=await post(Object.assign({a:'save',k},read(card)));fill();msg.textContent=X.msg||'Saved.';setTimeout(()=>{msg.textContent='';},4000);};
+ const add=card.querySelector('[data-add]');if(add)add.onclick=()=>{const l=card.querySelector('.list');l.append(k==='wheel'?sliceRow({k:'fx',v:X.fx[0][0]}):clueRow({k:'word'}));};
+ for(const b of card.querySelectorAll('[data-act]'))b.onclick=async()=>{X=await post({a:b.dataset.act});fill();msg.textContent=X.msg||'Done.';setTimeout(()=>{msg.textContent='';},5000);};}
+fetch('/api/fun').then(r=>r.json()).then(j=>{X=j;fill();});
+</script></body></html>"""
+
+
 def xmas_info(msg=""):
     return {"advent": advent_cfg(), "today": advent_day(), "tree": tree_cfg(), "treeState": tree_state(),
             "fx": [[k, n] for k, n in FX_LIST.get(S.get("theme") if S.get("theme") in FX_LIST else "xm", FX_LIST["xm"])],
@@ -6822,6 +7876,10 @@ class Admin(BaseHTTPRequestHandler):
             return self.send(200, RACE_PAGE, "text/html")
         if p == "/xmas":
             return self.send(200, XMAS_PAGE, "text/html")
+        if p == "/fun":
+            return self.send(200, FUN_PAGE, "text/html")
+        if p == "/api/fun":
+            return self.send(200, fun_info())
         if p == "/api/xmas":
             return self.send(200, xmas_info())
         if p == "/api/race":
@@ -6941,6 +7999,37 @@ class Admin(BaseHTTPRequestHandler):
                     save()
                 return self.send(200, {"ok": True, "cfg": race_cfg(), "state": r.state(), "profiles": sorted(prof), "sides": [face_name(i) for i in range(len(S["faces"]))]})
             return self.send(200, {"ok": False})
+        if p == "/api/fun":
+            a, msg = b.get("a"), ""
+            if a == "save" and b.get("k") in FUN_KEYS:
+                with lock:
+                    f = dict(S.get("fun") or {})
+                    f[b["k"]] = fun_clean(b["k"], b)
+                    S["fun"] = f
+                    FUN["v"] += 1
+                    save()
+                c = fun_cfg(b["k"])
+                if c["on"] and b["k"] not in fun_ready():
+                    msg = {"snow": "Saved, but it needs the 'switch on' address.", "hunt": "Saved, but it needs at least one clue.",
+                           "song": "Saved, but it needs at least 4 songs in the songs folder (and the cube's sides)."}.get(b["k"], "Saved, but the cube's sides are not set up.")
+                else:
+                    msg = "Saved."
+                threading.Thread(target=publish_status, daemon=True).start()
+            elif a == "bell-test":
+                threading.Thread(target=bell_ring, daemon=True).start()
+                msg = "Ding dong!"
+            elif a == "snow-test":
+                if FUN["snow_busy"]:
+                    msg = "It is snowing already."
+                else:
+                    threading.Thread(target=snow_run, args=(3, True), daemon=True).start()
+                    msg = "Snow on for 3 s (see the log if nothing happens)."
+            elif a == "songs-reload":
+                n = len(song_list(force=True))
+                msg = "%d songs found." % n
+                FUN["v"] += 1
+                threading.Thread(target=publish_status, daemon=True).start()
+            return self.send(200, fun_info(msg))
         if p == "/api/xmas":
             a, msg = b.get("a"), ""
             with lock:
@@ -7202,7 +8291,7 @@ if __name__ == "__main__":
         sys.exit(1)
     load()
     log("ShowPlay bridge %s - control page: http://%s:%d" % (VERSION, my_ip(), PORT))
-    for target in (poster.run, tree_loop, show_loop, render_loop, listen, status_loop, ezp_watch, game_loop, mix_watch, midi_native, play_loop, sing_loop,
+    for target in (poster.run, tree_loop, fun_loop, show_loop, render_loop, listen, status_loop, ezp_watch, game_loop, mix_watch, midi_native, play_loop, sing_loop,
                    lambda: (time.sleep(3), ezp_targets() if S.get("props") else None, prepare_props())):
         threading.Thread(target=target, daemon=True).start()
     OneServer(("0.0.0.0", PORT), Admin).serve_forever()

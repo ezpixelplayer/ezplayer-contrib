@@ -128,5 +128,16 @@
  "play_props": [],
  "midi_native": true,
  "midi_base": 36,
- "midi_map": {}
+ "midi_map": {},
+ "advent": {},
+ "tree": {},
+ "tree_orn": "",
+ "ntfy_day": {
+  "day": "2026-11-23",
+  "sent": 5,
+  "rx": 0,
+  "429": 0,
+  "last429": 0
+ },
+ "fun": {}
 }

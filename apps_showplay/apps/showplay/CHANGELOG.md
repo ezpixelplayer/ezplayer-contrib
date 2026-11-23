@@ -5,6 +5,7 @@ updates the installation guide (`INSTALL.md`) and the contents guide (`CONTENTS.
 
 | Version | Date | In one line |
 | --- | --- | --- |
+| v24 | 2026-11-23 | 🎁 Fun tab with 8 extras: photo frame, wheel of fortune, pick an animal, paint by numbers, ring the bell, snow on request, treasure hunt, guess the song (settings page /fun) |
 | v23 | 2026-11-22 | 📅 Advent calendar and 🎄 Decorate the tree for visitors (own settings page /xmas); ntfy.sh today card, at most 10 minutes of waiting, one bridge at a time |
 | v22 | 2026-11-22 | Space Invaders and Pong sliders send less (only when the finger moves, less often as the phone's message budget runs low) and no longer show "Too many messages" |
 | v21 | 2026-11-22 | The bridge waits at most 3 s to connect to each address, so any network with a dead IPv4 or IPv6 path costs seconds, not tens of seconds |
@@ -28,6 +29,62 @@ updates the installation guide (`INSTALL.md`) and the contents guide (`CONTENTS.
 | v3 | 2026-11-20 | README: how to set up the controllers and the sides of the cube |
 | v2 | 2026-11-20 | Show name MerryOnCherry on the bridge and the visitors' page |
 | v1 | 2026-11-20 | First version in English: bridge, control page and visitors' page, through EZPlayer overlays |
+
+---
+
+## v24 — Fun extras (2026-11-23)
+
+A new **🎁 Fun** tab on the visitors' page with eight extras, set up on their own page (**/fun**, or **🎁 Fun** at the top
+of the control page). The full guide is [docs/fun.md](docs/fun.md).
+
+**New**
+
+| Extra | What visitors do | What happens | Set up on /fun |
+| --- | --- | --- | --- |
+| 📸 Photo frame | Pick a frame, press Take a photo | A frame on the cube, a big 3-2-1, a white flash, then the frame holds | Frames (snowflakes, hearts, stars, Santa, rainbow), hold time, wait |
+| 🎰 Wheel of fortune | Press Spin | A wheel spins on the cube for 5 s and stops on a slice (picked by the bridge), then its surprise | 2–12 slices: effect, message, colour or "spin again"; surprise time; wait |
+| 🐾 Pick an animal | Pick an animal, press Send it | A pixel penguin, reindeer, snowman, polar bear or robin walks across the sides on a snowy night and hops | Animals, seconds per side, wait |
+| 🖍️ Paint by numbers | Colour one of 6 drawings (numbers suggest colours) | The drawing at the side's size; each area fills in turn, then it holds | Hold time, wait |
+| 🔔 Ring the bell | Tap the bell | A bell on the speaker (made by the bridge, or your bell.wav) and a gold flash on the cube or a prop | What flashes, volume, wait; Ring it now |
+| 🌨️ Snow on request | Tap the snowflake | The bridge opens the "switch on" address, waits, opens "switch off"; falling snow on the cube | Two web addresses (Shelly, Tasmota, ESP32…), run, rest, runs a night, hours; Test for 3 s |
+| 🔦 Treasure hunt | Answer clues: a word, a number or a prop | Right: that prop lights up, or a short effect; the last clue: fireworks | Up to 10 clues with answers, in order or not |
+| 🎶 Guess the song | Start or join a round, pick titles | A clip on the speaker with the cube moving to it; the title on the cube; a podium | WAV files in the `songs` folder; clip, songs a round, answer time, volume |
+
+**How they work**
+- Photo, wheel, animal and paint go into the normal queue (turns, time limits, approval). The approval list shows
+  what each one is, with a picture of the painting.
+- Every extra has a wait per phone; the phone is told how long to wait, or why something did not work.
+- The bridge posts the Fun tab's state on `<code>-fun` only when it changes (about 1 KB): the lists, the snow's
+  state, the clues (without the answers), the round of Guess the song and short notes for one phone.
+- Only one sound plays at a time on the speaker: a ring during a song is skipped.
+- Songs are cut on the bridge (from about a third into the song), mixed to mono and played at the chosen volume.
+
+**Changed**
+- Control page: **🎁 Fun** button.
+- A request can carry its own time on the cube (used by the extras, the bell's flash and the snow's falling snow).
+
+**Updating from v23**
+1. End every `python` / `pythonw` in Task Manager (search "py"), then start the v24 bridge **once**. The v24 folder on
+   the Desktop already has your `showplay_config.json`.
+2. Upload the new `visitors-page/index.html` to GitHub and reload the page on the phones.
+3. Open http://localhost:8099/fun and switch on the extras you want. For Guess the song, make a `songs` folder next to
+   the bridge with 4 or more WAV songs.
+
+**Tested**
+- Each cube extra: its job, its time on the cube and its frames (a contact sheet of the photo frames, the wheel, all
+  five animals and four paintings was checked by eye); the wait per phone; through `add()` into the queue with a note.
+- The wheel always stops on the slice the bridge picked (all 8 slices checked under the pointer).
+- Bell: rings once, refuses during the wait, flashes the chosen prop; the bell sound is a 1.8 s WAV.
+- Snow with a fake relay: "on", then "off" 2 s later; refused while snowing, while resting, after the night's limit
+  and outside the hours.
+- Treasure hunt: wrong and right numbers, a word with an accent and punctuation, a wrong and a right prop, fireworks
+  after the last clue; a clue with a prop that does not exist is dropped.
+- Guess the song with 5 generated songs: lobby, join, a second "new" refused, 3 songs with answers, scores (the right
+  and faster player wins), the clips played and the cube's bars, titles and podium queued.
+- The Fun state is 1.2 KB with everything on.
+- In a browser: the Fun tab (all eight, posting the right requests, a hunt answer marked right and moving to the next
+  clue, a song answer and its reveal) and the /fun page (saving each extra, adding a slice and a prop clue, the
+  "not ready" reasons, Ring it now), with no script errors. The v18, v19, v21 and v23 tests still pass.
 
 ---
 

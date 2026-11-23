@@ -1,4 +1,4 @@
-# ShowPlay — Installation guide for Windows (v23)
+# ShowPlay — Installation guide for Windows (v24)
 
 Visitors scan a QR code on the wall, and from their phone they send a message, a picture, an effect or a drawing
 to a cube of LED matrices, play **games** on it (Four in a Row, Tic-tac-toe, Simon, Count the colours, Snake, Space Invaders, Pong, Race to the Star), take turns to **play the lights** of the props, **sing** into the phone and make a singing prop sing it, or light up **props of the show** (the wings, the bats,
@@ -370,6 +370,22 @@ page). The full guide is `../docs/xmas.md`.
   hang a bauble that lights up on the real tree. The decorated tree shows for a while after each new bauble (or all
   the time); when it is full there is a party and it starts again.
 
+## Fun extras (visitors)
+
+Eight extras on the visitors' **🎁 Fun** tab, set up on **http://localhost:8099/fun** (or **🎁 Fun** at the top of the
+control page). The full guide is `../docs/fun.md`.
+
+| Extra | In short |
+| --- | --- |
+| 📸 Photo frame | A frame on the cube, 3-2-1, a flash, and the frame holds for the photo |
+| 🎰 Wheel of fortune | A wheel spins on the cube and stops on an effect, a message, a colour or "spin again" |
+| 🐾 Pick an animal | A pixel animal walks across the sides and hops |
+| 🖍️ Paint by numbers | Visitors colour a ready-made drawing that fills in on the cube |
+| 🔔 Ring the bell | A bell on the speaker and a gold flash on the cube or a prop |
+| 🌨️ Snow on request | Switches a snow or bubble machine through a web address (Shelly, Tasmota, ESP32…) |
+| 🔦 Treasure hunt | Clues on the phones; the answer is a word, a number or a prop |
+| 🎶 Guess the song | A round for up to 8 phones with WAV songs from the `songs` folder |
+
 ## Props of the show (through EZPlayer)
 
 If you run an **EZPlayer** show, visitors can also light up props of the show, such as a pair of wings, the bats or
@@ -480,3 +496,4 @@ New in v12: pads, faders and keys for **whoever runs the show**. The full guide 
 - **The phones get every board about 30 s late, with no 429 in the log:** IPv6 does not work on your network and older bridges waited for it on every post. Update to v20 or later, which uses IPv4 first (and since v21 waits at most 3 s for each address).
 - **Only one bridge at a time:** `autostart.bat` starts a hidden bridge, `start_bridge.bat` starts another in a window. Use one or the other. Since v23 a second bridge stops by itself with "Another ShowPlay bridge is already running".
 - **No 📅 Advent or 🎄 Tree tab:** switch them on at http://localhost:8099/xmas and save (see `../docs/xmas.md`).
+- **No 🎁 Fun tab, or an extra is missing:** switch it on at http://localhost:8099/fun; the page says what is missing (see `../docs/fun.md`).

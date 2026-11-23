@@ -1,6 +1,6 @@
 # ShowPlay for macOS — What is in this folder
 
-Every file of the `macOS` folder of ShowPlay v23, what it is for, and whether you need to change it, plus the parts
+Every file of the `macOS` folder of ShowPlay v24, what it is for, and whether you need to change it, plus the parts
 shared with the other versions. To install and set it up, see [INSTALL.md](INSTALL.md).
 
 ```
@@ -42,6 +42,7 @@ macOS/
 | `../docs/props.md` | How the Props feature works, step by step: what visitors pick, setting up props, how the effects are drawn and sent to EZPlayer, effects and palettes, troubleshooting. |
 | `../docs/race.md` | Race to the Star (new in v18): the ways to play, the phone, the race panel, tracks and stars, how climbing works, messages, settings, troubleshooting. |
 | `../docs/xmas.md` | Advent calendar and Decorate the tree (new in v23): what visitors see, the doors, the tree's spots and baubles, the settings page, messages, troubleshooting. |
+| `../docs/fun.md` | Fun extras (new in v24): photo frame, wheel of fortune, animals, paint by numbers, bell, snow on request, treasure hunt, guess the song; settings, messages, troubleshooting. |
 | `../docs/sing.md` | Sing (new in v17): the 🎤 tab, setting up the singers, the speaker on each platform, how the mouth moves, privacy and limits, settings, troubleshooting. |
 | `../docs/mixer.md` | The Mixer, Keys and MIDI controllers (new in v12): every tab, the Alesis VI25 preset, how the Mixer works with the visitors, the settings, the controls and the API, troubleshooting. |
 
@@ -103,6 +104,9 @@ Apple command line tools or from python.org) and nothing else.
   whoever is behind, the finish), its tracks and stars on any models, groups or the cube, and its own settings page
   at `/race` with a test race and saved profiles.
   Since v19 it also has three looks for the climbers: rope, climber or automatic.
+- **Fun extras** (new in v24): photo frame, wheel of fortune, pick an animal and paint by numbers on the cube; the
+  bell and Guess the song on the speaker; snow on request through a web address; the treasure hunt; their settings
+  page at `/fun`. Optional: a `songs` folder (WAV) and a `bell.wav` next to the bridge.
 - **Advent calendar and Decorate the tree** (new in v23): the doors and what they do, games unlocked by day, the
   tree's spots spread over any models, the baubles and the party when full, and their settings page at `/xmas`.
 - **ntfy.sh today and one bridge at a time** (new in v23): today's message counts on the control page, at most
