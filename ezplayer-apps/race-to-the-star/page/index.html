@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0a16">
+<title>Race to the Star</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --raise: #261d3a; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 10px 14px 24px; gap: 12px; min-height: 100dvh; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  header { display: flex; width: 100%; max-width: 520px; justify-content: space-between; align-items: baseline; gap: 10px; }
+  h1 { margin: 0; font-size: 20px; }
+  #phaseTag { color: var(--dim); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+  section { width: 100%; max-width: 520px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  #message { width: 100%; max-width: 520px; min-height: 1.4em; text-align: center; color: var(--dim); }
+  #message.alert { color: #ffb347; }
+  .lab { font-size: 13px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+  input[type=text] { width: 100%; font: inherit; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+  .swatches button { width: 44px; height: 44px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; padding: 0; }
+  .swatches button[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 10px #fff9; }
+  .swatches button:disabled { opacity: 0.2; cursor: default; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button { font: inherit; font-weight: 600; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+  .chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #1a1200; }
+  .note { margin: 0; font-size: 13px; color: var(--dim); }
+  .buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+  button.action { flex: 1; font: inherit; font-weight: 700; font-size: 17px; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 12px; min-height: 50px; cursor: pointer; }
+  button.action.primary { background: var(--accent); border-color: var(--accent); color: #1a1200; }
+  button.action:disabled { opacity: 0.4; }
+  #tap { width: 100%; min-height: 190px; border: 0; border-radius: 26px; font: 900 30px/1.1 system-ui, sans-serif; color: #fff; cursor: pointer; text-shadow: 0 2px 6px #0008; }
+  #tap:active { transform: scale(0.97); filter: brightness(1.2); }
+  #instruction { font-size: 22px; font-weight: 700; text-align: center; padding: 30px 10px; }
+  .meter { height: 22px; border-radius: 11px; background: var(--raise); overflow: hidden; }
+  .meter div { height: 100%; width: 0; transition: width 0.15s; }
+  #count { font-size: 64px; font-weight: 900; text-align: center; color: var(--accent); line-height: 1; }
+  #chart { flex-direction: row; align-items: flex-end; justify-content: center; gap: 10px; height: 230px; padding: 14px 14px 36px; position: relative; }
+  .bar { flex: 1; max-width: 56px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; position: relative; }
+  .bar .fill { width: 100%; border-radius: 8px 8px 3px 3px; min-height: 4px; transition: height 0.25s linear; box-shadow: 0 0 10px #0006 inset; }
+  .bar.me .fill { outline: 3px solid #fff; outline-offset: 2px; }
+  .bar .who { position: absolute; left: 0; right: 0; bottom: -24px; font-size: 12px; text-align: center; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar .top { position: absolute; left: 0; right: 0; text-align: center; font-size: 18px; }
+  #chart::before { content: "🌟"; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); font-size: 18px; }
+  #banner { width: 100%; max-width: 520px; text-align: center; font-size: 22px; font-weight: 800; padding: 16px; border-radius: 16px; background: var(--raise); border: 1px solid var(--accent); }
+  #players { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pchip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: var(--raise); border: 1px solid var(--line); font-size: 14px; }
+  .pchip i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+</style>
+</head>
+<body>
+<header><h1>🌟 Race to the Star</h1><span id="phaseTag"></span></header>
+<div id="message">Connecting...</div>
+
+<section id="choice" hidden>
+  <div class="lab">Your name</div>
+  <input id="name" type="text" maxlength="16" placeholder="Player" autocomplete="off">
+  <div class="lab">Your color</div>
+  <div id="colors" class="swatches"></div>
+  <div class="lab">How you climb</div>
+  <div id="modes" class="chips"></div>
+  <p id="modeHelp" class="note"></p>
+  <div class="lab">Your level</div>
+  <div id="levels" class="chips"></div>
+  <div class="buttons"><button id="go" class="action primary">New race</button></div>
+</section>
+
+<section id="lobby" hidden>
+  <div id="lobbyText"></div>
+  <div id="players"></div>
+  <div class="buttons"><button id="startNow" class="action primary">Start now</button><button id="leave" class="action">Leave</button></div>
+</section>
+
+<section id="play" hidden>
+  <div id="count" hidden></div>
+  <button id="tap" hidden>TAP TAP TAP!</button>
+  <div id="instruction" hidden></div>
+  <div class="meter"><div id="meter"></div></div>
+  <div id="rank" class="note"></div>
+  <div class="buttons"><button id="leave2" class="action">Leave</button></div>
+</section>
+
+<div id="banner" hidden></div>
+<section id="chart" hidden></section>
+
+<script>
+  const el = (id) => document.getElementById(id);
+  const MODES = { tap: '👆 Tap', voice: '🎤 Voice', shake: '🤳 Shake', run: '🏃 Run' };
+  const MODE_HELP = {
+    tap: 'Tap the big button as fast as you can. Stop, and you slide back down.',
+    voice: 'Sing or hold an "aaaa" loudly and without stopping. Only a number leaves your phone, never the sound.',
+    shake: 'Shake the phone hard and fast. Hold it tight with both hands!',
+    run: 'Run or march on the spot with the phone in your hand. Keep some space around you.',
+  };
+  const LEVELS = { kid: '🧒 Child', adult: '🧑 Adult', sport: '🏃 Sporty' };
+  const hasMotion = () => typeof DeviceMotionEvent !== 'undefined';
+  const hasMic = () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  const vibrate = (p) => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) { /* not on this phone */ } };
+
+  let app = null;
+  let status = { phase: 'idle', players: [], modes: ['tap'], colors: [], maxPlayers: 4 };
+  let skew = 0; // server clock minus ours, for the countdowns
+  let choice = { name: '', color: '', mode: '', level: 'adult' };
+  try { choice.name = localStorage.getItem('race.name') || ''; } catch (e) { /* no storage */ }
+  el('name').value = choice.name;
+
+  const me = () => (app && status.players || []).find((p) => p.id === app.clientId) || null;
+  const inRace = () => ['countdown', 'running'].includes(status.phase);
+
+  // ---- Effort measured on the phone, one number from 0 to 1 sent about once a second ----
+  let meas = null, sendTimer = null, measuringRace = 0, taps = [];
+  const prep = { motion: false, stream: null, ctx: null };
+
+  async function motionOk() {
+    if (hasMotion() && typeof DeviceMotionEvent.requestPermission === 'function') {
+      try { return (await DeviceMotionEvent.requestPermission()) === 'granted'; } catch (e) { return false; }
+    }
+    return hasMotion();
+  }
+
+  // Permissions are asked while the player taps New race / Join: phones allow them only during a tap.
+  async function prepare(mode) {
+    if (mode === 'shake' || mode === 'run') {
+      prep.motion = await motionOk();
+      if (!prep.motion) { say('Motion is not allowed on this phone: allow it, or pick another way to climb.', true); return false; }
+    }
+    if (mode === 'voice' && !prep.stream) {
+      try {
+        prep.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (prep.ctx.resume) prep.ctx.resume();
+        prep.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false } });
+      } catch (e) { say('The microphone is not allowed. Allow it to climb with your voice!', true); prep.ctx = null; return false; }
+    }
+    return true;
+  }
+
+  function release() {
+    if (prep.stream) { prep.stream.getTracks().forEach((t) => t.stop()); prep.stream = null; }
+    if (prep.ctx) { try { prep.ctx.close(); } catch (e) { /* already closed */ } prep.ctx = null; }
+  }
+
+  function stopMeasure() {
+    if (meas) { try { meas.stop(); } catch (e) { /* nothing to stop */ } meas = null; }
+    clearInterval(sendTimer); sendTimer = null;
+    measuringRace = 0;
+    el('meter').style.width = '0';
+  }
+
+  /** Sets `meas` to { stop(), effort() } where effort() is the last second's effort, 0..1. */
+  async function startMeasure(mode) {
+    stopMeasure();
+    const now = () => performance.now();
+    if (mode === 'tap') {
+      taps = [];
+      meas = { stop() {}, effort() { const t = now(); taps = taps.filter((x) => t - x < 1000); return Math.min(1, taps.length / 8); } };
+      return;
+    }
+    if (mode === 'voice') {
+      if (!prep.stream && !(await prepare('voice'))) return;
+      const ctx = prep.ctx, an = ctx.createAnalyser();
+      an.fftSize = 1024;
+      ctx.createMediaStreamSource(prep.stream).connect(an);
+      if (ctx.resume) ctx.resume();
+      const buf = new Float32Array(an.fftSize), hist = [];
+      const timer = setInterval(() => {
+        an.getFloatTimeDomainData(buf);
+        let s = 0;
+        for (const x of buf) s += x * x;
+        const level = Math.max(0, Math.min(1, (Math.sqrt(s / buf.length) - 0.015) / 0.15));
+        hist.push([now(), level]);
+        while (hist.length && now() - hist[0][0] > 1000) hist.shift();
+      }, 80);
+      // 60% for how steadily the voice is on, 40% for how loud: a steady voice beats shouting.
+      meas = { stop() { clearInterval(timer); release(); }, effort() {
+        if (!hist.length) return 0;
+        const voiced = hist.filter((h) => h[1] > 0.12).length / hist.length;
+        const avg = hist.reduce((a, h) => a + h[1], 0) / hist.length;
+        return Math.min(1, 0.6 * voiced + 0.4 * avg);
+      } };
+      return;
+    }
+    if (!prep.motion && !(await motionOk())) { say('Motion is not allowed on this phone: allow it, or pick another way to climb.', true); return; }
+    const hist = [], peaks = [];
+    let g = [0, 0, 0], lastPeak = 0;
+    const thr = mode === 'shake' ? 8 : 3.5, gap = mode === 'shake' ? 110 : 260;
+    const onMotion = (ev) => {
+      let a = ev.acceleration && ev.acceleration.x != null ? [ev.acceleration.x, ev.acceleration.y, ev.acceleration.z] : null;
+      if (!a) {
+        // No linear acceleration on this phone: take gravity out with a slow low-pass.
+        const ag = ev.accelerationIncludingGravity || {};
+        const v = [ag.x || 0, ag.y || 0, ag.z || 0];
+        g = g.map((x, i) => x * 0.9 + v[i] * 0.1);
+        a = v.map((x, i) => x - g[i]);
+      }
+      const mag = Math.hypot(a[0], a[1], a[2]), t = now();
+      hist.push([t, mag]);
+      while (hist.length && t - hist[0][0] > 1000) hist.shift();
+      if (mag > thr && t - lastPeak > gap) { peaks.push(t); lastPeak = t; }
+      while (peaks.length && t - peaks[0] > 1000) peaks.shift();
+    };
+    addEventListener('devicemotion', onMotion);
+    meas = { stop() { removeEventListener('devicemotion', onMotion); }, effort() {
+      if (mode === 'run') return Math.min(1, peaks.length / 3.5);
+      // Shake: half capped strength, half rhythm (6 shakes a second = full), so violence gives nothing extra.
+      const energy = hist.length ? Math.min(1, hist.reduce((s, h) => s + Math.min(h[1], 25), 0) / hist.length / 14) : 0;
+      return Math.min(1, 0.5 * energy + 0.5 * Math.min(1, peaks.length / 6));
+    } };
+  }
+
+  function startSending() {
+    clearInterval(sendTimer);
+    sendTimer = setInterval(() => {
+      if (!inRace() || !meas || !me()) return;
+      const value = Math.round(meas.effort() * 100) / 100;
+      el('meter').style.width = Math.round(value * 100) + '%';
+      app.send({ type: 'effort', value }).catch(() => undefined);
+    }, 1000);
+  }
+
+  el('tap').addEventListener('pointerdown', (e) => { e.preventDefault(); taps.push(performance.now()); vibrate(8); });
+  addEventListener('keydown', (e) => { if (e.key === ' ' && inRace() && me() && me().mode === 'tap') { e.preventDefault(); taps.push(performance.now()); } });
+
+  // ---- The screens ----
+  function say(text, alert) { el('message').textContent = text; el('message').className = alert ? 'alert' : ''; }
+
+  function chip(text, pressed, onClick, disabled) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = text; b.disabled = !!disabled;
+    b.setAttribute('aria-pressed', String(pressed));
+    b.onclick = () => { onClick(); render(); };
+    return b;
+  }
+
+  function renderChoice() {
+    const taken = status.phase === 'waiting' ? status.players.map((p) => p.color) : [];
+    const colors = status.colors || [];
+    const free = colors.filter((c) => !taken.includes(c));
+    if (!free.includes(choice.color)) choice.color = free[0] || '';
+    const modes = (status.modes || ['tap']).filter((m) => (m === 'shake' || m === 'run' ? hasMotion() : m === 'voice' ? hasMic() : true));
+    if (!modes.includes(choice.mode)) choice.mode = modes[0] || 'tap';
+    el('colors').replaceChildren(...colors.map((c) => {
+      const b = chip('', c === choice.color, () => { choice.color = c; }, taken.includes(c));
+      b.style.background = '#' + c; b.setAttribute('aria-label', 'Color');
+      return b;
+    }));
+    el('modes').replaceChildren(...modes.map((m) => chip(MODES[m], m === choice.mode, () => { choice.mode = m; })));
+    el('modeHelp').textContent = MODE_HELP[choice.mode] || '';
+    el('levels').replaceChildren(...Object.keys(LEVELS).map((l) => chip(LEVELS[l], l === choice.level, () => { choice.level = l; })));
+    const waiting = status.phase === 'waiting';
+    const full = waiting && status.players.length >= (status.maxPlayers || 8);
+    el('go').textContent = waiting ? (full ? 'The race is full' : 'Join the race') : 'New race';
+    el('go').disabled = status.phase === 'unconfigured' || full || !choice.color;
+  }
+
+  function renderChart() {
+    const ps = status.players || [];
+    el('chart').hidden = !ps.length || !['waiting', 'countdown', 'running', 'finished'].includes(status.phase);
+    el('chart').replaceChildren(...ps.map((p, i) => {
+      const bar = document.createElement('div');
+      bar.className = 'bar' + (app && p.id === app.clientId ? ' me' : '');
+      const fill = document.createElement('div');
+      fill.className = 'fill'; fill.style.background = '#' + p.color; fill.style.height = Math.max(2, p.pos * 100) + '%';
+      const who = document.createElement('div'); who.className = 'who'; who.textContent = p.name;
+      const top = document.createElement('div'); top.className = 'top';
+      top.style.bottom = Math.max(2, p.pos * 100) + '%';
+      top.textContent = status.phase === 'finished' && status.winner === i ? '🌟' : app && p.id === app.clientId ? '★' : '';
+      bar.append(top, fill, who);
+      return bar;
+    }));
+  }
+
+  let countTimer = null;
+  function tickCountdown() {
+    const now = Date.now() + skew;
+    if (status.phase === 'waiting' && status.waitEndsAt) {
+      const left = Math.max(0, Math.ceil((status.waitEndsAt - now) / 1000));
+      const n = status.players.length;
+      el('lobbyText').textContent = `${n} player${n === 1 ? '' : 's'} ready. The race starts in ${left} s.`;
+    } else if (status.phase === 'countdown' && status.startsAt) {
+      const left = Math.ceil((status.startsAt - now) / 1000);
+      el('count').textContent = left > 0 ? String(left) : 'GO!';
+    }
+  }
+
+  function render() {
+    const ps = status.players || [];
+    const mine = me();
+    const phase = status.phase;
+    el('phaseTag').textContent = phase === 'unconfigured' ? 'not set up' : phase === 'idle' ? '' : phase;
+    say(status.message || '', phase === 'unconfigured');
+
+    const showChoice = phase === 'idle' || phase === 'unconfigured' || phase === 'finished' || (phase === 'waiting' && !mine);
+    el('choice').hidden = !showChoice;
+    if (showChoice) renderChoice();
+
+    el('lobby').hidden = !(phase === 'waiting' && mine);
+    if (phase === 'waiting' && mine) {
+      el('players').replaceChildren(...ps.map((p) => {
+        const c = document.createElement('span'); c.className = 'pchip';
+        const dot = document.createElement('i'); dot.style.background = '#' + p.color;
+        c.append(dot, `${p.name} · ${MODES[p.mode] || p.mode}`);
+        return c;
+      }));
+      el('startNow').hidden = !(status.early && ps[0] && ps[0].id === app.clientId);
+    }
+
+    const playing = inRace() && mine;
+    el('play').hidden = !playing;
+    if (playing) {
+      el('count').hidden = phase !== 'countdown';
+      el('tap').hidden = !(phase === 'running' && mine.mode === 'tap');
+      el('tap').style.background = '#' + mine.color;
+      el('instruction').hidden = !(phase === 'running' && mine.mode !== 'tap');
+      el('instruction').textContent = mine.mode === 'voice' ? '🎤 Sing "aaaa" loud and long!' : mine.mode === 'shake' ? '🤳 Shake, shake, shake!' : '🏃 Run on the spot!';
+      el('meter').style.background = '#' + mine.color;
+      const order = ps.map((p, i) => i).sort((a, b) => ps[b].pos - ps[a].pos);
+      const rank = order.indexOf(ps.indexOf(mine)) + 1;
+      el('rank').textContent = phase === 'running' ? `You are number ${rank} of ${ps.length}. Keep going to the star!` : 'Get ready...';
+      if (measuringRace !== status.raceId) {
+        measuringRace = status.raceId;
+        startMeasure(mine.mode).then(startSending);
+        vibrate(200);
+      }
+    } else if (meas || sendTimer) {
+      stopMeasure();
+      release();
+    }
+
+    const w = phase === 'finished' && status.winner != null ? ps[status.winner] : null;
+    el('banner').hidden = !(phase === 'finished');
+    if (phase === 'finished') {
+      if (w && mine && w.id === mine.id) {
+        el('banner').textContent = 'You win! The star is yours! 🌟🎉';
+        if (!el('banner').dataset.buzzed) { el('banner').dataset.buzzed = '1'; vibrate([100, 60, 100]); }
+      } else if (w) {
+        el('banner').textContent = `${w.name} wins! 🌟`;
+        el('banner').style.borderColor = '#' + w.color;
+      } else {
+        el('banner').textContent = status.message || 'The race is over.';
+      }
+    } else {
+      delete el('banner').dataset.buzzed;
+      el('banner').style.borderColor = '';
+    }
+
+    renderChart();
+    tickCountdown();
+  }
+
+  el('name').addEventListener('input', () => {
+    choice.name = el('name').value.trim().slice(0, 16);
+    try { localStorage.setItem('race.name', choice.name); } catch (e) { /* no storage */ }
+  });
+  el('go').addEventListener('click', async () => {
+    if (!app || !choice.color) return;
+    el('go').disabled = true;
+    if (await prepare(choice.mode)) {
+      const type = status.phase === 'waiting' ? 'join' : 'start';
+      say(type === 'join' ? 'Joining...' : 'Opening the race...');
+      app.send({ type, name: choice.name, color: choice.color, mode: choice.mode, level: choice.level }).catch((e) => say(`Could not send: ${e.message}`, true));
+    }
+    setTimeout(() => { el('go').disabled = false; render(); }, 1500);
+  });
+  el('startNow').addEventListener('click', () => app && app.send({ type: 'startNow' }).catch(() => undefined));
+  const leave = () => { if (!app) return; stopMeasure(); release(); app.send({ type: 'leave' }).catch(() => undefined); };
+  el('leave').addEventListener('click', leave);
+  el('leave2').addEventListener('click', leave);
+
+  function init() {
+    app = EZApp.connect();
+    app.onStatus((s, snap) => {
+      if (!s) return;
+      if (snap && typeof snap.at === 'number') skew = snap.at - Date.now();
+      status = s;
+      render();
+    });
+    app.ready.catch((e) => say(`Could not reach the player: ${e.message}`, true));
+    clearInterval(countTimer);
+    countTimer = setInterval(tickCountdown, 250);
+    render();
+  }
+
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => say('Could not load the app SDK.', true);
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>
