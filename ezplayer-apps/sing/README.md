@@ -59,3 +59,7 @@ The page sends `sing` (`a`: `part`, `id`, `n`, `of`, `s`: who sings, `rate`, `d`
 ## Left out of the original
 
 Approval of recordings by the crew, and the cube side as a singer (any matrix can be one here).
+
+## Changes
+
+- **Version 2:** a group made of submodels lights only those submodels (before, it lit the whole models they belong to).
