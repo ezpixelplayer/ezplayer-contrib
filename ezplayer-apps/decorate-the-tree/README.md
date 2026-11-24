@@ -41,9 +41,13 @@ positions for the model, the app uses its grid instead (`grid` lease), as before
 - **The star's effect** (twinkle) and **the star's effects visitors can choose**: twinkle, steady, blink, pulse, spin
   (a bright band turning round the star), sparkle (white glints), rainbow.
 - **Decorations visitors can hang**: bauble, candy cane, star, bell, present, snowflake, heart (all by default).
-- **Effects a visitor can mix at once** (3; from 1, one at a time, to 6), for a decoration and for the star.
-- **Effects visitors can choose for their decoration**: glow (a slow shimmer), steady, blink, twinkle (each pixel on
-  its own), pulse, rainbow (the colours turn). Nothing flashes faster than about 3 times a second.
+- **Decorations a visitor can hang at once** (5; from 1 to 10): the visitor taps several spots, each with its own
+  decoration, colour and effects, then presses one button and they all appear together.
+- **Effects a visitor can pick** (3; from 1 to 6), for a decoration and for the star. Several effects take turns on
+  the lights (2.5 s each), so each one is seen clearly.
+- **Effects visitors can choose for their decoration**, each clearly different: glow (breathes slowly from dim to
+  bright), steady (always on), blink (fully on, fully off), twinkle (white sparkles pixel by pixel), pulse (a heartbeat:
+  two quick beats, dark between), rainbow (runs through the colours). Nothing flashes faster than about 3 times a second.
 - **Size of the decorations** (100 %).
 - **Baubles** (30), **each phone waits** between baubles, **show the tree for** after each new one.
 - **Show the decorated tree all the time** (off: the show's sequence plays between baubles).
@@ -53,10 +57,11 @@ positions for the model, the app uses its grid instead (`grid` lease), as before
 
 ## Use
 
-The phone shows the tree as a triangle with the spots on it; tap a free spot, pick a decoration and a colour, and it is
-on the lights, with the effects picked (glow, steady, blink, twinkle, pulse, rainbow): up to 3 can be mixed, for
-example rainbow and blink (Steady goes alone). A spot taken by someone else in
-the meantime is refused with a note. Tap the star to change its colour and effects (also up to 3 mixed, for example spin and sparkle).
+The phone shows the tree as a triangle with the spots on it. Tap a free spot and pick its decoration, colour and
+effects (up to 3, for example rainbow and blink; Steady goes alone); tap more spots for more decorations (up to 5 by
+default), each with its own choices. The one with the white ring is the one being changed: tap another chosen one to
+change it, or tap it twice to take it off. Then **Show it on the tree!** hangs them all at once. A spot taken by
+someone else in the meantime is skipped with a note, and the others are hung. Tap the star to change its colour and effects (also up to 3 mixed, for example spin and sparkle).
 
 On the lights each decoration is drawn in its spot: a candy cane with red and white stripes, a present with a gold
 ribbon and bow (white on a gold present), a bell with its clapper, a five-pointed star, a six-armed snowflake, a heart,
@@ -65,7 +70,8 @@ spot too small for its shape keeps what tells it apart (a cane's stripes, a pres
 
 ## Events
 
-The page sends `hang` (`i`: the spot, `c`: the colour 1 to 8, `k`: the decoration, `f`: its effect, or a list of up to 3) and `star`
+The page sends `hang` with `d`: a list of up to `maxDeco` decorations, each `[spot, colour 1 to 8, decoration, effects]`
+(the older single form `i`, `c`, `k`, `f` still works), and `star`
 (`c`: the colour, `f`: an effect or a list of up to 3).
 
 ## Left out of the original
@@ -103,3 +109,9 @@ the player (while the number of spots stays the same).
   adds it or takes it away.
 
 - **Version 10:** a setting for how many effects a visitor can mix at once (1 to 6, 3 by default).
+
+- **Version 11:** several decorations at once: tap several spots (up to **Decorations a visitor can hang at once**, 5
+  by default), each with its own decoration, colour and effects, then one button hangs them all. The effects are now
+  clearly different on the lights (blink fully off, pulse as a heartbeat, twinkle with white sparkles, glow breathing
+  slowly), and several effects on one decoration or on the star take turns instead of multiplying (which made them
+  look alike).

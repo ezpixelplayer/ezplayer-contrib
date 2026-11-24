@@ -32,16 +32,20 @@ function fxPick(f, allowed, dflt, max = 3) {
 const rnd = (i) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };   // a fixed random number for each pixel
 
 /** a decoration's brightness (0..1) for its effect at time t; rainbow also gives a colour */
+// how an effect lights a decoration's pixel: [brightness 0..1, white glint 0..1]. Each one is clearly different, so they
+// still tell apart on a few pixels and in a small preview: Glow breathes slowly, Steady stays on, Blink goes fully on and
+// off, Twinkle sparkles white pixel by pixel, Pulse beats like a heart (two quick beats), Rainbow runs through the colours.
 function decoLight(fx, t, sp, i) {
     switch (fx) {
-        case 'steady': return 1;
-        case 'blink': return Math.floor(t * 3 + rnd(sp) * 2) % 2 ? 1 : 0.06;
-        case 'twinkle': return 0.35 + 0.65 * Math.max(0, Math.sin(t * (3 + rnd(i) * 3) + rnd(i + 7) * 6.3)) ** 3;
-        case 'pulse': return 0.12 + 0.88 * (0.5 + 0.5 * Math.sin(t * 4 + sp * 0.9));
-        case 'rainbow': return 0.85 + 0.15 * Math.sin(t * 2 + sp);
-        default: return 0.75 + 0.25 * Math.sin(t * 2.3 + sp * 1.7);   // glow
+        case 'steady': return [1, 0];
+        case 'blink': return [Math.floor(t * 2 + rnd(sp)) % 2 ? 1 : 0, 0];
+        case 'twinkle': { const w = Math.max(0, Math.sin(t * (5 + rnd(i) * 4) + rnd(i + 7) * 6.3)) ** 10; return [0.45 + 0.55 * w, w * 0.8]; }
+        case 'pulse': { const p = ((t * 0.9 + rnd(sp)) % 1 + 1) % 1; return [0.04 + 0.96 * Math.max(Math.exp(-((p - 0.1) ** 2) / 0.003), 0.8 * Math.exp(-((p - 0.3) ** 2) / 0.003)), 0]; }
+        case 'rainbow': return [1, 0];
+        default: return [0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * 1.6 + sp * 1.7)), 0];   // glow
     }
 }
+const FX_TURN = 2.5;   // several effects on one decoration take turns, this many seconds each
 
 /**
  * how a decoration lights a pixel at (x across, y up), both in radii from its middle: null = not part of it, else
@@ -91,7 +95,7 @@ export function shapeAt(kind, x, y) {
         default: return d <= 1 ? [1, d < 0.35 && x < 0 && y > 0 ? 0.35 : 0] : null;   // a bauble with a shine
     }
 }
-const DEFAULTS = { target: '', shape: 'tree', star: '', kinds: KINDS.map(([k]) => k), fx: DECO_FX.map(([k]) => k), starFx: 'twinkle', starFxs: STAR_FX.map(([k]) => k), starPick: true, maxFx: 3, starColor: 'ffbe28', starEvery: 30, fps: 20, brightness: 100, spots: 30, every: 60, show: 30, always: false, bg: 'green', restart: true, size: 100 };
+const DEFAULTS = { target: '', shape: 'tree', star: '', kinds: KINDS.map(([k]) => k), fx: DECO_FX.map(([k]) => k), starFx: 'twinkle', starFxs: STAR_FX.map(([k]) => k), starPick: true, maxFx: 3, maxDeco: 5, starColor: 'ffbe28', starEvery: 30, fps: 20, brightness: 100, spots: 30, every: 60, show: 30, always: false, bg: 'green', restart: true, size: 100 };
 const PARTY_MS = 15000;
 const MAX_CANDIDATES = 3000;
 
@@ -102,7 +106,7 @@ export function cleanSettings(raw) {
         if (Array.isArray(raw[key])) { const k = list.map(([x]) => x).filter((x) => raw[key].includes(x)); if (k.length) s[key] = k; }
     if (STAR_FX.some(([k]) => k === raw.starFx)) s.starFx = raw.starFx;
     for (const k of ['target', 'star']) if (typeof raw[k] === 'string') s[k] = raw[k].trim().slice(0, 200);
-    for (const [k, lo, hi] of [['fps', 5, 30], ['brightness', 10, 100], ['maxFx', 1, MAX_FX], ['starEvery', 0, 600], ['spots', 8, 60], ['every', 0, 600], ['show', 10, 300], ['size', 50, 150]]) s[k] = num(raw[k], lo, hi, s[k]);
+    for (const [k, lo, hi] of [['fps', 5, 30], ['brightness', 10, 100], ['maxFx', 1, MAX_FX], ['maxDeco', 1, 10], ['starEvery', 0, 600], ['spots', 8, 60], ['every', 0, 600], ['show', 10, 300], ['size', 50, 150]]) s[k] = num(raw[k], lo, hi, s[k]);
     for (const k of ['always', 'restart', 'starPick']) if (typeof raw[k] === 'boolean') s[k] = raw[k];
     if (typeof raw.starColor === 'string' && /^#?[0-9a-fA-F]{6}$/.test(raw.starColor)) s.starColor = raw.starColor.replace('#', '').toLowerCase();
     if (raw.bg === 'green' || raw.bg === 'off') s.bg = raw.bg;
@@ -260,7 +264,7 @@ export class App {
 
     constructor(s) {
         this.s = s; this.ready = false; this.tree = null; this.star = null; this.lay = null; this.key = '';
-        this.orn = ''; this.kinds = ''; this.fxs = ''; this.by = new Map(); this.last = -1; this.lastAt = 0; this.lastBy = null; this.showUntil = 0; this.partyUntil = 0;
+        this.orn = ''; this.kinds = ''; this.fxs = ''; this.by = new Map(); this.last = -1; this.lastSet = []; this.hung = 0; this.lastAt = 0; this.lastBy = null; this.showUntil = 0; this.partyUntil = 0;
         this.problems = []; this.twinkle = null;
         this.starCol = ''; this.starFx = null; this.starAng = null; this.starBy = new Map(); this.starAt = 0; this.starLastBy = null;   // the star's colour, picked by a visitor ('' = the one in the settings)
     }
@@ -316,24 +320,35 @@ export class App {
         if (!this.lay) return 'The tree is not ready yet.';
         const n = this.lay.spots.length;
         if (now < this.partyUntil) return 'The tree is full: party time! Wait a moment.';
-        if (!Number.isInteger(d.i) || d.i < 0 || d.i >= n || !Number.isInteger(d.c) || d.c < 1 || d.c > COLORS.length) return '';
-        if (this.orn[d.i] !== '0') return 'Someone was faster! Pick another spot.';
-        const kind = d.k === undefined ? 'bauble' : d.k;
-        const ki = KINDS.findIndex(([k]) => k === kind);
-        if (ki < 0 || !this.s.kinds.includes(kind)) return 'Pick one of the decorations.';
-        const fx = fxPick(d.f, this.s.fx, this.s.fx[0], this.s.maxFx);
-        if (!fx) return this.s.maxFx > 1 ? `Pick one of the effects (up to ${this.s.maxFx} together).` : 'Pick one of the effects.';
+        // one decoration ({i, c, k, f}) or several at once ({d: [[i, c, k, f], ...]}, up to maxDeco), hung together
+        const list = Array.isArray(d.d) ? d.d.map((x) => (Array.isArray(x) ? { i: x[0], c: x[1], k: x[2], f: x[3] } : x)) : [{ i: d.i, c: d.c, k: d.k, f: d.f }];
+        if (!list.length) return '';
+        if (list.length > this.s.maxDeco) return this.s.maxDeco > 1 ? `You can hang up to ${this.s.maxDeco} decorations at once.` : 'You can hang one decoration at a time.';
         const left = Math.ceil(((this.by.get(client) ?? -Infinity) + this.s.every * 1000 - now) / 1000);
-        if (left > 0) return `You can hang another decoration in ${left} s.`;
-        this.orn = this.orn.slice(0, d.i) + d.c + this.orn.slice(d.i + 1);
-        this.kinds = this.kinds.slice(0, d.i) + ki + this.kinds.slice(d.i + 1);
-        this.fxs = this.fxs.slice(0, d.i) + B64[maskOf(fx, DECO_FX)] + this.fxs.slice(d.i + 1);
+        if (left > 0) return `You can hang more decorations in ${left} s.`;
+        const ok = [], seen = new Set();
+        let taken = 0;
+        for (const x of list) {
+            if (!x || typeof x !== 'object' || !Number.isInteger(x.i) || x.i < 0 || x.i >= n || seen.has(x.i) || !Number.isInteger(x.c) || x.c < 1 || x.c > COLORS.length) return '';
+            seen.add(x.i);
+            const kind = x.k === undefined ? 'bauble' : x.k;
+            const ki = KINDS.findIndex(([k]) => k === kind);
+            if (ki < 0 || !this.s.kinds.includes(kind)) return 'Pick one of the decorations.';
+            const fx = fxPick(x.f, this.s.fx, this.s.fx[0], this.s.maxFx);
+            if (!fx) return this.s.maxFx > 1 ? `Pick one of the effects (up to ${this.s.maxFx} together).` : 'Pick one of the effects.';
+            if (this.orn[x.i] !== '0') { taken++; continue; }
+            ok.push([x.i, x.c, ki, B64[maskOf(fx, DECO_FX)]]);
+        }
+        if (!ok.length) return list.length > 1 ? 'Someone was faster! Those spots are taken: pick others.' : 'Someone was faster! Pick another spot.';
+        const o = [...this.orn], k = [...this.kinds], f = [...this.fxs];
+        for (const [i, c, ki, m] of ok) { o[i] = String(c); k[i] = String(ki); f[i] = m; }
+        this.orn = o.join(''); this.kinds = k.join(''); this.fxs = f.join('');
         this.by.set(client, now);
-        if (this.by.size > 2000) for (const [k, v] of this.by) if (now - v > 3600000) this.by.delete(k);
-        this.last = d.i; this.lastAt = now; this.lastBy = client;
+        if (this.by.size > 2000) for (const [key, v] of this.by) if (now - v > 3600000) this.by.delete(key);
+        this.lastSet = ok.map(([i]) => i); this.last = this.lastSet[this.lastSet.length - 1]; this.lastAt = now; this.lastBy = client; this.hung++;
         this.showUntil = now + this.s.show * 1000;
         if (!this.orn.includes('0') && this.s.restart) { this.partyUntil = now + PARTY_MS; this.showUntil = this.partyUntil; }
-        return '';
+        return taken ? `${ok.length} hung; ${taken} ${taken > 1 ? 'spots were' : 'spot was'} taken by someone faster.` : '';
     }
 
     /** a visitor picks the star's colour (one of the 8 decoration colours) and its effect */
@@ -355,7 +370,7 @@ export class App {
     }
 
     step(now) {
-        if (this.partyUntil && now > this.partyUntil) { this.partyUntil = 0; this.orn = '0'.repeat(this.orn.length); this.kinds = '0'.repeat(this.orn.length); this.fxs = '0'.repeat(this.orn.length); this.starCol = ''; this.starFx = null; }
+        if (this.partyUntil && now > this.partyUntil) { this.partyUntil = 0; this.lastSet = []; this.orn = '0'.repeat(this.orn.length); this.kinds = '0'.repeat(this.orn.length); this.fxs = '0'.repeat(this.orn.length); this.starCol = ''; this.starFx = null; }
     }
 
     showing(now) { return this.ready && (this.s.always || now < this.showUntil || now < this.partyUntil); }
@@ -365,18 +380,19 @@ export class App {
         const t = now / 1000, party = now < this.partyUntil, g = this.tree, map = this.lay.map, out = new Uint8Array(g.n * 3);
         const drawn = this.lay.drawn, bg = this.s.bg === 'green' ? (drawn ? [0, 60, 12] : [0, 34, 6]) : [0, 0, 0], zone = this.lay.zone;
         const shine = Math.max(0, 1 - (now - Math.max(this.lastAt, this.starAt)) / 1200);
-        const sBase = hexRgb(this.starCol || this.s.starColor), sFx = new Set(this.starFx ?? [this.s.starFx]);
+        const sBase = hexRgb(this.starCol || this.s.starColor), sList = (this.starFx ?? [this.s.starFx]).length ? (this.starFx ?? [this.s.starFx]) : ['twinkle'];
         // a pixel of a star (a star model, or the star drawn on a matrix), with the star's colour and effect
         const starPx = (i, n, ang, tw) => {
             if (party) return hsv(t * 0.6 + i / n);
-            // the effects chosen work together: their brightness multiplies, the glints add up, rainbow gives the colour
+            // several effects chosen: they take turns (FX_TURN seconds each), so each one is seen clearly
+            const sf = sList[Math.floor(t / FX_TURN) % sList.length];
             let k = 1, col = sBase, white = 0;
-            if (sFx.has('twinkle')) k *= 0.55 + 0.45 * Math.sin(t * 3 + tw);
-            if (sFx.has('blink')) k *= Math.floor(t * 2.5) % 2 ? 1 : 0.05;
-            if (sFx.has('pulse')) k *= 0.12 + 0.88 * (0.5 + 0.5 * Math.sin(t * 3.5));
-            if (sFx.has('spin')) { const a = ((ang - t * 0.5) % 1 + 1) % 1; k *= 0.15 + 0.85 * Math.max(0, 1 - a * 3); white = Math.max(white, Math.max(0, 1 - a * 8) * 0.6); }
-            if (sFx.has('sparkle')) { const w = Math.max(0, Math.sin(t * (4 + rnd(i) * 5) + rnd(i + 3) * 6.3)) ** 12; k *= 0.6 + 0.4 * w; white = Math.max(white, w); }
-            if (sFx.has('rainbow')) col = hsv(t * 0.3 + ang);
+            if (sf === 'twinkle') k = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(t * 4 + tw));
+            if (sf === 'blink') k = Math.floor(t * 2) % 2 ? 1 : 0;
+            if (sf === 'pulse') { const p = (t * 0.9) % 1; k = 0.04 + 0.96 * Math.max(Math.exp(-((p - 0.1) ** 2) / 0.003), 0.8 * Math.exp(-((p - 0.3) ** 2) / 0.003)); }
+            if (sf === 'spin') { const a = ((ang - t * 0.6) % 1 + 1) % 1; k = 0.1 + 0.9 * Math.max(0, 1 - a * 3); white = Math.max(0, 1 - a * 8) * 0.6; }
+            if (sf === 'sparkle') { const w = Math.max(0, Math.sin(t * (4 + rnd(i) * 5) + rnd(i + 3) * 6.3)) ** 12; k = 0.5 + 0.5 * w; white = w; }
+            if (sf === 'rainbow') col = hsv(t * 0.4 + ang);
             return col.map((v) => { const x = v * k; return Math.min(255, x + (255 - x) * Math.max(shine, white)); });
         };
         for (let i = 0; i < g.n; i++) {
@@ -392,15 +408,16 @@ export class App {
                     at = kind === 'cane' ? (Math.floor(y * 3 + 10) % 2 ? [1, 0] : [0, 1]) : kind === 'present' ? (Math.abs(y) < 0.2 ? [0, 0] : [1, 0]) : kind === 'flake' || kind === 'star' ? [1, 0.35] : [1, 0];
                 }
                 if (at) {
-                    if (sp === this.last && now - this.lastAt < 4000 && Math.floor(t * 6) % 2) c = [255, 255, 255];
+                    if (this.lastSet.includes(sp) && now - this.lastAt < 4000 && Math.floor(t * 6) % 2) c = [255, 255, 255];
                     else {
                         const m = B64.indexOf(this.fxs[sp]), keys = DECO_FX.filter((_, b) => m > 0 && m & (1 << b)).map(([x]) => x);
                         if (!keys.length) keys.push('glow');
-                        const k = keys.reduce((a, f) => a * decoLight(f, t, sp, i), 1);   // several effects together: their brightness multiplies
-                        const own = keys.includes('rainbow') ? hsv(t * 0.25 + sp * 0.13) : hexRgb(COLORS[+this.orn[sp] - 1]);
+                        const f = keys[Math.floor(t / FX_TURN + rnd(sp + 11) * keys.length) % keys.length];   // several effects: they take turns
+                        const [k, w] = decoLight(f, t, sp, i);
+                        const own = f === 'rainbow' ? hsv(t * 0.5 + sp * 0.13) : hexRgb(COLORS[+this.orn[sp] - 1]);
                         const other = own.join() === '255,200,60' ? [255, 255, 255] : [255, 200, 60];   // a present's ribbon: gold (white on a gold box)
                         const base = at[0] ? own : kind === 'cane' ? [255, 255, 255] : other;
-                        c = base.map((v) => (v + (255 - v) * at[1]) * k);
+                        c = base.map((v) => { const x = (v + (255 - v) * at[1]) * k; return Math.min(255, x + (255 - x) * w); });
                     }
                 }
             }
@@ -423,7 +440,7 @@ export class App {
 
     status() {
         return { spots: this.lay?.spots ?? [], round: !!this.lay?.round, orn: this.orn, kinds: this.kinds, kindList: KINDS.filter(([k]) => this.s.kinds.includes(k)), allKinds: KINDS.map(([k]) => k), colors: COLORS, every: this.s.every, party: Date.now() < this.partyUntil,
-            last: this.last, lastBy: this.lastBy, star: !!this.star, starPick: !!this.star && this.s.starPick, starCol: this.starCol || this.s.starColor,
+            last: this.last, lastSet: this.lastSet, hung: this.hung, maxDeco: this.s.maxDeco, lastBy: this.lastBy, star: !!this.star, starPick: !!this.star && this.s.starPick, starCol: this.starCol || this.s.starColor,
             starAt: this.starAt, starLastBy: this.starLastBy, starEvery: this.s.starEvery,
             fxs: this.fxs, fxList: DECO_FX.filter(([k]) => this.s.fx.includes(k)), allFx: DECO_FX.map(([k]) => k),
             starFx: (this.starFx ?? [this.s.starFx]).slice(-this.s.maxFx), maxFx: this.s.maxFx, starFxList: STAR_FX.filter(([k]) => this.s.starFxs.includes(k)), players: [] };
