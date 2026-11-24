@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0a16">
+<title>Catch the presents</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --raise: #261d3a; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; --c1: #ff2a2a; --c2: #2a7bff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 12px 14px 24px; gap: 12px; min-height: 100dvh; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  h1 { margin: 4px 0 0; font-size: 24px; text-align: center; }
+  .panel { width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  label { color: var(--dim); font-size: 14px; }
+  input[type=text] { width: 100%; font: inherit; font-size: 18px; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 12px; padding: 12px; user-select: text; -webkit-user-select: text; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  .seg button, .grid button { min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .btn { min-height: 54px; border-radius: 14px; border: 0; background: var(--accent); color: #1a1200; font: 800 18px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; width: 100%; }
+  .btn.ghost { background: var(--raise); color: var(--text); border: 1px solid var(--line); min-height: 44px; font-size: 15px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #msg { text-align: center; font-weight: 700; font-size: 18px; min-height: 26px; max-width: 420px; }
+  #note { text-align: center; color: #ff9a9a; min-height: 20px; font-size: 15px; max-width: 420px; }
+  #timer { text-align: center; color: var(--dim); font-size: 14px; min-height: 18px; }
+  .players { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+  .players span { flex: 1; text-align: center; padding: 6px; border-radius: 10px; border: 2px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .players span.turn { border-color: var(--accent); }
+  .big { text-align: center; font: 900 34px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .hidden { display: none !important; }
+  .strip { position: relative; border-radius: 18px; background: linear-gradient(180deg, #120c22, #261d3a); border: 1px solid var(--line); touch-action: none; overflow: hidden; margin: 0 auto; }
+  .strip.h { width: 100%; height: 130px; }
+  .strip .sleigh { position: absolute; height: 22px; width: 28%; bottom: 14px; transform: translateX(-50%); border-radius: 4px 4px 12px 12px; background: var(--c1); pointer-events: none; }
+  .strip .sleigh::before, .strip .sleigh::after { content: ''; position: absolute; top: -10px; width: 6px; height: 12px; background: inherit; border-radius: 3px; }
+  .strip .sleigh::before { left: 0; } .strip .sleigh::after { right: 0; }
+  .score2 { display: flex; justify-content: center; gap: 18px; align-items: center; font: 900 30px/1 system-ui, sans-serif; }
+  .clock { text-align: center; font: 700 18px/1 system-ui, sans-serif; color: var(--dim); }
+  .best { margin: 0; padding-left: 24px; font-size: 17px; line-height: 1.6; }
+
+</style>
+</head>
+<body>
+<h1>🎁 Catch the presents</h1>
+<div class="panel" id="namePanel">
+  <label for="name">Your name</label>
+  <input type="text" id="name" maxlength="16" placeholder="Your name" autocomplete="off">
+</div>
+<div class="panel" id="setup">
+  <label>Play</label>
+  <div class="seg" id="modes"></div>
+  <button class="btn" id="go" disabled>New game</button>
+  <button class="btn hidden" id="join">Join the game</button>
+</div>
+<div class="panel hidden" id="play">
+  <div class="players" id="players"></div>
+  <div class="score2" id="score"></div>
+  <div class="clock" id="clock"></div>
+  <div class="strip h" id="strip"><div class="sleigh" id="sleigh"></div></div>
+  <div class="hint" style="text-align:center">🎁 1 point · ⭐ 3 points<span id="coalHint"> · ⚫ coal −2</span></div>
+  <button class="btn ghost hidden" id="quit">Leave the game</button>
+</div>
+<div class="panel hidden" id="bestBox">
+  <label>🏆 Best of the day</label>
+  <ol class="best" id="best"></ol>
+</div>
+
+<div id="timer"></div>
+<div id="msg">Connecting...</div>
+<div id="note"></div>
+<script>
+  const el = (id) => document.getElementById(id);
+  let app = null, status = { phase: 'idle', players: [] }, skew = 0, lastNoteText = '', lastNoteAt = 0;
+  try { el('name').value = localStorage.getItem('spName') || ''; } catch (e) {}
+  el('name').addEventListener('input', () => { try { localStorage.setItem('spName', el('name').value); } catch (e) {} });
+  const myName = () => el('name').value.trim();
+  const me = () => (app && (status.players || []).find((p) => p.id === app.clientId)) || null;
+  const meIndex = () => (app ? (status.players || []).findIndex((p) => p.id === app.clientId) : -1);
+  const nowMs = () => Date.now() + skew;
+  const say = (t) => { el('msg').textContent = t; };
+  const send = (o) => (app ? app.send(o).catch((e) => { el('note').textContent = 'Could not send: ' + e.message; lastNoteAt = Date.now(); }) : Promise.resolve());
+  function seg(box, list, cur, set) {
+    box.replaceChildren(...list.map(([v, t]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-pressed', String(v === cur));
+      b.addEventListener('click', () => { set(v); render(); }); return b;
+    }));
+  }
+  const secsLeft = (at) => Math.max(0, Math.ceil((at - nowMs()) / 1000));
+  let draw = () => {}, tickGame = () => '', onStatus = () => {};
+  const choice = { mode: 'solo' };
+  let goal = 0.5, sentAt = 0, timer = null, lastSent = -1, sentFor = -1;
+  function sendGoal() {
+    clearTimeout(timer);
+    const wait = 90 - (Date.now() - sentAt);            // at most about 11 a second
+    if (wait > 0) { timer = setTimeout(sendGoal, wait); return; }
+    const v = Math.round(goal * 1000) / 1000;
+    if (status.game !== sentFor) { sentFor = status.game; lastSent = -1; }   // a new game: send it even if the finger has not moved
+    if (Math.abs(v - lastSent) < 0.01) return;
+    sentAt = Date.now(); lastSent = v; send({ type: 'go', x: v });
+  }
+  function slide(e) {
+    if (meIndex() < 0 || status.phase !== 'playing') return;
+    const r = el('strip').getBoundingClientRect();
+    goal = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    el('sleigh').style.left = goal * 100 + '%';
+    sendGoal();
+  }
+  el('strip').addEventListener('pointerdown', (e) => { el('strip').setPointerCapture(e.pointerId); slide(e); });
+  el('strip').addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 'touch') slide(e); });
+  draw = () => {
+    const s = status, m = me(), i = meIndex(), ps = s.players || [];
+    const c = s.colors || ['ff3c3c', '3c8cff'];
+    document.documentElement.style.setProperty('--c1', '#' + c[0]); document.documentElement.style.setProperty('--c2', '#' + c[1]);
+    const modes = [['solo', '🎁 Alone'], s.friend !== false && ['friend', '🧑‍🤝‍🧑 With a friend']].filter(Boolean);
+    if (!modes.some(([v]) => v === choice.mode)) choice.mode = 'solo';
+    seg(el('modes'), modes, choice.mode, (v) => { choice.mode = v; });
+    el('modes').classList.toggle('hidden', modes.length < 2);
+    const busy = s.phase === 'waiting' || s.phase === 'playing';
+    el('go').disabled = !app || busy || s.phase === 'unconfigured';
+    el('go').textContent = s.phase === 'over' ? 'Play again' : 'New game';
+    el('join').classList.toggle('hidden', !(s.phase === 'waiting' && !m));
+    el('go').classList.toggle('hidden', s.phase === 'waiting' && !m);
+    el('setup').classList.toggle('hidden', !!m && busy);
+    el('quit').classList.toggle('hidden', !(m && busy));
+    el('play').classList.toggle('hidden', s.phase === 'idle' || s.phase === 'unconfigured');
+    const two = ps.length > 1 || s.mode === 'friend';
+    el('players').replaceChildren(...(two ? [0, 1] : [0]).map((k) => {
+      const p = ps[k], sp = document.createElement('span');
+      sp.textContent = (p ? p.name + (app && p.id === app.clientId ? ' (you)' : '') : k === 1 && s.phase === 'waiting' ? 'waiting…' : '—');
+      sp.style.color = 'var(--c' + (k + 1) + ')'; return sp;
+    }));
+    const sc = s.score || [0, 0];
+    el('score').innerHTML = two ? '<span style="color:var(--c1)">' + sc[0] + '</span><span>-</span><span style="color:var(--c2)">' + sc[1] + '</span>' : '<span style="color:var(--c1)">' + sc[0] + '</span>';
+    el('clock').textContent = s.phase === 'playing' ? (s.startsIn ? 'Get ready… ' + s.startsIn : '⏱️ ' + s.left + ' s') : '';
+    el('coalHint').classList.toggle('hidden', s.coal === false);
+    const playing = i >= 0 && s.phase === 'playing';
+    el('strip').classList.toggle('hidden', !playing);
+    el('sleigh').style.background = 'var(--c' + (i + 1) + ')';
+    if (playing && lastSent < 0 && s.pos) el('sleigh').style.left = s.pos[i] * 100 + '%';
+    const best = s.best || [];
+    el('bestBox').classList.toggle('hidden', !best.length);
+    el('best').replaceChildren(...best.map((b) => { const li = document.createElement('li'); li.textContent = b.name + ' — ' + b.score; return li; }));
+    let t = s.message || '';
+    if (s.phase === 'waiting' && m) t = 'Waiting for a friend: ask them to open this page and tap Join.';
+    if (playing) t = 'Slide your finger to move your sleigh' + (two ? ' (' + (i === 0 ? 'the first colour' : 'the second colour') + ')' : '') + ' and catch the presents!';
+    if (s.phase === 'over' && m) t = (ps.length === 1 || s.winner === i + 1 ? '🎉 ' : s.winner === 3 ? '🤝 ' : '😅 ') + s.message;
+    say(t);
+  };
+  tickGame = () => status.phase === 'waiting' && status.waitEndsAt ? 'The game is open for ' + secsLeft(status.waitEndsAt) + ' s' : '';
+  el('go').addEventListener('click', () => { el('go').disabled = true; lastSent = -1; send({ type: 'new', mode: choice.mode, name: myName() }); say('Starting…'); setTimeout(render, 1500); });
+  el('join').addEventListener('click', () => { lastSent = -1; send({ type: 'join', name: myName() }); say('Joining…'); });
+  el('quit').addEventListener('click', () => send({ type: 'quit' }));
+
+  function render() {
+    draw();
+    el('timer').textContent = tickGame() || '';
+    const n = app && status.notices && status.notices[app.clientId];
+    if (n && n !== lastNoteText) { lastNoteText = n; lastNoteAt = Date.now(); el('note').textContent = n; }
+    if (!n) lastNoteText = '';
+    if (Date.now() - lastNoteAt > 5000) el('note').textContent = '';
+  }
+  function init() {
+    app = EZApp.connect();
+    app.onStatus((s, snap) => {
+      if (!s) return;
+      if (snap && typeof snap.at === 'number') skew = snap.at - Date.now();
+      const old = status; status = s; onStatus(old, s);
+      render();
+    });
+    app.ready.then(render).catch((e) => say('Could not reach the player: ' + e.message));
+    setInterval(() => { el('timer').textContent = tickGame() || ''; }, 250);
+    render();
+  }
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => say('Could not load the app SDK.');
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>
