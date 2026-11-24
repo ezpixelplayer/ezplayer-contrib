@@ -80,7 +80,7 @@ export function shapeAt(kind, x, y) {
         default: return d <= 1 ? [1, d < 0.35 && x < 0 && y > 0 ? 0.35 : 0] : null;   // a bauble with a shine
     }
 }
-const DEFAULTS = { target: '', star: '', kinds: KINDS.map(([k]) => k), fx: DECO_FX.map(([k]) => k), starFx: 'twinkle', starFxs: STAR_FX.map(([k]) => k), starPick: true, starColor: 'ffbe28', starEvery: 30, fps: 20, brightness: 100, spots: 30, every: 60, show: 30, always: false, bg: 'green', restart: true, size: 100 };
+const DEFAULTS = { target: '', shape: 'tree', star: '', kinds: KINDS.map(([k]) => k), fx: DECO_FX.map(([k]) => k), starFx: 'twinkle', starFxs: STAR_FX.map(([k]) => k), starPick: true, starColor: 'ffbe28', starEvery: 30, fps: 20, brightness: 100, spots: 30, every: 60, show: 30, always: false, bg: 'green', restart: true, size: 100 };
 const PARTY_MS = 15000;
 const MAX_CANDIDATES = 3000;
 
@@ -95,6 +95,7 @@ export function cleanSettings(raw) {
     for (const k of ['always', 'restart', 'starPick']) if (typeof raw[k] === 'boolean') s[k] = raw[k];
     if (typeof raw.starColor === 'string' && /^#?[0-9a-fA-F]{6}$/.test(raw.starColor)) s.starColor = raw.starColor.replace('#', '').toLowerCase();
     if (raw.bg === 'green' || raw.bg === 'off') s.bg = raw.bg;
+    if (raw.shape === 'tree' || raw.shape === 'fill') s.shape = raw.shape;
     return s;
 }
 
@@ -111,18 +112,66 @@ function hsv(h, s = 1, v = 1) {
  * each pixel within a bauble's radius belongs to the nearest spot. Also where each spot goes on the phone's drawing:
  * u across (round trees: the angle round the trunk, as if unrolled), v down from the top, both 0..1.
  */
-export function layout(pts, n, size = 100) {
+/**
+ * a flat model can stand at any angle in a 3D layout (a matrix turned 45°, a carpet lying flat): its pixels are turned
+ * to face the front, so it is not taken for a round tree. pts in, pts out ([x, y up, z]; z = 0 when flat).
+ */
+export function faceFront(pts) {
+    const N = pts.length;
+    if (!N) return pts;
+    let mx = 0, my = 0, mz = 0;
+    for (const [x, y, z] of pts) { mx += x; my += y; mz += z; }
+    mx /= N; my /= N; mz /= N;
+    let sxx = 0, szz = 0, sxz = 0, syy = 0;
+    for (const [x, y, z] of pts) { const a = x - mx, b = z - mz, c = y - my; sxx += a * a; szz += b * b; sxz += a * b; syy += c * c; }
+    // the main direction of the pixels seen from above, and how thin they are across it
+    const tr = sxx + szz, det = sxx * szz - sxz * sxz, disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+    const l1 = tr / 2 + disc, l2 = tr / 2 - disc;
+    let ex = 1, ez = 0;
+    if (Math.abs(sxz) > 1e-12) { ex = l1 - szz; ez = sxz; const m = Math.hypot(ex, ez); ex /= m; ez /= m; } else if (szz > sxx) { ex = 0; ez = 1; }
+    if (ex < 0 || (ex === 0 && ez < 0)) { ex = -ex; ez = -ez; }
+    if (l1 > 0 && l2 < 0.02 * l1) return pts.map(([x, y, z]) => [(x - mx) * ex + (z - mz) * ez, y, 0]);                   // standing up, at any angle
+    if (l1 > 0 && syy < 0.02 * l1) return pts.map(([x, , z]) => [(x - mx) * ex + (z - mz) * ez, -((x - mx) * -ez + (z - mz) * ex), 0]);   // lying flat
+    return pts;                                                                                                              // round: a real 3D tree
+}
+
+export function layout(pts, n, size = 100, shape = 'tree') {
+    pts = faceFront(pts);
     const N = pts.length;
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const [x, y, z] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
-    const H = (y1 - y0) || 1, vOf = (y) => (y1 - y) / H;
-    const round = z1 - z0 > 0.25 * ((x1 - x0) || 1), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-    const uOf = ([x, , z]) => (round ? ((Math.atan2(z - cz, x - cx) / (2 * Math.PI)) % 1 + 1) % 1 : (x - x0) / ((x1 - x0) || 1));
+    const H = (y1 - y0) || 1, W = (x1 - x0) || 1, vOf = (y) => (y1 - y) / H;
+    const round = z1 - z0 > 0.25 * W, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    // a flat model (a matrix) gets a tree drawn on it: a triangle (green), a trunk (brown) and a star on top; the
+    // decorations go only on the triangle. Sizes by the real distances, so a wide matrix still gets a tree of tree shape.
+    const drawn = !round && shape === 'tree';
+    const zone = new Uint8Array(N);   // 0 outside, 1 the tree, 2 the trunk, 3 the drawn star
+    const yTop = 0.17 * H, yBase = 0.86 * H, hwMax = Math.min(0.47 * W, 0.42 * (yBase - yTop)), starR = Math.min(0.11 * H, 0.12 * W);
+    const starAt = 0.09 * H, trunkHw = Math.max(0.09 * hwMax, 0.5 * W / Math.max(8, Math.sqrt(N)));
+    const hwAt = (Y) => hwMax * (Y - yTop) / (yBase - yTop);
+    const starDu = new Float32Array(N), starDv = new Float32Array(N);
+    if (drawn) for (let i = 0; i < N; i++) {
+        const X = pts[i][0] - cx, Y = y1 - pts[i][1];
+        if (Y >= yTop && Y <= yBase && Math.abs(X) <= hwAt(Y)) zone[i] = 1;
+        else if (Y > yBase && Y <= 0.985 * H && Math.abs(X) <= trunkHw) zone[i] = 2;
+        else if (shapeAt('star', X / starR, (starAt - Y) / starR)) { zone[i] = 3; starDu[i] = X / starR; starDv[i] = (starAt - Y) / starR; }
+    }
+    const uOf = ([x, y, z]) => {
+        if (round) return ((Math.atan2(z - cz, x - cx) / (2 * Math.PI)) % 1 + 1) % 1;
+        if (!drawn) return (x - x0) / W;
+        const hw = hwAt(y1 - y); return Math.max(0, Math.min(1, 0.5 + (x - cx) / (2 * Math.max(hw, 1e-9))));   // across the triangle, as the phone draws it
+    };
+    const vPhone = (y) => (drawn ? Math.max(0, Math.min(1, ((y1 - y) - yTop) / (yBase - yTop))) : vOf(y));
     // a round tree narrows to a point: near the top a bauble would be a ring round the whole tree, so the top fifth is
     // left for the star
     const top = round ? 0.2 : 0.1;
     let cand = [];
-    for (let i = 0; i < N; i++) { const v = vOf(pts[i][1]); if (v >= top && v <= 0.95) cand.push(i); }
+    if (drawn) {   // a small matrix: no more decorations than fit with about 12 pixels each
+        let treePx = 0; for (let i = 0; i < N; i++) if (zone[i] === 1) treePx++;
+        n = Math.max(3, Math.min(n, Math.floor(treePx / 12)));
+    }
+    if (drawn) { for (let i = 0; i < N; i++) { const Y = y1 - pts[i][1], X = pts[i][0] - cx; if (zone[i] === 1 && Y > yTop + 0.12 * (yBase - yTop) && Y < yBase - 0.03 * H && Math.abs(X) < hwAt(Y) * 0.85) cand.push(i); } }
+    else for (let i = 0; i < N; i++) { const v = vOf(pts[i][1]); if (v >= top && v <= 0.95) cand.push(i); }
     if (!cand.length) cand = [...Array(N).keys()];
     const step = Math.max(1, Math.floor(cand.length / MAX_CANDIDATES));
     cand = cand.filter((_, k) => k % step === 0);
@@ -147,6 +196,7 @@ export function layout(pts, n, size = 100) {
     const map = new Int16Array(N).fill(-1);
     for (let i = 0; i < N; i++) {
         if (round && vOf(pts[i][1]) < top - 0.05) continue;
+        if (drawn && zone[i] !== 1) continue;
         let bd = r2;
         for (let k = 0; k < spots.length; k++) { const d = d2(i, spots[k]); if (d <= bd) { bd = d; map[i] = k; } }
     }
@@ -163,7 +213,8 @@ export function layout(pts, n, size = 100) {
     const r2d = (v) => Math.round(v * 100) / 100;
     const counts = new Int32Array(spots.length);
     for (let i = 0; i < N; i++) if (map[i] >= 0) counts[map[i]]++;
-    return { spots: spots.map((i) => [r2d(uOf(pts[i])), r2d(vOf(pts[i][1]))]), map, du, dv, counts, round };
+    const starAng = Float32Array.from(starDu, (x, i) => ((Math.atan2(starDv[i], x) / (2 * Math.PI)) % 1 + 1) % 1);
+    return { spots: spots.map((i) => [r2d(uOf(pts[i])), r2d(vPhone(pts[i][1]))]), map, du, dv, counts, round, drawn, zone, starAng };
 }
 
 async function targetOf(base, model) {
@@ -220,9 +271,9 @@ export class App {
             } catch (e) { this.problems.push(`star: ${e.message}`); }
         }
         if (s.star && !stars.length) this.problems.push(`star: "${s.star}" is not a model or a group of the show`);
-        const key = [s.target, tree.geom.n, s.spots, s.size].join('|');
+        const key = [s.target, tree.geom.n, s.spots, s.size, s.shape].join('|');
         if (key !== this.key) {
-            this.lay = layout(tree.pts, s.spots, s.size);
+            this.lay = layout(tree.pts, s.spots, s.size, s.shape);
             this.key = key;
             const n = this.lay.spots.length;
             if (this.saved && this.saved.orn.length === n && !this.orn.replace(/0/g, '')) { this.orn = this.saved.orn; this.kinds = this.saved.kinds; this.fxs = this.saved.fxs; }
@@ -231,7 +282,7 @@ export class App {
             if (this.fxs.length !== n) this.fxs = '0'.repeat(n);
             this.saved = null;
         }
-        this.tree = tree.geom; this.stars = stars; this.star = stars.length > 0;
+        this.tree = tree.geom; this.stars = stars; this.star = stars.length > 0 || this.lay.drawn;   // a matrix has its own star
         this.ready = true;
     }
 
@@ -296,11 +347,26 @@ export class App {
     frames(now) {
         if (!this.showing(now)) return [];
         const t = now / 1000, party = now < this.partyUntil, g = this.tree, map = this.lay.map, out = new Uint8Array(g.n * 3);
-        const bg = this.s.bg === 'green' ? [0, 34, 6] : [0, 0, 0];
+        const drawn = this.lay.drawn, bg = this.s.bg === 'green' ? (drawn ? [0, 60, 12] : [0, 34, 6]) : [0, 0, 0], zone = this.lay.zone;
+        const shine = Math.max(0, 1 - (now - Math.max(this.lastAt, this.starAt)) / 1200);
+        const sBase = hexRgb(this.starCol || this.s.starColor), sFx = this.starFx || this.s.starFx;
+        // a pixel of a star (a star model, or the star drawn on a matrix), with the star's colour and effect
+        const starPx = (i, n, ang, tw) => {
+            if (party) return hsv(t * 0.6 + i / n);
+            let k = 1, col = sBase, white = 0;
+            if (sFx === 'twinkle') k = 0.55 + 0.45 * Math.sin(t * 3 + tw);
+            else if (sFx === 'blink') k = Math.floor(t * 2.5) % 2 ? 1 : 0.05;
+            else if (sFx === 'pulse') k = 0.12 + 0.88 * (0.5 + 0.5 * Math.sin(t * 3.5));
+            else if (sFx === 'spin') { const a = ((ang - t * 0.5) % 1 + 1) % 1; k = 0.15 + 0.85 * Math.max(0, 1 - a * 3); white = Math.max(0, 1 - a * 8) * 0.6; }
+            else if (sFx === 'sparkle') { k = 0.6; white = Math.max(0, Math.sin(t * (4 + rnd(i) * 5) + rnd(i + 3) * 6.3)) ** 12; k += white * 0.4; }
+            else if (sFx === 'rainbow') col = hsv(t * 0.3 + ang);
+            return col.map((v) => { const x = v * k; return Math.min(255, x + (255 - x) * Math.max(shine, white)); });
+        };
         for (let i = 0; i < g.n; i++) {
-            const sp = map[i];
-            let c = bg;
-            if (party) c = hsv(i / g.n * 3 - t * 0.5);
+            const sp = map[i], z = drawn ? zone[i] : 1;
+            let c = z === 1 ? bg : z === 2 ? [70, 32, 8] : [0, 0, 0];
+            if (z === 3) c = starPx(i, g.n, this.lay.starAng[i], rnd(i) * 6.3);
+            else if (party) c = z ? hsv(i / g.n * 3 - t * 0.5) : [0, 0, 0];
             else if (sp >= 0 && this.orn[sp] !== '0') {
                 const kind = KINDS[+this.kinds[sp]]?.[0] ?? 'bauble';
                 let at = shapeAt(kind, this.lay.du[i], this.lay.dv[i]);
@@ -322,24 +388,9 @@ export class App {
             out[i * 3] = c[0]; out[i * 3 + 1] = c[1]; out[i * 3 + 2] = c[2];
         }
         const list = [{ geom: g, bytes: out }];
-        const shine = Math.max(0, 1 - (now - Math.max(this.lastAt, this.starAt)) / 1200);
-        const base = hexRgb(this.starCol || this.s.starColor), fx = this.starFx || this.s.starFx;
         for (const star of this.stars ?? []) {
             const sg = star.geom, sb = new Uint8Array(sg.n * 3);
-            for (let i = 0; i < sg.n; i++) {
-                let c, k = 1, col = base, white = 0;
-                if (party) c = hsv(t * 0.6 + i / sg.n);
-                else {
-                    if (fx === 'twinkle') k = 0.55 + 0.45 * Math.sin(t * 3 + star.twinkle[i]);
-                    else if (fx === 'blink') k = Math.floor(t * 2.5) % 2 ? 1 : 0.05;
-                    else if (fx === 'pulse') k = 0.12 + 0.88 * (0.5 + 0.5 * Math.sin(t * 3.5));
-                    else if (fx === 'spin') { const a = (((star.ang[i] ?? i / sg.n) - t * 0.5) % 1 + 1) % 1; k = 0.15 + 0.85 * Math.max(0, 1 - a * 3); white = Math.max(0, 1 - a * 8) * 0.6; }
-                    else if (fx === 'sparkle') { k = 0.6; white = Math.max(0, Math.sin(t * (4 + rnd(i) * 5) + rnd(i + 3) * 6.3)) ** 12; k += white * 0.4; }
-                    else if (fx === 'rainbow') col = hsv(t * 0.3 + (star.ang[i] ?? i / sg.n));
-                    c = col.map((v) => { const x = v * k; return Math.min(255, x + (255 - x) * Math.max(shine, white)); });
-                }
-                sb[i * 3] = c[0]; sb[i * 3 + 1] = c[1]; sb[i * 3 + 2] = c[2];
-            }
+            for (let i = 0; i < sg.n; i++) { const c = starPx(i, sg.n, star.ang[i] ?? i / sg.n, star.twinkle[i]); sb[i * 3] = c[0]; sb[i * 3 + 1] = c[1]; sb[i * 3 + 2] = c[2]; }
             list.push({ geom: sg, bytes: sb });
         }
         return list;

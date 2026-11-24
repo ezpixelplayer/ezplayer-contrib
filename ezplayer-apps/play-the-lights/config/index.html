@@ -73,6 +73,7 @@
           const b = document.createElement('button'); b.type = 'button'; b.textContent = (g ? '👥 ' : '') + n; if (g) b.className = 'g';
           b.title = g ? 'Group: ' + groups[n].join(', ') : 'Model';
           b.addEventListener('click', () => {
+            if (f.single) { el('f_' + f.for).value = n; return; }   // a box for one model: the name replaces what was there
             const t = el('f_' + f.for), at = t.selectionStart ?? t.value.length, before = t.value.slice(0, at), after = t.value.slice(at);
             const sep = !before || /[|,\n]\s*$/.test(before) ? (/[|,]$/.test(before) ? ' ' : '') : ', ';
             t.value = before + sep + n + after; t.focus(); t.selectionStart = t.selectionEnd = (before + sep + n).length;
