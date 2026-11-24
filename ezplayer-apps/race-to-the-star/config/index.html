@@ -33,11 +33,17 @@
 <p class="hint">Phones race climbers up the track; the first to the top lights the star in their color. Pick the track, the star, how long the waiting room stays open and how hard the climb is, then Save.</p>
 
 <h2>Track and star</h2>
-<label for="track">Track (a matrix or tree is split into one lane per player; any other model or submodel runs its lanes along the node order)</label>
-<select id="track"><option value="">Loading targets...</option></select>
+<label for="trackModel">Track model (a matrix or tree is split into one lane per player; any other model runs its lanes along the node order)</label>
+<select id="trackModel"><option value="">Loading models...</option></select>
+<label for="trackPart">Part of it (the whole model, or one of its stranded submodels)</label>
+<select id="trackPart"><option value="">Whole model</option></select>
+<input id="track" type="hidden">
 <p class="hint" id="targetsNote"></p>
-<label for="star">Star (optional: a prop that stays dim during the race and lights in the winner's color)</label>
-<select id="star"><option value="">No star prop (the top of the track becomes the star)</option></select>
+<label for="starModel">Star (optional: a prop that stays dim during the race and lights in the winner's color)</label>
+<select id="starModel"><option value="">No star prop (the top of the track becomes the star)</option></select>
+<label for="starPart">Part of it</label>
+<select id="starPart"><option value="">Whole model</option></select>
+<input id="star" type="hidden">
 <div class="row">
   <div><label for="fps">Frames per second (5 to 30)</label><input id="fps" type="number" min="5" max="30" step="1" value="20"></div>
   <div><label for="brightness">Brightness (%)</label><input id="brightness" type="number" min="10" max="100" step="5" value="100"></div>
@@ -117,36 +123,78 @@
     }));
   }
 
+  // A layout can hold thousands of submodels, so the page lists models first and asks
+  // for one model's submodels only when it is picked. Only stranded submodels make lanes.
+  const partCache = new Map();
+  async function partsOf(model) {
+    if (!partCache.has(model)) {
+      const res = await fetch(`${app.apiBase}/api/ezp/overlays/targets?model=${encodeURIComponent(model)}&detail=submodels`);
+      const { targets = [] } = res.ok ? await res.json() : {};
+      partCache.set(model, targets.filter((t) => t.subModel));
+    }
+    return partCache.get(model);
+  }
+  function splitTarget(v) {
+    const i = (v || '').indexOf('/');
+    return i === -1 ? { model: v || '', part: '' } : { model: v.slice(0, i), part: v.slice(i + 1) };
+  }
+  async function fillParts(which, model, part, strandedOnly) {
+    const sel = el(which + 'Part');
+    sel.replaceChildren(new Option('Whole model', ''));
+    sel.disabled = !model;
+    if (!model) return;
+    const parts = (await partsOf(model))
+      .filter((t) => !strandedOnly || t.kind === 'multi' || t.kind === 'multiEqual')
+      .sort((a, b) => a.subModel.localeCompare(b.subModel, undefined, { sensitivity: 'base' }));
+    const frag = document.createDocumentFragment();
+    for (const t of parts) {
+      const lanes = Array.isArray(t.strands) ? `${t.strands.length} strands, ` : '';
+      frag.append(new Option(`${t.subModel} (${lanes}${t.nodeCount} nodes)`, t.subModel));
+    }
+    sel.append(frag);
+    if (part && !parts.some((t) => t.subModel === part)) sel.append(new Option(`${part} (not in this layout)`, part));
+    sel.value = part || '';
+  }
+  function compose(which) {
+    const model = el(which + 'Model').value, part = el(which + 'Part').value;
+    el(which).value = model ? (part ? `${model}/${part}` : model) : '';
+  }
   async function loadTargets(track, star) {
-    const keep = (sel, value, label) => { sel.replaceChildren(); if (value) sel.append(new Option(label || value, value)); };
+    el('track').value = track || '';
+    el('star').value = star || '';
     if (app.apiBase === null) {
-      keep(el('track'), track, track || 'Open this page on the home network to pick a track');
-      const starSel = el('star'); starSel.replaceChildren(new Option('No star prop', ''));
-      if (star) starSel.append(new Option(star, star));
-      starSel.value = star || '';
-      el('track').disabled = el('star').disabled = true;
+      for (const w of ['track', 'star']) {
+        const { model, part } = splitTarget(w === 'track' ? track : star);
+        el(w + 'Model').replaceChildren(new Option(model || (w === 'track' ? 'Open this page on the home network to pick a track' : 'No star prop'), model));
+        el(w + 'Part').replaceChildren(new Option(part || 'Whole model', part));
+        el(w + 'Model').disabled = el(w + 'Part').disabled = true;
+      }
       el('targetsNote').textContent = 'The list of models is only available on the home network; the other settings can still be saved.';
       return;
     }
-    const res = await fetch(`${app.apiBase}/api/ezp/overlays/targets?detail=submodels`);
+    const res = await fetch(`${app.apiBase}/api/ezp/overlays/targets`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const { targets = [] } = await res.json();
     const rows = targets
       .map((t) => {
-        const name = t.target || t.model;
-        const grid = !t.subModel && t.width >= 2 && t.height >= 2;
-        const shape = grid ? `${t.width} x ${t.height}` : `${t.nodeCount} nodes`;
-        return { name, label: `${name} (${shape})` };
+        const grid = t.width >= 2 && t.height >= 2;
+        const subs = t.subModels ? `, ${t.subModels} submodels` : '';
+        return { name: t.model, label: `${t.model} (${grid ? `${t.width} x ${t.height}` : `${t.nodeCount} nodes`}${subs})` };
       })
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-    const trackSel = el('track'), starSel = el('star');
-    trackSel.replaceChildren(new Option('Pick a track...', ''));
-    starSel.replaceChildren(new Option('No star prop (the top of the track becomes the star)', ''));
-    for (const r of rows) { trackSel.append(new Option(r.label, r.name)); starSel.append(new Option(r.label, r.name)); }
-    if (track && !rows.some((r) => r.name === track)) trackSel.append(new Option(`${track} (not in this layout)`, track));
-    if (star && !rows.some((r) => r.name === star)) starSel.append(new Option(`${star} (not in this layout)`, star));
-    trackSel.value = track || '';
-    starSel.value = star || '';
+    for (const w of ['track', 'star']) {
+      const sel = el(w + 'Model');
+      sel.replaceChildren(new Option(w === 'track' ? 'Pick a model...' : 'No star prop (the top of the track becomes the star)', ''));
+      const frag = document.createDocumentFragment();
+      for (const r of rows) frag.append(new Option(r.label, r.name));
+      sel.append(frag);
+      const { model, part } = splitTarget(w === 'track' ? track : star);
+      if (model && !rows.some((r) => r.name === model)) sel.append(new Option(`${model} (not in this layout)`, model));
+      sel.value = model;
+      await fillParts(w, model, part, w === 'track');
+      sel.addEventListener('change', async () => { await fillParts(w, sel.value, '', w === 'track'); compose(w); });
+      el(w + 'Part').addEventListener('change', () => compose(w));
+    }
     if (!rows.length) el('targetsNote').textContent = 'No overlay targets found: the show has no models yet.';
   }
 
