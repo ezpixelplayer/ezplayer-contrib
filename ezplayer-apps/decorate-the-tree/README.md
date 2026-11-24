@@ -32,7 +32,8 @@ positions for the model, the app uses its grid instead (`grid` lease), as before
 ## Configure
 
 - **Tree**: a mega tree, a matrix or any model with a grid.
-- **The star on top** (optional): the star's model; the list of the show's models under it puts a name in the box.
+- **The star on top** (optional): the star's model, a group of the show (all its models are lit as the star), or
+  several separated by commas; the list of the show's models and groups under it puts a name in the box.
   **The star's colour** (gold), **visitors may change it** (tap the star on the phone, pick a colour) and **each phone
   waits** between star colours (30 s). After the party the star goes back to its colour.
 - **The star's effect** (twinkle) and **the star's effects visitors can choose**: twinkle, steady, blink, pulse, spin
@@ -82,3 +83,8 @@ the player (while the number of spots stays the same).
 
 - **Version 5:** effects: each decoration can glow, stay steady, blink, twinkle, pulse or turn rainbow; the star can
   twinkle, stay steady, blink, pulse, spin, sparkle or turn rainbow, chosen by the visitor who taps it.
+
+- **Version 6:** the star can be a group of the show (for example "All Stars") or several models; before, only a single
+  model worked, and with a group the star could not be changed from the phones.
+
+- **Version 7:** a group made of submodels (for example the stars of two Baby Grand Illusions) lights only those submodels, not the whole models.
