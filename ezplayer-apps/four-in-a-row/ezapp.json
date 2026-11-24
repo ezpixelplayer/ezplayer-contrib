@@ -1,0 +1,13 @@
+{
+    "id": "four-in-a-row",
+    "name": "Four in a Row",
+    "version": "1",
+    "description": "Play Four in a Row on a matrix of the show from your phone, against the computer or a friend's phone",
+    "icon": "🔴",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 600, "perClientPerSecond": 3 }
+}

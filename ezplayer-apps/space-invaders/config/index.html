@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Space Invaders settings</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 640px; margin-inline: auto; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  h2 { font-size: 14px; margin: 24px 0 4px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+  label { display: block; margin: 12px 0 4px; color: var(--dim); font-size: 14px; }
+  select, input[type=number] { width: 100%; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .checks { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+  .checks label { display: inline-flex; align-items: center; gap: 8px; margin: 0; color: var(--text); }
+  input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
+  input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: none; padding: 2px; }
+  button { font: inherit; font-weight: 600; color: #1a1200; background: var(--accent); border: 0; border-radius: 10px; padding: 12px 20px; margin-top: 18px; cursor: pointer; }
+  button:disabled { opacity: 0.5; }
+  #note { margin-left: 12px; color: var(--dim); }
+  details { margin-top: 24px; }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12px; overflow: auto; max-height: 50vh; white-space: pre-wrap; }
+  .hint { color: var(--dim); font-size: 13px; margin: 4px 0 0; }
+</style>
+</head>
+<body>
+<h1>👾 Space Invaders settings</h1>
+<p class="hint">One visitor defends the show: sliding a finger on their phone moves the ship, which fires by itself (or with a fire button). Waves get faster, a mystery ship crosses the top now and then. On a tall matrix the field is as wide as the matrix and not much taller, in the middle. Pick the matrix, then Save.</p>
+<h2>The matrix</h2>
+<label for="target">Matrix (any model at least 12 x 12 pixels)</label>
+<select id="target"><option value="">Loading models...</option></select>
+<p class="hint" id="targetsNote"></p>
+<div class="row">
+  <div><label for="fps">Frames per second (5 to 30)</label><input id="fps" type="number" min="5" max="30" step="1" value="20"></div>
+  <div><label for="brightness">Brightness (%)</label><input id="brightness" type="number" min="10" max="100" step="5" value="100"></div>
+</div>
+<div id="fields"></div>
+<button id="save" disabled>Save</button><span id="note"></span>
+<details>
+  <summary>Current status (debug)</summary>
+  <pre id="status">No status yet.</pre>
+</details>
+<script>
+  const el = (id) => document.getElementById(id);
+  const MIN = { w: 12, h: 12 };
+  const FIELDS = [{"id": "level", "type": "select", "label": "Difficulty", "options": [["easy", "Easy (slow invaders and bombs)"], ["normal", "Normal"], ["hard", "Hard (arcade speed)"]], "default": "normal"}, {"id": "fire", "type": "select", "label": "Firing", "options": [["auto", "The ship fires by itself"], ["button", "A fire button on the phone"]], "default": "auto", "end": true}, {"id": "maxMinutes", "type": "number", "label": "Longest game (minutes)", "min": 1, "max": 20, "default": 7}, {"id": "partySecs", "type": "number", "label": "Seconds of result at the end", "min": 3, "max": 30, "default": 8}];
+  let app;
+  function build() {
+    const box = el('fields');
+    let row = null;
+    for (const f of FIELDS) {
+      if (f.section) { const h = document.createElement('h2'); h.textContent = f.section; box.append(h); row = null; continue; }
+      if (f.type === 'checks' || f.type === 'check') {
+        const wrap = document.createElement('div');
+        if (f.label) { const l = document.createElement('label'); l.textContent = f.label; wrap.append(l); }
+        const c = document.createElement('div'); c.className = 'checks';
+        for (const [v, t] of f.type === 'check' ? [[f.id, f.text]] : f.options) {
+          const l = document.createElement('label'); const i = document.createElement('input'); i.type = 'checkbox';
+          i.dataset.f = f.id; i.value = v; l.append(i, ' ' + t); c.append(l);
+        }
+        wrap.append(c); box.append(wrap); row = null;
+        if (f.hint) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = f.hint; box.append(p); }
+        continue;
+      }
+      if (!row) { row = document.createElement('div'); row.className = 'row'; box.append(row); }
+      const cell = document.createElement('div');
+      const l = document.createElement('label'); l.textContent = f.label; l.htmlFor = 'f_' + f.id;
+      let i;
+      if (f.type === 'select') { i = document.createElement('select'); for (const [v, t] of f.options) i.append(new Option(t, v)); }
+      else { i = document.createElement('input'); i.type = f.type; if (f.type === 'number') { i.min = f.min; i.max = f.max; i.step = f.step || 1; } }
+      i.id = 'f_' + f.id; i.dataset.f = f.id;
+      cell.append(l, i); row.append(cell);
+      if (f.hint) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = f.hint; cell.append(p); }
+      if (f.end) row = null;
+    }
+  }
+  function fill(s) {
+    if (typeof s.fps === 'number') el('fps').value = s.fps;
+    if (typeof s.brightness === 'number') el('brightness').value = s.brightness;
+    for (const f of FIELDS) {
+      if (f.section) continue;
+      const v = s[f.id] !== undefined ? s[f.id] : f.default;
+      if (f.type === 'checks') for (const c of document.querySelectorAll(`[data-f="${f.id}"]`)) c.checked = Array.isArray(v) && v.includes(c.value);
+      else if (f.type === 'check') document.querySelector(`[data-f="${f.id}"]`).checked = !!v;
+      else if (f.type === 'color') el('f_' + f.id).value = '#' + v;
+      else el('f_' + f.id).value = v;
+    }
+  }
+  function gather() {
+    const clamp = (i, lo, hi) => { const v = Math.round(Math.min(hi, Math.max(lo, Number(i.value) || lo))); i.value = v; return v; };
+    const out = { target: el('target').value, fps: clamp(el('fps'), 5, 30), brightness: clamp(el('brightness'), 10, 100) };
+    for (const f of FIELDS) {
+      if (f.section) continue;
+      if (f.type === 'checks') out[f.id] = [...document.querySelectorAll(`[data-f="${f.id}"]:checked`)].map((c) => c.value);
+      else if (f.type === 'check') out[f.id] = document.querySelector(`[data-f="${f.id}"]`).checked;
+      else if (f.type === 'color') out[f.id] = el('f_' + f.id).value.slice(1);
+      else if (f.type === 'number') out[f.id] = clamp(el('f_' + f.id), f.min, f.max);
+      else out[f.id] = el('f_' + f.id).value;
+    }
+    return out;
+  }
+  async function loadTargets(current) {
+    if (app.apiBase === null) {
+      el('target').replaceChildren(new Option(current || 'Open this page on the home network to pick a matrix', current || ''));
+      el('target').disabled = true;
+      el('targetsNote').textContent = 'The list of models is only available on the home network; the other settings can still be saved.';
+      return;
+    }
+    const res = await fetch(`${app.apiBase}/api/ezp/overlays/targets`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { targets = [] } = await res.json();
+    const rows = targets.filter((t) => t.width >= MIN.w && t.height >= MIN.h)
+      .map((t) => ({ name: t.model, label: `${t.model} (${t.width} x ${t.height})` }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    const sel = el('target');
+    sel.replaceChildren(new Option('Pick a matrix...', ''));
+    for (const r of rows) sel.append(new Option(r.label, r.name));
+    if (current && !rows.some((r) => r.name === current)) sel.append(new Option(`${current} (not in this layout)`, current));
+    sel.value = current || '';
+    if (!rows.length) el('targetsNote').textContent = `No matrix found: the show has no model at least ${MIN.w} x ${MIN.h} pixels.`;
+  }
+  async function init() {
+    build();
+    app = EZApp.connect();
+    try { await app.ready; } catch (e) { el('note').textContent = `Could not reach the player: ${e.message}`; return; }
+    app.onStatus((s) => { el('status').textContent = JSON.stringify(s, null, 2); });
+    let settings = null;
+    try { settings = await app.get('private', 'settings'); } catch (e) { /* not readable here; the form keeps its defaults */ }
+    fill(settings || {});
+    try { await loadTargets(settings?.target); } catch (e) { el('note').textContent = `Could not list models: ${e.message}`; }
+    el('save').disabled = false;
+  }
+  el('save').addEventListener('click', async () => {
+    const body = gather();
+    if (!body.target) { el('note').textContent = 'Pick a matrix first.'; return; }
+
+    el('save').disabled = true;
+    try {
+      await app.put('private', 'settings', body);
+      el('note').textContent = 'Saved. The game picks it up within a few seconds (after the current game).';
+    } catch (e) {
+      el('note').textContent = `Save failed: ${e.message}`;
+    }
+    el('save').disabled = false;
+  });
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => { el('note').textContent = 'Could not load the app SDK.'; };
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>

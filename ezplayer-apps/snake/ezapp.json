@@ -1,0 +1,13 @@
+{
+    "id": "snake",
+    "name": "Snake",
+    "version": "1",
+    "description": "Steer a snake on a matrix of the show from your phone; eat the apples, don't hit the walls",
+    "icon": "🐍",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 900, "perClientPerSecond": 8 }
+}

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0a16">
+<title>Count the colours</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --raise: #261d3a; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; --c1: #ff2a2a; --c2: #2a7bff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 12px 14px 24px; gap: 12px; min-height: 100dvh; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  h1 { margin: 4px 0 0; font-size: 24px; text-align: center; }
+  .panel { width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  label { color: var(--dim); font-size: 14px; }
+  input[type=text] { width: 100%; font: inherit; font-size: 18px; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 12px; padding: 12px; user-select: text; -webkit-user-select: text; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  .seg button, .grid button { min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .btn { min-height: 54px; border-radius: 14px; border: 0; background: var(--accent); color: #1a1200; font: 800 18px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; width: 100%; }
+  .btn.ghost { background: var(--raise); color: var(--text); border: 1px solid var(--line); min-height: 44px; font-size: 15px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #msg { text-align: center; font-weight: 700; font-size: 18px; min-height: 26px; max-width: 420px; }
+  #note { text-align: center; color: #ff9a9a; min-height: 20px; font-size: 15px; max-width: 420px; }
+  #timer { text-align: center; color: var(--dim); font-size: 14px; min-height: 18px; }
+  .players { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+  .players span { flex: 1; text-align: center; padding: 6px; border-radius: 10px; border: 2px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .players span.turn { border-color: var(--accent); }
+  .big { text-align: center; font: 900 34px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .hidden { display: none !important; }
+  .nums { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .nums button { min-height: 52px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 800 20px/1 system-ui, sans-serif; cursor: pointer; }
+  .nums button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .nums.off button { opacity: .4; cursor: default; }
+  .table { display: flex; flex-direction: column; gap: 4px; }
+  .table div { display: flex; justify-content: space-between; padding: 6px 10px; border-radius: 10px; background: var(--raise); font-weight: 700; }
+  .table div.me { box-shadow: 0 0 0 2px var(--accent) inset; }
+  .swatch { display: inline-block; width: 22px; height: 22px; border-radius: 50%; vertical-align: middle; margin-right: 6px; }
+
+</style>
+</head>
+<body>
+<h1>🔢 Count the colours</h1>
+<div class="panel" id="namePanel">
+  <label for="name">Your name</label>
+  <input type="text" id="name" maxlength="16" placeholder="Your name" autocomplete="off">
+</div>
+<div class="panel" id="setup">
+  <button class="btn" id="go" disabled>New game</button>
+  <button class="btn hidden" id="join">Join the game</button>
+  <button class="btn ghost hidden" id="start">Start now</button>
+</div>
+<div class="panel hidden" id="ask">
+  <div class="big" id="question"></div>
+  <div class="nums" id="nums"></div>
+</div>
+<div class="panel hidden" id="board">
+  <div class="table" id="table"></div>
+  <button class="btn ghost hidden" id="quit">Leave the game</button>
+</div>
+
+<div id="timer"></div>
+<div id="msg">Connecting...</div>
+<div id="note"></div>
+<script>
+  const el = (id) => document.getElementById(id);
+  let app = null, status = { phase: 'idle', players: [] }, skew = 0, lastNoteText = '', lastNoteAt = 0;
+  try { el('name').value = localStorage.getItem('spName') || ''; } catch (e) {}
+  el('name').addEventListener('input', () => { try { localStorage.setItem('spName', el('name').value); } catch (e) {} });
+  const myName = () => el('name').value.trim();
+  const me = () => (app && (status.players || []).find((p) => p.id === app.clientId)) || null;
+  const meIndex = () => (app ? (status.players || []).findIndex((p) => p.id === app.clientId) : -1);
+  const nowMs = () => Date.now() + skew;
+  const say = (t) => { el('msg').textContent = t; };
+  const send = (o) => (app ? app.send(o).catch((e) => { el('note').textContent = 'Could not send: ' + e.message; lastNoteAt = Date.now(); }) : Promise.resolve());
+  function seg(box, list, cur, set) {
+    box.replaceChildren(...list.map(([v, t]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-pressed', String(v === cur));
+      b.addEventListener('click', () => { set(v); render(); }); return b;
+    }));
+  }
+  const secsLeft = (at) => Math.max(0, Math.ceil((at - nowMs()) / 1000));
+  let draw = () => {}, tickGame = () => '', onStatus = () => {};
+  let picked = -1, pickedFor = '';
+  const nums = [...Array(20)].map((_, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = i + 1;
+    b.addEventListener('click', () => answer(i + 1)); el('nums').append(b); return b;
+  });
+  function answer(v) {
+    const m = me();
+    if (!m || m.answered || picked >= 0 || !['show', 'answer'].includes(status.phase)) return;
+    picked = v; send({ type: 'answer', value: v, round: status.round }); render();
+  }
+  draw = () => {
+    const s = status, m = me(), ps = s.players || [];
+    const key = s.game + ':' + s.round; if (key !== pickedFor) { pickedFor = key; picked = -1; }
+    const busy = !['idle', 'over', 'unconfigured'].includes(s.phase);
+    el('go').disabled = !app || busy || s.phase === 'unconfigured';
+    el('go').textContent = s.phase === 'over' ? 'Play again' : 'New game';
+    el('go').classList.toggle('hidden', s.phase === 'lobby');
+    el('join').classList.toggle('hidden', !(s.phase === 'lobby' && !m && ps.length < (s.maxPlayers || 8)));
+    el('start').classList.toggle('hidden', !(s.phase === 'lobby' && ps[0] && app && ps[0].id === app.clientId));
+    el('setup').classList.toggle('hidden', !!m && busy && s.phase !== 'lobby');
+    const asking = m && ['show', 'answer'].includes(s.phase);
+    el('ask').classList.toggle('hidden', !asking);
+    if (asking) {
+      el('question').innerHTML = '<span class="swatch" style="background:#' + s.targetColor + '"></span>How many <b style="color:#' + s.targetColor + '">' + s.targetName + '</b>?';
+      const done = m.answered || picked >= 0;
+      el('nums').classList.toggle('off', done);
+      nums.forEach((b, i) => b.setAttribute('aria-pressed', String(picked === i + 1)));
+    }
+    el('board').classList.toggle('hidden', !busy && s.phase !== 'over');
+    el('quit').classList.toggle('hidden', !(m && busy));
+    const order = s.phase === 'over' ? [...ps].sort((a, b) => b.score - a.score) : ps;
+    el('table').replaceChildren(...order.map((p, k) => {
+      const d = document.createElement('div'); if (app && p.id === app.clientId) d.className = 'me';
+      const mark = p.ok === true ? ' ✅' : p.ok === false ? ' ❌' : ['show', 'answer'].includes(s.phase) && p.answered ? ' ✔️' : '';
+      d.textContent = (s.phase === 'over' ? ['🥇', '🥈', '🥉'][k] || '  ' : '') + ' ' + p.avatar + ' ' + p.name + (p.left ? ' (left)' : '') + mark;
+      const sc = document.createElement('span'); sc.textContent = p.score + (p.answer !== null && p.answer !== undefined ? '  (said ' + p.answer + ')' : ''); d.append(sc); return d;
+    }));
+    let t = s.message || '';
+    if (m && s.phase === 'show') t = picked >= 0 ? 'Answer locked in: ' + picked : '👀 Count the ' + s.targetName + ' flashes!';
+    if (m && s.phase === 'answer') t = picked >= 0 || m.answered ? 'Waiting for the others…' : 'Pick your answer!';
+    if (m && s.phase === 'result') t = (m.ok ? '🎉 Right! ' : '😅 ') + s.message;
+    if (!m && busy && s.phase !== 'lobby') t = 'A game is on. ' + t;
+    say(t);
+  };
+  tickGame = () => ['lobby', 'answer'].includes(status.phase) && status.until ? secsLeft(status.until) + ' s' : '';
+  el('go').addEventListener('click', () => { el('go').disabled = true; send({ type: 'new', name: myName() }); say('Starting…'); setTimeout(render, 1500); });
+  el('join').addEventListener('click', () => { send({ type: 'join', name: myName() }); say('Joining…'); });
+  el('start').addEventListener('click', () => send({ type: 'start' }));
+  el('quit').addEventListener('click', () => send({ type: 'quit' }));
+
+  function render() {
+    draw();
+    el('timer').textContent = tickGame() || '';
+    const n = app && status.notices && status.notices[app.clientId];
+    if (n && n !== lastNoteText) { lastNoteText = n; lastNoteAt = Date.now(); el('note').textContent = n; }
+    if (!n) lastNoteText = '';
+    if (Date.now() - lastNoteAt > 5000) el('note').textContent = '';
+  }
+  function init() {
+    app = EZApp.connect();
+    app.onStatus((s, snap) => {
+      if (!s) return;
+      if (snap && typeof snap.at === 'number') skew = snap.at - Date.now();
+      const old = status; status = s; onStatus(old, s);
+      render();
+    });
+    app.ready.then(render).catch((e) => say('Could not reach the player: ' + e.message));
+    setInterval(() => { el('timer').textContent = tickGame() || ''; }, 250);
+    render();
+  }
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => say('Could not load the app SDK.');
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>
