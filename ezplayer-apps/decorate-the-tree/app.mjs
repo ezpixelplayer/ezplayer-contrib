@@ -12,6 +12,8 @@
 import { num } from './multi-helpers.mjs';
 
 export const COLORS = ['ff2a2a', 'ffc83c', '2a7bff', 'ffffff', 'ff5fc8', 'a05bff', 'ff8c1a', '3cf0ff'];
+// the colours the tree itself can be (v12): green, red, blue, white, gold, pink, purple, ice blue (shown dim behind the decorations)
+export const TREE_COLS = ['1e9e3c', 'd21e1e', '2a6bff', 'ffffff', 'ffc83c', 'ff5fc8', 'a05bff', '3cf0ff'];
 /** the decorations: key, name, emoji (the phone draws each one in its colour) */
 export const KINDS = [['bauble', 'Bauble', '🔴'], ['cane', 'Candy cane', '🍭'], ['star', 'Star', '⭐'], ['bell', 'Bell', '🔔'], ['present', 'Present', '🎁'], ['flake', 'Snowflake', '❄️'], ['heart', 'Heart', '❤️']];
 
@@ -95,7 +97,7 @@ export function shapeAt(kind, x, y) {
         default: return d <= 1 ? [1, d < 0.35 && x < 0 && y > 0 ? 0.35 : 0] : null;   // a bauble with a shine
     }
 }
-const DEFAULTS = { target: '', shape: 'tree', star: '', kinds: KINDS.map(([k]) => k), fx: DECO_FX.map(([k]) => k), starFx: 'twinkle', starFxs: STAR_FX.map(([k]) => k), starPick: true, maxFx: 3, maxDeco: 5, starColor: 'ffbe28', starEvery: 30, fps: 20, brightness: 100, spots: 30, every: 60, show: 30, always: false, bg: 'green', restart: true, size: 100 };
+const DEFAULTS = { target: '', shape: 'tree', star: '', kinds: KINDS.map(([k]) => k), fx: DECO_FX.map(([k]) => k), starFx: 'twinkle', starFxs: STAR_FX.map(([k]) => k), starPick: true, maxFx: 3, maxDeco: 5, starColor: 'ffbe28', starEvery: 30, treeColor: '1e9e3c', treePick: true, fps: 20, brightness: 100, spots: 30, every: 60, show: 30, always: false, bg: 'green', restart: true, size: 100 };
 const PARTY_MS = 15000;
 const MAX_CANDIDATES = 3000;
 
@@ -107,7 +109,8 @@ export function cleanSettings(raw) {
     if (STAR_FX.some(([k]) => k === raw.starFx)) s.starFx = raw.starFx;
     for (const k of ['target', 'star']) if (typeof raw[k] === 'string') s[k] = raw[k].trim().slice(0, 200);
     for (const [k, lo, hi] of [['fps', 5, 30], ['brightness', 10, 100], ['maxFx', 1, MAX_FX], ['maxDeco', 1, 10], ['starEvery', 0, 600], ['spots', 8, 60], ['every', 0, 600], ['show', 10, 300], ['size', 50, 150]]) s[k] = num(raw[k], lo, hi, s[k]);
-    for (const k of ['always', 'restart', 'starPick']) if (typeof raw[k] === 'boolean') s[k] = raw[k];
+    for (const k of ['always', 'restart', 'starPick', 'treePick']) if (typeof raw[k] === 'boolean') s[k] = raw[k];
+    if (typeof raw.treeColor === 'string' && /^#?[0-9a-fA-F]{6}$/.test(raw.treeColor)) s.treeColor = raw.treeColor.replace('#', '').toLowerCase();
     if (typeof raw.starColor === 'string' && /^#?[0-9a-fA-F]{6}$/.test(raw.starColor)) s.starColor = raw.starColor.replace('#', '').toLowerCase();
     if (raw.bg === 'green' || raw.bg === 'off') s.bg = raw.bg;
     if (raw.shape === 'tree' || raw.shape === 'fill') s.shape = raw.shape;
@@ -266,7 +269,9 @@ export class App {
         this.s = s; this.ready = false; this.tree = null; this.star = null; this.lay = null; this.key = '';
         this.orn = ''; this.kinds = ''; this.fxs = ''; this.by = new Map(); this.last = -1; this.lastSet = []; this.hung = 0; this.lastAt = 0; this.lastBy = null; this.showUntil = 0; this.partyUntil = 0;
         this.problems = []; this.twinkle = null;
-        this.starCol = ''; this.starFx = null; this.starAng = null; this.starBy = new Map(); this.starAt = 0; this.starLastBy = null;   // the star's colour, picked by a visitor ('' = the one in the settings)
+        this.starCol = ''; this.starFx = null; this.starAng = null; this.starBy = new Map(); this.starAt = 0; this.starLastBy = null;
+        this.treeCol = ''; this.treeBy = new Map(); this.treeAt = 0; this.treeLastBy = null;   // the tree's colour, picked by a visitor ('' = the one in the settings)
+        // the star's colour, picked by a visitor ('' = the one in the settings)
     }
 
     async prepare({ base, groups = {} }) {
@@ -302,7 +307,7 @@ export class App {
     }
 
     /** the baubles survive a restart of the app or the player (kept while the tree and the number of spots stay the same) */
-    saveState() { return { orn: this.orn, kinds: this.kinds, fxs: this.fxs, fxv: 2, star: this.starCol, starFx: this.starFx }; }
+    saveState() { return { orn: this.orn, kinds: this.kinds, fxs: this.fxs, fxv: 2, star: this.starCol, starFx: this.starFx, tree: this.treeCol }; }
     restore(st) {
         const same = (x) => (typeof x === 'string' && x.length === st.orn.length && /^[0-9]*$/.test(x) ? x : '0'.repeat(st.orn.length));
         // effects: one character a spot, the chosen effects as bits (fxv 2); before that, one digit: the single effect
@@ -310,12 +315,14 @@ export class App {
             : [...st.fxs].map((c) => (/[0-9]/.test(c) && +c < DECO_FX.length && +c > 0 ? B64[1 << +c] : '0')).join('')) : '0'.repeat(st?.orn?.length ?? 0);
         if (st && typeof st.orn === 'string' && /^[0-8]{1,200}$/.test(st.orn)) this.saved = { orn: st.orn, kinds: same(st.kinds), fxs };
         if (st && typeof st.star === 'string' && /^([0-9a-f]{6})?$/.test(st.star)) this.starCol = st.star;
+        if (st && typeof st.tree === 'string' && /^([0-9a-f]{6})?$/.test(st.tree)) this.treeCol = st.tree;
         const sf = typeof st?.starFx === 'string' ? [st.starFx] : st?.starFx;
         if (Array.isArray(sf) && sf.length && sf.length <= MAX_FX && sf.every((k) => STAR_FX.some(([x]) => x === k))) this.starFx = sf;
     }
 
     handle(client, d, now) {
         if (d.type === 'star') return this.colourStar(client, d, now);
+        if (d.type === 'tree') return this.colourTree(client, d, now);
         if (d.type !== 'hang') return '';
         if (!this.lay) return 'The tree is not ready yet.';
         const n = this.lay.spots.length;
@@ -351,6 +358,21 @@ export class App {
         return taken ? `${ok.length} hung; ${taken} ${taken > 1 ? 'spots were' : 'spot was'} taken by someone faster.` : '';
     }
 
+    /** a visitor picks the tree's colour (one of TREE_COLS): shown dim behind the decorations, until the next party */
+    colourTree(client, d, now) {
+        if (!this.s.treePick || this.s.bg === 'off') return 'The tree\'s colour cannot change right now.';
+        if (now < this.partyUntil) return 'The tree is full: party time! Wait a moment.';
+        if (!Number.isInteger(d.c) || d.c < 1 || d.c > TREE_COLS.length) return '';
+        const left = Math.ceil(((this.treeBy.get(client) ?? -Infinity) + this.s.starEvery * 1000 - now) / 1000);
+        if (left > 0) return `You can change the tree's colour again in ${left} s.`;
+        this.treeCol = TREE_COLS[d.c - 1];
+        this.treeBy.set(client, now);
+        if (this.treeBy.size > 2000) for (const [k, v] of this.treeBy) if (now - v > 3600000) this.treeBy.delete(k);
+        this.treeAt = now; this.treeLastBy = client;
+        this.showUntil = Math.max(this.showUntil, now + this.s.show * 1000);
+        return '';
+    }
+
     /** a visitor picks the star's colour (one of the 8 decoration colours) and its effect */
     colourStar(client, d, now) {
         if (!this.star || !this.s.starPick) return 'The star cannot change right now.';
@@ -370,7 +392,7 @@ export class App {
     }
 
     step(now) {
-        if (this.partyUntil && now > this.partyUntil) { this.partyUntil = 0; this.lastSet = []; this.orn = '0'.repeat(this.orn.length); this.kinds = '0'.repeat(this.orn.length); this.fxs = '0'.repeat(this.orn.length); this.starCol = ''; this.starFx = null; }
+        if (this.partyUntil && now > this.partyUntil) { this.partyUntil = 0; this.lastSet = []; this.orn = '0'.repeat(this.orn.length); this.kinds = '0'.repeat(this.orn.length); this.fxs = '0'.repeat(this.orn.length); this.starCol = ''; this.starFx = null; this.treeCol = ''; }
     }
 
     showing(now) { return this.ready && (this.s.always || now < this.showUntil || now < this.partyUntil); }
@@ -378,7 +400,9 @@ export class App {
     frames(now) {
         if (!this.showing(now)) return [];
         const t = now / 1000, party = now < this.partyUntil, g = this.tree, map = this.lay.map, out = new Uint8Array(g.n * 3);
-        const drawn = this.lay.drawn, bg = this.s.bg === 'green' ? (drawn ? [0, 60, 12] : [0, 34, 6]) : [0, 0, 0], zone = this.lay.zone;
+        const drawn = this.lay.drawn, zone = this.lay.zone;
+        // the tree between the decorations: its colour (the settings', or a visitor's), dim; or off
+        const bg = this.s.bg === 'off' ? [0, 0, 0] : hexRgb(this.treeCol || this.s.treeColor).map((v) => Math.round(v * (drawn ? 0.3 : 0.17)));
         const shine = Math.max(0, 1 - (now - Math.max(this.lastAt, this.starAt)) / 1200);
         const sBase = hexRgb(this.starCol || this.s.starColor), sList = (this.starFx ?? [this.s.starFx]).length ? (this.starFx ?? [this.s.starFx]) : ['twinkle'];
         // a pixel of a star (a star model, or the star drawn on a matrix), with the star's colour and effect
@@ -442,6 +466,7 @@ export class App {
         return { spots: this.lay?.spots ?? [], round: !!this.lay?.round, orn: this.orn, kinds: this.kinds, kindList: KINDS.filter(([k]) => this.s.kinds.includes(k)), allKinds: KINDS.map(([k]) => k), colors: COLORS, every: this.s.every, party: Date.now() < this.partyUntil,
             last: this.last, lastSet: this.lastSet, hung: this.hung, maxDeco: this.s.maxDeco, lastBy: this.lastBy, star: !!this.star, starPick: !!this.star && this.s.starPick, starCol: this.starCol || this.s.starColor,
             starAt: this.starAt, starLastBy: this.starLastBy, starEvery: this.s.starEvery,
+            treeCol: this.treeCol || this.s.treeColor, treePick: this.s.treePick && this.s.bg !== 'off', treeCols: TREE_COLS, treeAt: this.treeAt, treeLastBy: this.treeLastBy,
             fxs: this.fxs, fxList: DECO_FX.filter(([k]) => this.s.fx.includes(k)), allFx: DECO_FX.map(([k]) => k),
             starFx: (this.starFx ?? [this.s.starFx]).slice(-this.s.maxFx), maxFx: this.s.maxFx, starFxList: STAR_FX.filter(([k]) => this.s.starFxs.includes(k)), players: [] };
     }
