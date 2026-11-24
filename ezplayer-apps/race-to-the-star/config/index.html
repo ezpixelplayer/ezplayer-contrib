@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Race to the Star settings</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 640px; margin-inline: auto; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  h2 { font-size: 14px; margin: 24px 0 4px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+  label { display: block; margin: 12px 0 4px; color: var(--dim); font-size: 14px; }
+  select, input[type=text], input[type=number] { width: 100%; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  select:disabled { opacity: 0.5; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .checks { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+  .checks label { display: inline-flex; align-items: center; gap: 8px; margin: 0; color: var(--text); }
+  input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
+  .colors { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .colors input[type=color] { width: 48px; height: 40px; border: 1px solid var(--line); border-radius: 10px; background: none; padding: 2px; }
+  button { font: inherit; font-weight: 600; color: #1a1200; background: var(--accent); border: 0; border-radius: 10px; padding: 12px 20px; margin-top: 18px; cursor: pointer; }
+  button:disabled { opacity: 0.5; }
+  #note { margin-left: 12px; color: var(--dim); }
+  details { margin-top: 24px; }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12px; overflow: auto; max-height: 50vh; white-space: pre-wrap; }
+  .hint { color: var(--dim); font-size: 13px; margin: 4px 0 0; }
+</style>
+</head>
+<body>
+<h1>🌟 Race to the Star settings</h1>
+<p class="hint">Phones race climbers up the track; the first to the top lights the star in their color. Pick the track, the star, how long the waiting room stays open and how hard the climb is, then Save.</p>
+
+<h2>Track and star</h2>
+<label for="track">Track (a matrix or tree is split into one lane per player; any other model or submodel runs its lanes along the node order)</label>
+<select id="track"><option value="">Loading targets...</option></select>
+<p class="hint" id="targetsNote"></p>
+<label for="star">Star (optional: a prop that stays dim during the race and lights in the winner's color)</label>
+<select id="star"><option value="">No star prop (the top of the track becomes the star)</option></select>
+<div class="row">
+  <div><label for="fps">Frames per second (5 to 30)</label><input id="fps" type="number" min="5" max="30" step="1" value="20"></div>
+  <div><label for="brightness">Brightness (%)</label><input id="brightness" type="number" min="10" max="100" step="5" value="100"></div>
+</div>
+<div class="row">
+  <div><label for="style">Climbers look like</label>
+    <select id="style"><option value="auto">Automatic (a figure on tracks 50 pixels tall or more, a rope below)</option><option value="rope">Rope</option><option value="climber">Climber</option></select></div>
+  <div><label for="bg">Track background</label>
+    <select id="bg"><option value="dim">Dim lane colors</option><option value="off">Off</option></select></div>
+</div>
+
+<h2>Players</h2>
+<div class="row">
+  <div><label for="wait">Waiting room open for (seconds)</label><input id="wait" type="number" min="5" max="300" step="5" value="30"></div>
+  <div><label for="maxPlayers">Most players (1 to 8)</label><input id="maxPlayers" type="number" min="1" max="8" step="1" value="4"></div>
+</div>
+<div class="checks"><label><input id="early" type="checkbox" checked> The first player can start before the waiting room closes</label></div>
+<label>Ways to play</label>
+<div class="checks">
+  <label><input type="checkbox" class="mode" value="tap" checked> 👆 Tap</label>
+  <label><input type="checkbox" class="mode" value="voice" checked> 🎤 Voice</label>
+  <label><input type="checkbox" class="mode" value="shake" checked> 🤳 Shake</label>
+  <label><input type="checkbox" class="mode" value="run" checked> 🏃 Run on the spot</label>
+</div>
+<label>Colors players can pick (one lane each)</label>
+<div class="colors" id="colors"></div>
+
+<h2>Levels</h2>
+<p class="hint">How far the same effort climbs for each level (100 % = normal).</p>
+<div class="row3">
+  <div><label for="lvl-kid">🧒 Child (%)</label><input id="lvl-kid" type="number" min="30" max="300" step="5" value="150"></div>
+  <div><label for="lvl-adult">🧑 Adult (%)</label><input id="lvl-adult" type="number" min="30" max="300" step="5" value="100"></div>
+  <div><label for="lvl-sport">🏃 Sporty (%)</label><input id="lvl-sport" type="number" min="30" max="300" step="5" value="80"></div>
+</div>
+<div class="checks"><label><input id="catchup" type="checkbox" checked> Help whoever is behind (they climb up to 60 % faster, so races stay close)</label></div>
+
+<h2>Difficulty</h2>
+<label for="difficulty">Preset</label>
+<select id="difficulty">
+  <option value="easy">Easy: 25 s race, slides 2 % a second after 2 s</option>
+  <option value="normal" selected>Normal: 35 s race, slides 3.5 % a second after 1.2 s</option>
+  <option value="hard">Hard: 45 s race, slides 6 % a second after 0.6 s</option>
+  <option value="custom">Custom</option>
+</select>
+<div class="row3">
+  <div><label for="climbTime">Race length at average effort (s)</label><input id="climbTime" type="number" min="5" max="300" step="1" value="35"></div>
+  <div><label for="slide">Slide speed (% of track per second)</label><input id="slide" type="number" min="0" max="50" step="0.5" value="3.5"></div>
+  <div><label for="slideDelay">Wait before sliding (s)</label><input id="slideDelay" type="number" min="0" max="10" step="0.1" value="1.2"></div>
+</div>
+<label for="maxTime">Longest race (seconds; the highest climber then wins)</label>
+<input id="maxTime" type="number" min="20" max="600" step="10" value="90">
+
+<button id="save" disabled>Save</button><span id="note"></span>
+
+<details>
+  <summary>Current status (debug)</summary>
+  <pre id="status">No status yet.</pre>
+</details>
+
+<script>
+  const el = (id) => document.getElementById(id);
+  const PRESETS = { easy: { climbTime: 25, slide: 0.02, slideDelay: 2 }, normal: { climbTime: 35, slide: 0.035, slideDelay: 1.2 }, hard: { climbTime: 45, slide: 0.06, slideDelay: 0.6 } };
+  const DEFAULT_COLORS = ['ff2a2a', '2a7bff', '39d353', 'ffd23f', 'a35cff', 'ff8a1a', '2ad4ff', 'ff5cc8'];
+  let app;
+
+  function applyPreset() {
+    const p = PRESETS[el('difficulty').value];
+    const custom = !p;
+    for (const id of ['climbTime', 'slide', 'slideDelay']) el(id).disabled = !custom;
+    if (p) { el('climbTime').value = p.climbTime; el('slide').value = p.slide * 100; el('slideDelay').value = p.slideDelay; }
+  }
+  el('difficulty').addEventListener('change', applyPreset);
+
+  function drawColors(colors) {
+    el('colors').replaceChildren(...colors.map((c) => {
+      const i = document.createElement('input'); i.type = 'color'; i.value = '#' + c; return i;
+    }));
+  }
+
+  async function loadTargets(track, star) {
+    const keep = (sel, value, label) => { sel.replaceChildren(); if (value) sel.append(new Option(label || value, value)); };
+    if (app.apiBase === null) {
+      keep(el('track'), track, track || 'Open this page on the home network to pick a track');
+      const starSel = el('star'); starSel.replaceChildren(new Option('No star prop', ''));
+      if (star) starSel.append(new Option(star, star));
+      starSel.value = star || '';
+      el('track').disabled = el('star').disabled = true;
+      el('targetsNote').textContent = 'The list of models is only available on the home network; the other settings can still be saved.';
+      return;
+    }
+    const res = await fetch(`${app.apiBase}/api/ezp/overlays/targets?detail=submodels`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { targets = [] } = await res.json();
+    const rows = targets
+      .map((t) => {
+        const name = t.target || t.model;
+        const grid = !t.subModel && t.width >= 2 && t.height >= 2;
+        const shape = grid ? `${t.width} x ${t.height}` : `${t.nodeCount} nodes`;
+        return { name, label: `${name} (${shape})` };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    const trackSel = el('track'), starSel = el('star');
+    trackSel.replaceChildren(new Option('Pick a track...', ''));
+    starSel.replaceChildren(new Option('No star prop (the top of the track becomes the star)', ''));
+    for (const r of rows) { trackSel.append(new Option(r.label, r.name)); starSel.append(new Option(r.label, r.name)); }
+    if (track && !rows.some((r) => r.name === track)) trackSel.append(new Option(`${track} (not in this layout)`, track));
+    if (star && !rows.some((r) => r.name === star)) starSel.append(new Option(`${star} (not in this layout)`, star));
+    trackSel.value = track || '';
+    starSel.value = star || '';
+    if (!rows.length) el('targetsNote').textContent = 'No overlay targets found: the show has no models yet.';
+  }
+
+  function fill(s) {
+    if (s.fps) el('fps').value = s.fps;
+    if (s.brightness) el('brightness').value = s.brightness;
+    if (s.style) el('style').value = s.style;
+    if (s.bg) el('bg').value = s.bg;
+    if (s.wait) el('wait').value = s.wait;
+    if (s.maxPlayers) el('maxPlayers').value = s.maxPlayers;
+    if (typeof s.early === 'boolean') el('early').checked = s.early;
+    if (Array.isArray(s.modes)) for (const c of document.querySelectorAll('.mode')) c.checked = s.modes.includes(c.value);
+    if (s.levels) for (const k of ['kid', 'adult', 'sport']) if (typeof s.levels[k] === 'number') el('lvl-' + k).value = Math.round(s.levels[k] * 100);
+    if (typeof s.catchup === 'boolean') el('catchup').checked = s.catchup;
+    if (s.difficulty) el('difficulty').value = s.difficulty;
+    if (typeof s.climbTime === 'number') el('climbTime').value = s.climbTime;
+    if (typeof s.slide === 'number') el('slide').value = Math.round(s.slide * 1000) / 10;
+    if (typeof s.slideDelay === 'number') el('slideDelay').value = s.slideDelay;
+    if (s.maxTime) el('maxTime').value = s.maxTime;
+    drawColors(Array.isArray(s.colors) && s.colors.length ? s.colors : DEFAULT_COLORS);
+  }
+
+  function gather() {
+    const num = (id, lo, hi) => { const v = Math.min(hi, Math.max(lo, Number(el(id).value))); el(id).value = v; return v; };
+    const levels = {};
+    for (const k of ['kid', 'adult', 'sport']) levels[k] = num('lvl-' + k, 30, 300) / 100;
+    const modes = [...document.querySelectorAll('.mode:checked')].map((c) => c.value);
+    const colors = [...document.querySelectorAll('#colors input')].map((i) => i.value.slice(1).toLowerCase());
+    return {
+      track: el('track').value,
+      star: el('star').value,
+      fps: Math.round(num('fps', 5, 30)),
+      brightness: Math.round(num('brightness', 10, 100)),
+      style: el('style').value,
+      bg: el('bg').value,
+      wait: Math.round(num('wait', 5, 300)),
+      maxPlayers: Math.round(num('maxPlayers', 1, 8)),
+      early: el('early').checked,
+      modes: modes.length ? modes : ['tap'],
+      colors: [...new Set(colors)],
+      levels,
+      catchup: el('catchup').checked,
+      difficulty: el('difficulty').value,
+      climbTime: num('climbTime', 5, 300),
+      slide: num('slide', 0, 50) / 100,
+      slideDelay: num('slideDelay', 0, 10),
+      maxTime: Math.round(num('maxTime', 20, 600)),
+    };
+  }
+
+  async function init() {
+    app = EZApp.connect();
+    try {
+      await app.ready;
+    } catch (e) {
+      el('note').textContent = `Could not reach the player: ${e.message}`;
+      return;
+    }
+    app.onStatus((s) => { el('status').textContent = JSON.stringify(s, null, 2); });
+    let settings = null;
+    try { settings = await app.get('private', 'settings'); } catch (e) { /* not readable here; the form keeps its defaults */ }
+    fill(settings || {});
+    applyPreset();
+    try {
+      await loadTargets(settings?.track, settings?.star);
+    } catch (e) {
+      el('note').textContent = `Could not list models: ${e.message}`;
+    }
+    el('save').disabled = false;
+  }
+
+  el('save').addEventListener('click', async () => {
+    const body = gather();
+    if (!body.track) { el('note').textContent = 'Pick a track first.'; return; }
+    if (!document.querySelectorAll('.mode:checked').length) { el('note').textContent = 'Tick at least one way to play.'; return; }
+    el('save').disabled = true;
+    try {
+      await app.put('private', 'settings', body);
+      el('note').textContent = 'Saved. The game picks it up within a few seconds (after the current race).';
+    } catch (e) {
+      el('note').textContent = `Save failed: ${e.message}`;
+    }
+    el('save').disabled = false;
+  });
+
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => { el('note').textContent = 'Could not load the app SDK.'; };
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>

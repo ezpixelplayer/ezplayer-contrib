@@ -1,0 +1,14 @@
+{
+    "id": "race-to-the-star",
+    "name": "Race to the Star",
+    "version": "1",
+    "description": "Up to eight phones race climbers up a tree or matrix by tapping, singing, shaking or running; the winner lights the star",
+    "icon": "🌟",
+    "runtime": "node",
+    "start": ["race.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "inputs": [{ "name": "start", "kind": "event" }],
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 1200, "perClientPerSecond": 5 }
+}
