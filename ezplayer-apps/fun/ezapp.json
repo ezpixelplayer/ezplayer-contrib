@@ -1,0 +1,13 @@
+{
+    "id": "fun",
+    "name": "Fun",
+    "version": "1",
+    "description": "Eight extras for visitors: photo frame, wheel of fortune, animals, paint by numbers, the bell, snow on request, a treasure hunt and guess the song",
+    "icon": "🎁",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 600, "perClientPerSecond": 3 }
+}

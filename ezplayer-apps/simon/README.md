@@ -46,3 +46,7 @@ The page sends `new` (`name`), `press` (`c` 0-3, `i` the press's place in the se
 ## Left out of the original
 
 Nothing. In ShowPlay the phone sent the whole answer at the end of a round (to save messages); here each press is sent, so it lights at once.
+
+## Changes
+
+- **Version 2:** a press that could not be sent (network or rate limit) is taken back on the phone, so the following presses keep their place in the sequence instead of being ignored until the time runs out.

@@ -75,12 +75,13 @@
   }
   const secsLeft = (at) => Math.max(0, Math.ceil((at - nowMs()) / 1000));
   let draw = () => {}, tickGame = () => '', onStatus = () => {};
-  let goal = 0.5, sentAt = 0, timer = null, lastSent = -1;
+  let goal = 0.5, sentAt = 0, timer = null, lastSent = -1, sentFor = -1;
   function sendGoal() {
     clearTimeout(timer);
     const wait = 120 - (Date.now() - sentAt);            // at most about 8 a second
     if (wait > 0) { timer = setTimeout(sendGoal, wait); return; }
     const v = Math.round(goal * 1000) / 1000;
+    if (status.game !== sentFor) { sentFor = status.game; lastSent = -1; }   // a new game: send it even if the finger has not moved
     if (Math.abs(v - lastSent) < 0.01) return;
     sentAt = Date.now(); lastSent = v; send({ type: 'go', x: v });
   }

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0a16">
+<title>Decorate the tree</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --raise: #261d3a; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; --c1: #ff2a2a; --c2: #2a7bff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 12px 14px 24px; gap: 12px; min-height: 100dvh; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  h1 { margin: 4px 0 0; font-size: 24px; text-align: center; }
+  .panel { width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  label { color: var(--dim); font-size: 14px; }
+  input[type=text] { width: 100%; font: inherit; font-size: 18px; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 12px; padding: 12px; user-select: text; -webkit-user-select: text; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  .seg button, .grid button { min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .btn { min-height: 54px; border-radius: 14px; border: 0; background: var(--accent); color: #1a1200; font: 800 18px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; width: 100%; }
+  .btn.ghost { background: var(--raise); color: var(--text); border: 1px solid var(--line); min-height: 44px; font-size: 15px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #msg { text-align: center; font-weight: 700; font-size: 18px; min-height: 26px; max-width: 420px; }
+  #note { text-align: center; color: #ff9a9a; min-height: 20px; font-size: 15px; max-width: 420px; }
+  #timer { text-align: center; color: var(--dim); font-size: 14px; min-height: 18px; }
+  .players { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+  .players span { flex: 1; text-align: center; padding: 6px; border-radius: 10px; border: 2px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .players span.turn { border-color: var(--accent); }
+  .big { text-align: center; font: 900 34px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .hidden { display: none !important; }
+  .treebox svg { width: 100%; max-width: 340px; display: block; margin: 0 auto; background: radial-gradient(circle at 50% 30%, #0c2a18, #050f09); border-radius: 16px; touch-action: manipulation; }
+  .treebox circle { cursor: pointer; }
+  .sw { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .sw button { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+  .sw button[aria-pressed="true"] { border-color: #fff; }
+
+</style>
+</head>
+<body>
+<h1>🎄 Decorate the tree</h1>
+<div class="panel" id="namePanel">
+  <label for="name">Your name</label>
+  <input type="text" id="name" maxlength="16" placeholder="Your name" autocomplete="off">
+</div>
+<div class="panel">
+  <div class="treebox"><svg id="svg" viewBox="0 0 100 120" role="img" aria-label="The tree and its baubles"></svg></div>
+  <div class="sw" id="cols"></div>
+  <button class="btn" id="hang" disabled>Hang my bauble</button>
+</div>
+
+<div id="timer"></div>
+<div id="msg">Connecting...</div>
+<div id="note"></div>
+<script>
+  const el = (id) => document.getElementById(id);
+  let app = null, status = { phase: 'idle', players: [] }, skew = 0, lastNoteText = '', lastNoteAt = 0;
+  try { el('name').value = localStorage.getItem('spName') || ''; } catch (e) {}
+  el('name').addEventListener('input', () => { try { localStorage.setItem('spName', el('name').value); } catch (e) {} });
+  const myName = () => el('name').value.trim();
+  const me = () => (app && (status.players || []).find((p) => p.id === app.clientId)) || null;
+  const meIndex = () => (app ? (status.players || []).findIndex((p) => p.id === app.clientId) : -1);
+  const nowMs = () => Date.now() + skew;
+  const say = (t) => { el('msg').textContent = t; };
+  const send = (o) => (app ? app.send(o).catch((e) => { el('note').textContent = 'Could not send: ' + e.message; lastNoteAt = Date.now(); }) : Promise.resolve());
+  function seg(box, list, cur, set) {
+    box.replaceChildren(...list.map(([v, t]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-pressed', String(v === cur));
+      b.addEventListener('click', () => { set(v); render(); }); return b;
+    }));
+  }
+  const secsLeft = (at) => Math.max(0, Math.ceil((at - nowMs()) / 1000));
+  let draw = () => {}, tickGame = () => '', onStatus = () => {};
+  el('namePanel').classList.add('hidden');
+  let sel = -1, col = 0, mine = -1, nextAt = 0, sentAt = 0;   // sentAt: a bauble on its way; the button waits for the answer (3 s at most)
+  // a spot (u across, v down the tree's grid) drawn on a tree shape: narrow at the top, wide at the bottom
+  const P = (u, v) => [50 + (u - 0.5) * (12 + 76 * v), 12 + v * 96];
+  draw = () => {
+    const s = status, svg = el('svg'), ns = 'http://www.w3.org/2000/svg', sp = s.spots || [], orn = s.orn || '';
+    if (sel >= 0 && orn[sel] !== '0') sel = -1;
+    svg.replaceChildren();
+    const tri = document.createElementNS(ns, 'polygon'); tri.setAttribute('points', '50,6 94,110 6,110'); tri.setAttribute('fill', '#14522b'); tri.setAttribute('stroke', '#2c8a4c'); svg.append(tri);
+    const trunk = document.createElementNS(ns, 'rect'); trunk.setAttribute('x', 44); trunk.setAttribute('y', 110); trunk.setAttribute('width', 12); trunk.setAttribute('height', 8); trunk.setAttribute('fill', '#5a3412'); svg.append(trunk);
+    const star = document.createElementNS(ns, 'text'); star.setAttribute('x', 50); star.setAttribute('y', 10); star.setAttribute('text-anchor', 'middle'); star.setAttribute('font-size', '11'); star.textContent = '⭐'; svg.append(star);
+    sp.forEach(([u, v], i) => {
+      const [x, y] = P(u, v), o = orn[i], c = document.createElementNS(ns, 'circle');
+      c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', i === sel ? 4.4 : 3.6); c.setAttribute('stroke-width', '0.7');
+      if (o === '0') { c.setAttribute('fill', i === sel ? '#' + s.colors[col] : '#ffffff14'); c.setAttribute('stroke', i === sel ? '#fff' : '#ffffff88'); if (i !== sel) c.setAttribute('stroke-dasharray', '1.2 1'); }
+      else { c.setAttribute('fill', '#' + s.colors[+o - 1]); c.setAttribute('stroke', i === mine ? '#fff' : '#0006'); }
+      c.onclick = () => { if (orn[i] !== '0') { el('note').textContent = i === mine ? 'That is your bauble! ✨' : 'This spot already has a bauble. Pick a free one.'; return; } sel = i; render(); };
+      svg.append(c);
+    });
+    el('cols').replaceChildren(...(s.colors || []).map((h, k) => { const b = document.createElement('button'); b.type = 'button'; b.style.background = '#' + h; b.setAttribute('aria-label', 'Colour ' + (k + 1)); b.setAttribute('aria-pressed', String(k === col)); b.onclick = () => { col = k; render(); }; return b; }));
+    const left = Math.ceil((nextAt - Date.now()) / 1000);
+    el('hang').disabled = !app || sel < 0 || left > 0 || s.party || s.phase === 'unconfigured' || Date.now() - sentAt < 3000;
+    const n = sp.length, used = n - [...orn].filter((c) => c === '0').length;
+    say(s.phase === 'unconfigured' ? s.message : s.party ? '🎉 The tree is full! Party on the lights!' : left > 0 ? 'You can hang another bauble in ' + left + ' s. (' + used + ' of ' + n + ')'
+      : sel < 0 ? 'Tap a free spot on the tree. (' + used + ' of ' + n + ' baubles)' : 'Now pick a colour and press Hang my bauble!');
+  };
+  tickGame = () => { if (nextAt > Date.now()) render(); return ''; };
+  onStatus = (o, s) => { if (s.lastBy && app && s.lastBy === app.clientId && s.last !== o.last) { mine = s.last; nextAt = Date.now() + (s.every || 0) * 1000; sentAt = 0; }
+    if (app && s.notices && s.notices[app.clientId]) sentAt = 0; };
+  el('hang').addEventListener('click', () => {
+    if (sel < 0) return;
+    sentAt = Date.now(); send({ type: 'hang', i: sel, c: col + 1 }); say('Hanging your bauble… watch the lights ✨'); el('hang').disabled = true;
+  });
+
+  function render() {
+    draw();
+    el('timer').textContent = tickGame() || '';
+    const n = app && status.notices && status.notices[app.clientId];
+    if (n && n !== lastNoteText) { lastNoteText = n; lastNoteAt = Date.now(); el('note').textContent = n; }
+    if (!n) lastNoteText = '';
+    if (Date.now() - lastNoteAt > 5000) el('note').textContent = '';
+  }
+  function init() {
+    app = EZApp.connect();
+    app.onStatus((s, snap) => {
+      if (!s) return;
+      if (snap && typeof snap.at === 'number') skew = snap.at - Date.now();
+      const old = status; status = s; onStatus(old, s);
+      render();
+    });
+    app.ready.then(render).catch((e) => say('Could not reach the player: ' + e.message));
+    setInterval(() => { el('timer').textContent = tickGame() || ''; }, 250);
+    render();
+  }
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => say('Could not load the app SDK.');
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>

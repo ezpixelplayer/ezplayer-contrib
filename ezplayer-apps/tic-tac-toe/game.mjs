@@ -170,8 +170,10 @@ export class Game {
         this.cpuAt = 0;
     }
 
-    move(client, cell, gameId, now) {
+    move(client, cell, gameId, now, n) {
         if (this.phase !== 'playing' || gameId !== this.id) return 'This game is over.';
+        // n: how many marks the phone saw on the board; a move sent for an older board (late or sent twice) is refused
+        if (Number.isInteger(n) && n !== this.board.replace(/\./g, '').length) return "It is not your turn.";
         const p = this.player(client);
         if (!p) return 'You are watching this game.';
         if (p.mark !== this.turn) return "It is not your turn.";

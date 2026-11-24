@@ -88,12 +88,17 @@
     b.addEventListener('click', () => drop(c)); el('arrows').append(b); return b;
   });
   holes.forEach((d, i) => d.addEventListener('click', () => drop(i % 7)));
-  function myTurn() { const i = meIndex(); return i >= 0 && status.phase === 'playing' && status.turn === i; }
+  let pend = null;   // a move sent and not yet confirmed: { game, n, at }; the board stays locked until the app answers
+  function myTurn() { const i = meIndex(); return !pend && i >= 0 && status.phase === 'playing' && status.turn === i; }
   function drop(c) {
     if (!myTurn() || status.board[c] !== '0') return;
-    send({ type: 'move', col: c, game: status.game });
-    status.turn = -1; render();      // wait for the app; it shows the disc
+    pend = { game: status.game, n: status.n, at: Date.now() };
+    send({ type: 'move', col: c, game: status.game, n: status.n }).then(() => { if (pend && Date.now() - pend.at > 3000) pend = null; });
+    render();      // wait for the app; it shows the disc
   }
+  // a status from before the move (it crossed the move on its way) does not unlock the board; a newer one, or a refusal, does
+  const settle = (s) => { if (!pend) return; const refused = app && s.notices && s.notices[app.clientId];
+    if (refused || s.game !== pend.game || s.n !== pend.n || s.phase !== 'playing' || Date.now() - pend.at > 4000) pend = null; };
   draw = () => {
     const s = status, m = me(), i = meIndex();
     const c = s.colors || ['ff2a2a', 'ffd23f'];
@@ -132,7 +137,7 @@
   tickGame = () => status.phase === 'playing' && status.turnEndsAt ? secsLeft(status.turnEndsAt) + ' s left for this move'
     : status.phase === 'waiting' && status.waitEndsAt ? 'The game is open for ' + secsLeft(status.waitEndsAt) + ' s' : '';
   let cheered = 0;
-  onStatus = (o, s) => { const i = meIndex(); if (s.phase === 'finished' && i >= 0 && s.winner === i + 1 && cheered !== s.game) { cheered = s.game; try { navigator.vibrate && navigator.vibrate([120, 80, 120, 80, 300]); } catch (e) {} } };
+  onStatus = (o, s) => { settle(s); const i = meIndex(); if (s.phase === 'finished' && i >= 0 && s.winner === i + 1 && cheered !== s.game) { cheered = s.game; try { navigator.vibrate && navigator.vibrate([120, 80, 120, 80, 300]); } catch (e) {} } };
   el('go').addEventListener('click', () => { el('go').disabled = true; send({ type: 'new', mode: choice.mode, level: choice.level, name: myName() }); say('Starting…'); setTimeout(render, 1500); });
   el('join').addEventListener('click', () => { send({ type: 'join', name: myName() }); say('Joining…'); });
   el('quit').addEventListener('click', () => send({ type: 'quit' }));

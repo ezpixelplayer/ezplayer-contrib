@@ -1,0 +1,13 @@
+{
+    "id": "props",
+    "name": "Props of the show",
+    "version": "1",
+    "description": "Visitors light up real models of the show (wings, bats, arches) with an effect and colours of their choice",
+    "icon": "✨",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 600, "perClientPerSecond": 3 }
+}

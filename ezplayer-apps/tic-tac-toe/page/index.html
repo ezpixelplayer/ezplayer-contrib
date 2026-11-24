@@ -62,6 +62,7 @@
 <script>
   const el = (id) => document.getElementById(id);
   let app = null, status = { phase: 'idle', board: '.........', players: [] }, skew = 0, lastNoteText = '', lastNoteAt = 0, cheered = 0;
+  let pend = null;   // a move sent and not yet confirmed: { game, board before it, at }; the board is locked until the app answers
   const choice = { mode: 'cpu', level: 'normal' };
   try { el('name').value = localStorage.getItem('tttName') || ''; } catch (e) {}
   el('name').addEventListener('input', () => { try { localStorage.setItem('tttName', el('name').value); } catch (e) {} });
@@ -72,10 +73,13 @@
     const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', 'Square ' + (i + 1));
     b.addEventListener('click', () => {
       const m = me();
-      if (!m || status.phase !== 'playing' || status.turn !== m.mark || status.board[i] !== '.') return;
-      status.board = status.board.slice(0, i) + m.mark + status.board.slice(i + 1);   // shown at once, the app confirms
+      if (pend || !m || status.phase !== 'playing' || status.turn !== m.mark || status.board[i] !== '.') return;
+      const before = status.board, n = before.replace(/\./g, '').length;
+      pend = { game: status.game, board: before, at: Date.now() };
+      // shown at once, and the turn passes on the phone too, so a second tap cannot play again before the app answers
+      status = { ...status, board: before.slice(0, i) + m.mark + before.slice(i + 1), turn: m.mark === 'X' ? 'O' : 'X' };
       render();
-      app.send({ type: 'move', cell: i, game: status.game }).catch((e) => { el('note').textContent = 'Could not send: ' + e.message; });
+      app.send({ type: 'move', cell: i, game: status.game, n }).catch((e) => { pend = null; el('note').textContent = 'Could not send: ' + e.message; render(); });
     });
     el('board').append(b); return b;
   });
@@ -164,6 +168,12 @@
     app.onStatus((s, snap) => {
       if (!s) return;
       if (snap && typeof snap.at === 'number') skew = snap.at - Date.now();
+      if (pend) {
+        const refused = app && s.notices && s.notices[app.clientId] && s.notices[app.clientId] !== lastNoteText;
+        // a status from before the move arrived (it crossed the move on its way): keep the move on the phone, for a few seconds at most
+        if (!refused && s.game === pend.game && s.board === pend.board && s.phase === 'playing' && Date.now() - pend.at < 4000) return;
+        pend = null;
+      }
       status = s;
       render();
     });

@@ -47,3 +47,7 @@ The page sends `new` (`name`), `go` (`x` 0-1, sent at most about 8 times a secon
 ## Left out of the original
 
 The crew's controls of the ShowPlay Mixer page (keyboard and MIDI).
+
+## Changes
+
+- **Version 2:** the ship's position is sent again at the start of each game, even if the finger has not moved since the last one.
