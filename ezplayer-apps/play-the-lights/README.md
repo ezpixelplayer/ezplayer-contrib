@@ -44,3 +44,7 @@ The page sends `play` with `a`: `join`, `leave`, `down` / `up` (`k`: the keys, `
 ## Left out of the original
 
 Nothing. (In ShowPlay a key was only a tap, because of the relay's delay; here a key can be held.)
+
+## Changes
+
+- **Version 2:** a group made of submodels lights only those submodels (before, it lit the whole models they belong to).

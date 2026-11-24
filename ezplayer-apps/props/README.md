@@ -58,3 +58,7 @@ The page sends `prop` (`i`: the prop, `fx`, `pal`: a palette or `mine`, `mine`: 
 ## Left out of the original
 
 Approval of requests by the crew (ShowPlay's control page). DMX lights cannot be props (as in ShowPlay).
+
+## Changes
+
+- **Version 2:** a group made of submodels lights only those submodels (before, it lit the whole models they belong to).
