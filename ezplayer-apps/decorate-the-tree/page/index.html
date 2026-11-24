@@ -94,9 +94,9 @@
     el('hang').disabled = !app || sel < 0 || left > 0 || s.party || s.phase === 'unconfigured' || Date.now() - sentAt < 3000;
     const n = sp.length, used = n - [...orn].filter((c) => c === '0').length;
     say(s.phase === 'unconfigured' ? s.message : s.party ? '🎉 The tree is full! Party on the lights!' : left > 0 ? 'You can hang another bauble in ' + left + ' s. (' + used + ' of ' + n + ')'
-      : sel < 0 ? 'Tap a free spot on the tree. (' + used + ' of ' + n + ' baubles)' : 'Now pick a colour and press Hang my bauble!');
+      : sel < 0 ? 'Tap a free spot on the tree. (' + used + ' of ' + n + ' baubles)' + (s.round ? ' The tree is shown unrolled: the spots go all the way round it.' : '') : 'Now pick a colour and press Hang my bauble!');
   };
-  tickGame = () => { if (nextAt > Date.now()) render(); return ''; };
+  tickGame = () => { if (nextAt > Date.now() - 1000) draw(); return ''; };   // the countdown (draw only: render calls this)
   onStatus = (o, s) => { if (s.lastBy && app && s.lastBy === app.clientId && s.last !== o.last) { mine = s.last; nextAt = Date.now() + (s.every || 0) * 1000; sentAt = 0; }
     if (app && s.notices && s.notices[app.clientId]) sentAt = 0; };
   el('hang').addEventListener('click', () => {
