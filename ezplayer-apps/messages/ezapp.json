@@ -1,0 +1,13 @@
+{
+    "id": "messages",
+    "name": "Messages on the lights",
+    "version": "1",
+    "description": "Visitors put a message, an effect or their own drawing on a matrix of the show from their phones, one after another",
+    "icon": "💬",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 300, "perClientPerSecond": 2 }
+}
