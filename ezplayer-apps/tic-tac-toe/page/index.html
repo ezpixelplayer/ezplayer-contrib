@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0a16">
+<title>Tic-tac-toe</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --raise: #261d3a; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; --x: #ff2a2a; --o: #2a7bff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 12px 14px 24px; gap: 12px; min-height: 100dvh; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  h1 { margin: 4px 0 0; font-size: 24px; }
+  .panel { width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  label { color: var(--dim); font-size: 14px; }
+  input[type=text] { width: 100%; font: inherit; font-size: 18px; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  .seg button { min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .btn { min-height: 54px; border-radius: 14px; border: 0; background: var(--accent); color: #1a1200; font: 800 18px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; width: 100%; }
+  .btn.ghost { background: var(--raise); color: var(--text); border: 1px solid var(--line); min-height: 44px; font-size: 15px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #msg { text-align: center; font-weight: 700; font-size: 18px; min-height: 26px; }
+  #note { text-align: center; color: #ff9a9a; min-height: 20px; font-size: 15px; }
+  .players { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+  .players span { flex: 1; text-align: center; padding: 6px; border-radius: 10px; border: 2px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .players span.turn { border-color: var(--accent); }
+  .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; aspect-ratio: 1; }
+  .board button { border: 0; border-radius: 14px; background: var(--raise); font: 900 clamp(48px, 18vw, 84px)/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .board button.X { color: var(--x); }
+  .board button.O { color: var(--o); }
+  .board button.win { background: #3a2f12; box-shadow: 0 0 0 3px var(--accent) inset; }
+  .board button.can:active { background: #34284f; }
+  .board.off button { cursor: default; }
+  #timer { text-align: center; color: var(--dim); font-size: 14px; min-height: 18px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<h1>⭕ Tic-tac-toe ❌</h1>
+
+<div class="panel" id="setup">
+  <label for="name">Your name</label>
+  <input type="text" id="name" maxlength="16" placeholder="Your name" autocomplete="off">
+  <label>Play against</label>
+  <div class="seg" id="modes"></div>
+  <div id="levelBox"><label>How hard</label><div class="seg" id="levels"></div></div>
+  <button class="btn" id="go" disabled>New game</button>
+  <button class="btn hidden" id="join">Join the game</button>
+</div>
+
+<div class="panel" id="play">
+  <div class="players" id="players"></div>
+  <div class="board off" id="board"></div>
+  <div id="timer"></div>
+  <button class="btn ghost hidden" id="quit">Leave the game</button>
+</div>
+
+<div id="msg">Connecting...</div>
+<div id="note"></div>
+
+<script>
+  const el = (id) => document.getElementById(id);
+  let app = null, status = { phase: 'idle', board: '.........', players: [] }, skew = 0, lastNoteText = '', lastNoteAt = 0, cheered = 0;
+  const choice = { mode: 'cpu', level: 'normal' };
+  try { el('name').value = localStorage.getItem('tttName') || ''; } catch (e) {}
+  el('name').addEventListener('input', () => { try { localStorage.setItem('tttName', el('name').value); } catch (e) {} });
+  const me = () => (app && (status.players || []).find((p) => p.id === app.clientId)) || null;
+  const say = (t) => { el('msg').textContent = t; };
+
+  const cells = [...Array(9)].map((_, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', 'Square ' + (i + 1));
+    b.addEventListener('click', () => {
+      const m = me();
+      if (!m || status.phase !== 'playing' || status.turn !== m.mark || status.board[i] !== '.') return;
+      status.board = status.board.slice(0, i) + m.mark + status.board.slice(i + 1);   // shown at once, the app confirms
+      render();
+      app.send({ type: 'move', cell: i, game: status.game }).catch((e) => { el('note').textContent = 'Could not send: ' + e.message; });
+    });
+    el('board').append(b); return b;
+  });
+
+  function seg(box, list, cur, set) {
+    box.replaceChildren(...list.map(([v, t]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-pressed', String(v === cur));
+      b.addEventListener('click', () => { set(v); render(); }); return b;
+    }));
+  }
+
+  function render() {
+    const s = status, m = me(), now = Date.now() + skew;
+    document.documentElement.style.setProperty('--x', '#' + ((s.colors && s.colors.X) || 'ff2a2a'));
+    document.documentElement.style.setProperty('--o', '#' + ((s.colors && s.colors.O) || '2a7bff'));
+    const modes = [s.cpu !== false && ['cpu', '🤖 The computer'], s.friend !== false && ['friend', '🧑‍🤝‍🧑 A friend']].filter(Boolean);
+    if (!modes.some(([v]) => v === choice.mode) && modes.length) choice.mode = modes[0][0];
+    seg(el('modes'), modes, choice.mode, (v) => { choice.mode = v; });
+    const levels = (s.levels || ['easy', 'normal', 'hard']).map((l) => [l, { easy: '😊 Easy', normal: '🙂 Normal', hard: '😈 Hard' }[l] || l]);
+    if (!levels.some(([v]) => v === choice.level) && levels.length) choice.level = levels[Math.min(1, levels.length - 1)][0];
+    seg(el('levels'), levels, choice.level, (v) => { choice.level = v; });
+    el('levelBox').classList.toggle('hidden', choice.mode !== 'cpu');
+
+    const busy = s.phase === 'waiting' || s.phase === 'playing';
+    el('go').disabled = !app || busy || s.phase === 'unconfigured';
+    el('go').textContent = s.phase === 'finished' ? 'Play again' : 'New game';
+    el('join').classList.toggle('hidden', !(s.phase === 'waiting' && !m));
+    el('go').classList.toggle('hidden', s.phase === 'waiting' && !m);
+    el('setup').classList.toggle('hidden', !!m && busy);
+    el('quit').classList.toggle('hidden', !(m && busy));
+
+    const ps = s.players || [];
+    el('players').replaceChildren(...['X', 'O'].map((mk) => {
+      const p = ps.find((x) => x.mark === mk), sp = document.createElement('span');
+      sp.textContent = (mk === 'X' ? '❌ ' : '⭕ ') + (p ? p.name + (app && p.id === app.clientId ? ' (you)' : '') : mk === 'O' && s.phase === 'waiting' ? 'waiting…' : '—');
+      sp.style.color = 'var(--' + mk.toLowerCase() + ')';
+      if (s.phase === 'playing' && s.turn === mk) sp.className = 'turn';
+      return sp;
+    }));
+    el('play').classList.toggle('hidden', s.phase === 'idle' || s.phase === 'unconfigured');
+    const myTurn = m && s.phase === 'playing' && s.turn === m.mark;
+    el('board').classList.toggle('off', !myTurn);
+    cells.forEach((b, i) => {
+      const c = (s.board || '.........')[i];
+      b.textContent = c === 'X' ? '✕' : c === 'O' ? '◯' : '';
+      b.className = (c !== '.' ? c : '') + (s.line && s.line.includes(i) ? ' win' : '') + (myTurn && c === '.' ? ' can' : '');
+    });
+
+    let text = s.message || '';
+    if (s.phase === 'playing' && m) text = myTurn ? 'Your turn! Tap a square.' : (ps.find((p) => p.mark === s.turn) || {}).id === 'cpu' ? 'The computer is thinking…' : 'Waiting for ' + ((ps.find((p) => p.mark === s.turn) || {}).name || 'the other player') + '…';
+    if (s.phase === 'finished' && m) text = s.winner === 'draw' ? '🤝 ' + (s.message || 'A draw!') : s.winner === m.mark ? '🎉 You win! Watch the lights!' : '😅 ' + s.message;
+    if (s.phase === 'waiting' && m) text = 'Waiting for a friend: ask them to open this page and tap Join.';
+    say(text);
+    tick();
+
+    const n = app && s.notices && s.notices[app.clientId];
+    if (n && n !== lastNoteText) { lastNoteText = n; lastNoteAt = Date.now(); el('note').textContent = n; }
+    if (!n) lastNoteText = '';
+    if (Date.now() - lastNoteAt > 5000) el('note').textContent = '';
+    if (s.phase === 'finished' && m && s.winner === m.mark && cheered !== s.game) { cheered = s.game; try { navigator.vibrate && navigator.vibrate([120, 80, 120, 80, 300]); } catch (e) {} }
+  }
+
+  function tick() {
+    const s = status, now = Date.now() + skew;
+    if (s.phase === 'playing' && s.turnEndsAt) el('timer').textContent = Math.max(0, Math.ceil((s.turnEndsAt - now) / 1000)) + ' s left for this move';
+    else if (s.phase === 'waiting' && s.waitEndsAt) el('timer').textContent = 'The game is open for ' + Math.max(0, Math.ceil((s.waitEndsAt - now) / 1000)) + ' s';
+    else el('timer').textContent = '';
+  }
+
+  el('go').addEventListener('click', () => {
+    if (!app) return;
+    el('go').disabled = true;
+    app.send({ type: 'new', mode: choice.mode, level: choice.level, name: el('name').value.trim() }).catch((e) => { el('note').textContent = 'Could not send: ' + e.message; });
+    say('Starting…');
+    setTimeout(render, 1500);
+  });
+  el('join').addEventListener('click', () => {
+    if (!app) return;
+    app.send({ type: 'join', name: el('name').value.trim() }).catch((e) => { el('note').textContent = 'Could not send: ' + e.message; });
+    say('Joining…');
+  });
+  el('quit').addEventListener('click', () => { if (app) app.send({ type: 'quit' }).catch(() => undefined); });
+
+  function init() {
+    app = EZApp.connect();
+    app.onStatus((s, snap) => {
+      if (!s) return;
+      if (snap && typeof snap.at === 'number') skew = snap.at - Date.now();
+      status = s;
+      render();
+    });
+    app.ready.then(render).catch((e) => say('Could not reach the player: ' + e.message));
+    setInterval(tick, 250);
+    render();
+  }
+
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => say('Could not load the app SDK.');
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>
