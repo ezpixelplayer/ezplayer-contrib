@@ -203,13 +203,23 @@ export class App {
         this.starCol = ''; this.starFx = ''; this.starAng = null; this.starBy = new Map(); this.starAt = 0; this.starLastBy = null;   // the star's colour, picked by a visitor ('' = the one in the settings)
     }
 
-    async prepare({ base }) {
+    async prepare({ base, groups = {} }) {
         const s = this.s;
         this.problems = [];
         if (!s.target) { this.ready = false; this.notReady = 'Not set up yet: open the app settings and pick the tree.'; return; }
         const tree = await pixelsOf(base, s.target);
-        let star = null;
-        if (s.star) { try { star = await pixelsOf(base, s.star); } catch (e) { this.problems.push(e.message); } }
+        // the star: a model, a group of the show, or several separated by commas (each model lit the same way)
+        const stars = [];
+        const names = [...new Set(s.star.split(',').map((x) => x.trim()).filter(Boolean).flatMap((x) => groups[x] ?? [x]))].filter((m) => m !== s.target).slice(0, 64);
+        for (const m of names) {
+            try {
+                const st = await pixelsOf(base, m);
+                const cx = st.pts.reduce((a, p) => a + p[0], 0) / st.pts.length, cy = st.pts.reduce((a, p) => a + p[1], 0) / st.pts.length;
+                stars.push({ geom: st.geom, twinkle: Float32Array.from({ length: st.geom.n }, () => Math.random() * 6.3),
+                    ang: Float32Array.from(st.pts, ([x, y]) => ((Math.atan2(y - cy, x - cx) / (2 * Math.PI)) % 1 + 1) % 1) });   // each pixel's angle round its star's middle, for Spin
+            } catch (e) { this.problems.push(`star: ${e.message}`); }
+        }
+        if (s.star && !stars.length) this.problems.push(`star: "${s.star}" is not a model or a group of the show`);
         const key = [s.target, tree.geom.n, s.spots, s.size].join('|');
         if (key !== this.key) {
             this.lay = layout(tree.pts, s.spots, s.size);
@@ -221,12 +231,7 @@ export class App {
             if (this.fxs.length !== n) this.fxs = '0'.repeat(n);
             this.saved = null;
         }
-        this.tree = tree.geom; this.star = star?.geom ?? null;
-        this.twinkle = this.star ? Float32Array.from({ length: this.star.n }, () => Math.random() * 6.3) : null;
-        if (star) {   // each pixel's angle round the star's middle, for the Spin effect
-            const cx = star.pts.reduce((a, p) => a + p[0], 0) / star.pts.length, cy = star.pts.reduce((a, p) => a + p[1], 0) / star.pts.length;
-            this.starAng = Float32Array.from(star.pts, ([x, y]) => ((Math.atan2(y - cy, x - cx) / (2 * Math.PI)) % 1 + 1) % 1);
-        }
+        this.tree = tree.geom; this.stars = stars; this.star = stars.length > 0;
         this.ready = true;
     }
 
@@ -317,19 +322,20 @@ export class App {
             out[i * 3] = c[0]; out[i * 3 + 1] = c[1]; out[i * 3 + 2] = c[2];
         }
         const list = [{ geom: g, bytes: out }];
-        if (this.star) {
-            const sg = this.star, sb = new Uint8Array(sg.n * 3), shine = Math.max(0, 1 - (now - Math.max(this.lastAt, this.starAt)) / 1200);
-            const base = hexRgb(this.starCol || this.s.starColor), fx = this.starFx || this.s.starFx;
+        const shine = Math.max(0, 1 - (now - Math.max(this.lastAt, this.starAt)) / 1200);
+        const base = hexRgb(this.starCol || this.s.starColor), fx = this.starFx || this.s.starFx;
+        for (const star of this.stars ?? []) {
+            const sg = star.geom, sb = new Uint8Array(sg.n * 3);
             for (let i = 0; i < sg.n; i++) {
                 let c, k = 1, col = base, white = 0;
                 if (party) c = hsv(t * 0.6 + i / sg.n);
                 else {
-                    if (fx === 'twinkle') k = 0.55 + 0.45 * Math.sin(t * 3 + this.twinkle[i]);
+                    if (fx === 'twinkle') k = 0.55 + 0.45 * Math.sin(t * 3 + star.twinkle[i]);
                     else if (fx === 'blink') k = Math.floor(t * 2.5) % 2 ? 1 : 0.05;
                     else if (fx === 'pulse') k = 0.12 + 0.88 * (0.5 + 0.5 * Math.sin(t * 3.5));
-                    else if (fx === 'spin') { const a = (((this.starAng?.[i] ?? i / sg.n) - t * 0.5) % 1 + 1) % 1; k = 0.15 + 0.85 * Math.max(0, 1 - a * 3); white = Math.max(0, 1 - a * 8) * 0.6; }
+                    else if (fx === 'spin') { const a = (((star.ang[i] ?? i / sg.n) - t * 0.5) % 1 + 1) % 1; k = 0.15 + 0.85 * Math.max(0, 1 - a * 3); white = Math.max(0, 1 - a * 8) * 0.6; }
                     else if (fx === 'sparkle') { k = 0.6; white = Math.max(0, Math.sin(t * (4 + rnd(i) * 5) + rnd(i + 3) * 6.3)) ** 12; k += white * 0.4; }
-                    else if (fx === 'rainbow') col = hsv(t * 0.3 + (this.starAng?.[i] ?? i / sg.n));
+                    else if (fx === 'rainbow') col = hsv(t * 0.3 + (star.ang[i] ?? i / sg.n));
                     c = col.map((v) => { const x = v * k; return Math.min(255, x + (255 - x) * Math.max(shine, white)); });
                 }
                 sb[i * 3] = c[0]; sb[i * 3 + 1] = c[1]; sb[i * 3 + 2] = c[2];
