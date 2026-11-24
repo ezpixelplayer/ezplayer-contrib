@@ -311,6 +311,22 @@ class Track {
                     lane[i] = w >= n ? Math.min(n - 1, Math.floor((x * n) / w)) : -1;
                 }
             }
+        } else if (this.shape.strands && this.shape.strands.length >= n) {
+            // A stranded submodel: each strand climbs on its own, and the strands are
+            // dealt out to the lanes in order, so a tree's strings race side by side.
+            const strands = this.shape.strands;
+            const S = strands.length;
+            rows = Math.min(...strands);
+            let i = 0;
+            for (let s = 0; s < S; s++) {
+                const j = Math.min(n - 1, Math.floor((s * n) / S));
+                const len = strands[s];
+                for (let k = 0; k < len && i < pixels; k++, i++) {
+                    lane[i] = j;
+                    prog[i] = k / Math.max(1, len - 1);
+                }
+            }
+            for (; i < pixels; i++) lane[i] = -1;
         } else if (Math.floor(pixels / n) >= 2) {
             rows = Math.floor(pixels / n);
             for (let i = 0; i < pixels; i++) {
@@ -456,7 +472,12 @@ function trackShape(t) {
         return { target, kind: 'grid', width: w, height: h, pixels: w * h };
     }
     if (!t.nodeCount || t.nodeCount < 2) return null;
-    return { target, kind: 'nodes', pixels: t.nodeCount };
+    // Strands of a stranded submodel become lanes when there are enough of them.
+    const strands =
+        Array.isArray(t.strands) && t.strands.length >= 2 && t.strands.every((s) => s >= 2)
+            ? t.strands.map(Number)
+            : undefined;
+    return { target, kind: 'nodes', pixels: t.nodeCount, strands };
 }
 
 /** Reads the settings and resolves the targets; returns { settings, track, star } or { error }. */
