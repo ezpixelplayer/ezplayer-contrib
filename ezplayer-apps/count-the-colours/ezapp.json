@@ -1,0 +1,13 @@
+{
+    "id": "count-the-colours",
+    "name": "Count the colours",
+    "version": "1",
+    "description": "A party game for up to eight phones: count how many times a colour flashes on the lights",
+    "icon": "🔢",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 600, "perClientPerSecond": 3 }
+}

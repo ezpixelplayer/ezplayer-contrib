@@ -1,0 +1,13 @@
+{
+    "id": "space-invaders",
+    "name": "Space Invaders",
+    "version": "1",
+    "description": "Defend the show from space invaders on a matrix: slide your phone to move the ship",
+    "icon": "👾",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 1200, "perClientPerSecond": 10 }
+}

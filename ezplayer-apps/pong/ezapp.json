@@ -1,0 +1,13 @@
+{
+    "id": "pong",
+    "name": "Pong",
+    "version": "1",
+    "description": "Pong on a matrix of the show: slide your phone to move your paddle, against the computer or a friend",
+    "icon": "🏓",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 1500, "perClientPerSecond": 12 }
+}

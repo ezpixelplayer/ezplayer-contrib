@@ -1,0 +1,13 @@
+{
+    "id": "simon",
+    "name": "Simon",
+    "version": "1",
+    "description": "Repeat the colours the lights show, on four pads of your phone; one more colour every round",
+    "icon": "🟢",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 900, "perClientPerSecond": 8 }
+}

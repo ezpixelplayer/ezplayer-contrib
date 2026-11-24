@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0a16">
+<title>Four in a Row</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --raise: #261d3a; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; --c1: #ff2a2a; --c2: #2a7bff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 12px 14px 24px; gap: 12px; min-height: 100dvh; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  h1 { margin: 4px 0 0; font-size: 24px; text-align: center; }
+  .panel { width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  label { color: var(--dim); font-size: 14px; }
+  input[type=text] { width: 100%; font: inherit; font-size: 18px; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 12px; padding: 12px; user-select: text; -webkit-user-select: text; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  .seg button, .grid button { min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .btn { min-height: 54px; border-radius: 14px; border: 0; background: var(--accent); color: #1a1200; font: 800 18px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; width: 100%; }
+  .btn.ghost { background: var(--raise); color: var(--text); border: 1px solid var(--line); min-height: 44px; font-size: 15px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #msg { text-align: center; font-weight: 700; font-size: 18px; min-height: 26px; max-width: 420px; }
+  #note { text-align: center; color: #ff9a9a; min-height: 20px; font-size: 15px; max-width: 420px; }
+  #timer { text-align: center; color: var(--dim); font-size: 14px; min-height: 18px; }
+  .players { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+  .players span { flex: 1; text-align: center; padding: 6px; border-radius: 10px; border: 2px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .players span.turn { border-color: var(--accent); }
+  .big { text-align: center; font: 900 34px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .hidden { display: none !important; }
+  .board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; background: #0028a0; padding: 6px; border-radius: 14px; width: 100%; }
+  .board div { aspect-ratio: 1; border-radius: 50%; background: #0d0a16; }
+  .board div.c1 { background: var(--c1); } .board div.c2 { background: var(--c2); }
+  .board div.win { box-shadow: 0 0 0 3px #fff inset; }
+  .board.can { cursor: pointer; }
+  .arrows { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 0 6px; }
+  .arrows button { min-height: 40px; border: 0; border-radius: 10px; background: var(--raise); color: var(--text); font: 800 18px/1 system-ui, sans-serif; cursor: pointer; }
+  .arrows.off button { opacity: .3; cursor: default; }
+
+</style>
+</head>
+<body>
+<h1>🔴 Four in a Row</h1>
+<div class="panel" id="namePanel">
+  <label for="name">Your name</label>
+  <input type="text" id="name" maxlength="16" placeholder="Your name" autocomplete="off">
+</div>
+<div class="panel" id="setup">
+  <label>Play against</label>
+  <div class="seg" id="modes"></div>
+  <div id="levelBox"><label>How hard</label><div class="seg" id="levels"></div></div>
+  <button class="btn" id="go" disabled>New game</button>
+  <button class="btn hidden" id="join">Join the game</button>
+</div>
+<div class="panel hidden" id="play">
+  <div class="players" id="players"></div>
+  <div class="arrows off" id="arrows"></div>
+  <div class="board" id="board"></div>
+  <button class="btn ghost hidden" id="quit">Leave the game</button>
+</div>
+
+<div id="timer"></div>
+<div id="msg">Connecting...</div>
+<div id="note"></div>
+<script>
+  const el = (id) => document.getElementById(id);
+  let app = null, status = { phase: 'idle', players: [] }, skew = 0, lastNoteText = '', lastNoteAt = 0;
+  try { el('name').value = localStorage.getItem('spName') || ''; } catch (e) {}
+  el('name').addEventListener('input', () => { try { localStorage.setItem('spName', el('name').value); } catch (e) {} });
+  const myName = () => el('name').value.trim();
+  const me = () => (app && (status.players || []).find((p) => p.id === app.clientId)) || null;
+  const meIndex = () => (app ? (status.players || []).findIndex((p) => p.id === app.clientId) : -1);
+  const nowMs = () => Date.now() + skew;
+  const say = (t) => { el('msg').textContent = t; };
+  const send = (o) => (app ? app.send(o).catch((e) => { el('note').textContent = 'Could not send: ' + e.message; lastNoteAt = Date.now(); }) : Promise.resolve());
+  function seg(box, list, cur, set) {
+    box.replaceChildren(...list.map(([v, t]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-pressed', String(v === cur));
+      b.addEventListener('click', () => { set(v); render(); }); return b;
+    }));
+  }
+  const secsLeft = (at) => Math.max(0, Math.ceil((at - nowMs()) / 1000));
+  let draw = () => {}, tickGame = () => '', onStatus = () => {};
+  const choice = { mode: 'cpu', level: 'normal' };
+  const holes = [...Array(42)].map(() => { const d = document.createElement('div'); el('board').append(d); return d; });
+  const arrows = [...Array(7)].map((_, c) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = '▼'; b.setAttribute('aria-label', 'Column ' + (c + 1));
+    b.addEventListener('click', () => drop(c)); el('arrows').append(b); return b;
+  });
+  holes.forEach((d, i) => d.addEventListener('click', () => drop(i % 7)));
+  function myTurn() { const i = meIndex(); return i >= 0 && status.phase === 'playing' && status.turn === i; }
+  function drop(c) {
+    if (!myTurn() || status.board[c] !== '0') return;
+    send({ type: 'move', col: c, game: status.game });
+    status.turn = -1; render();      // wait for the app; it shows the disc
+  }
+  draw = () => {
+    const s = status, m = me(), i = meIndex();
+    const c = s.colors || ['ff2a2a', 'ffd23f'];
+    document.documentElement.style.setProperty('--c1', '#' + c[0]); document.documentElement.style.setProperty('--c2', '#' + c[1]);
+    const modes = [s.cpu !== false && ['cpu', '🤖 The computer'], s.friend !== false && ['friend', '🧑‍🤝‍🧑 A friend']].filter(Boolean);
+    if (!modes.some(([v]) => v === choice.mode) && modes.length) choice.mode = modes[0][0];
+    seg(el('modes'), modes, choice.mode, (v) => { choice.mode = v; });
+    const levels = (s.levels || ['easy', 'normal', 'hard']).map((l) => [l, { easy: '😊 Easy', normal: '🙂 Normal', hard: '😈 Hard' }[l] || l]);
+    if (!levels.some(([v]) => v === choice.level) && levels.length) choice.level = levels[Math.min(1, levels.length - 1)][0];
+    seg(el('levels'), levels, choice.level, (v) => { choice.level = v; });
+    el('levelBox').classList.toggle('hidden', choice.mode !== 'cpu');
+    const busy = s.phase === 'waiting' || s.phase === 'playing';
+    el('go').disabled = !app || busy || s.phase === 'unconfigured';
+    el('go').textContent = s.phase === 'finished' ? 'Play again' : 'New game';
+    el('join').classList.toggle('hidden', !(s.phase === 'waiting' && !m));
+    el('go').classList.toggle('hidden', s.phase === 'waiting' && !m);
+    el('setup').classList.toggle('hidden', !!m && busy);
+    el('quit').classList.toggle('hidden', !(m && busy));
+    el('play').classList.toggle('hidden', s.phase === 'idle' || s.phase === 'unconfigured');
+    const ps = s.players || [];
+    el('players').replaceChildren(...[0, 1].map((k) => {
+      const p = ps[k], sp = document.createElement('span');
+      sp.textContent = '● ' + (p ? p.name + (app && p.id === app.clientId ? ' (you)' : '') : k === 1 && s.phase === 'waiting' ? 'waiting…' : '—');
+      sp.style.color = 'var(--c' + (k + 1) + ')'; if (s.phase === 'playing' && s.turn === k) sp.className = 'turn'; return sp;
+    }));
+    const b = s.board || '0'.repeat(42), mine = myTurn();
+    holes.forEach((d, k) => { d.className = (b[k] === '1' ? 'c1' : b[k] === '2' ? 'c2' : '') + (s.line && s.line.includes(k) ? ' win' : ''); });
+    el('board').classList.toggle('can', mine); el('arrows').classList.toggle('off', !mine);
+    arrows.forEach((a, k) => { a.disabled = !mine || b[k] !== '0'; });
+    let t = s.message || '';
+    if (s.phase === 'playing' && m) t = mine ? 'Your turn! Tap a column.' : (ps[s.turn] || {}).id === 'cpu' ? 'The computer is thinking…' : 'Waiting for ' + ((ps[s.turn] || {}).name || 'the other player') + '…';
+    if (s.phase === 'finished' && m) t = s.winner === 3 ? '🤝 ' + s.message : s.winner === i + 1 ? '🎉 You win! Watch the lights!' : '😅 ' + s.message;
+    if (s.phase === 'waiting' && m) t = 'Waiting for a friend: ask them to open this page and tap Join.';
+    say(t);
+  };
+  tickGame = () => status.phase === 'playing' && status.turnEndsAt ? secsLeft(status.turnEndsAt) + ' s left for this move'
+    : status.phase === 'waiting' && status.waitEndsAt ? 'The game is open for ' + secsLeft(status.waitEndsAt) + ' s' : '';
+  let cheered = 0;
+  onStatus = (o, s) => { const i = meIndex(); if (s.phase === 'finished' && i >= 0 && s.winner === i + 1 && cheered !== s.game) { cheered = s.game; try { navigator.vibrate && navigator.vibrate([120, 80, 120, 80, 300]); } catch (e) {} } };
+  el('go').addEventListener('click', () => { el('go').disabled = true; send({ type: 'new', mode: choice.mode, level: choice.level, name: myName() }); say('Starting…'); setTimeout(render, 1500); });
+  el('join').addEventListener('click', () => { send({ type: 'join', name: myName() }); say('Joining…'); });
+  el('quit').addEventListener('click', () => send({ type: 'quit' }));
+
+  function render() {
+    draw();
+    el('timer').textContent = tickGame() || '';
+    const n = app && status.notices && status.notices[app.clientId];
+    if (n && n !== lastNoteText) { lastNoteText = n; lastNoteAt = Date.now(); el('note').textContent = n; }
+    if (!n) lastNoteText = '';
+    if (Date.now() - lastNoteAt > 5000) el('note').textContent = '';
+  }
+  function init() {
+    app = EZApp.connect();
+    app.onStatus((s, snap) => {
+      if (!s) return;
+      if (snap && typeof snap.at === 'number') skew = snap.at - Date.now();
+      const old = status; status = s; onStatus(old, s);
+      render();
+    });
+    app.ready.then(render).catch((e) => say('Could not reach the player: ' + e.message));
+    setInterval(() => { el('timer').textContent = tickGame() || ''; }, 250);
+    render();
+  }
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => say('Could not load the app SDK.');
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>
