@@ -52,7 +52,8 @@ positions for the model, the app uses its grid instead (`grid` lease), as before
 - **Baubles** (30), **each phone waits** between baubles, **show the tree for** after each new one.
 - **Show the decorated tree all the time** (off: the show's sequence plays between baubles).
 - **When the tree is full**: a party on the lights, then it starts again.
-- **The tree between the baubles**: green or off.
+- **The tree between the baubles**: lit dim in **the tree's colour** (green by default), or off. **Visitors may change
+  the tree's colour** (on): they tap the tree on the phone and pick one of 8 colours.
 - **Frames per second** and **brightness**.
 
 ## Use
@@ -115,3 +116,7 @@ the player (while the number of spots stays the same).
   clearly different on the lights (blink fully off, pulse as a heartbeat, twinkle with white sparkles, glow breathing
   slowly), and several effects on one decoration or on the star take turns instead of multiplying (which made them
   look alike).
+
+- **Version 12:** the tree's own colour: a setting for the colour the tree is lit in between the decorations (green by
+  default; dim), and visitors can tap the tree on the phone to pick its colour (green, red, blue, white, gold, pink,
+  purple, ice blue), waiting between changes like for the star. After the party it goes back to the settings' colour.

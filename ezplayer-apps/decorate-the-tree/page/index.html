@@ -100,16 +100,21 @@
   }
   // picks: the decorations chosen but not hung yet (spot -> {k, c, f}); sel: the one being changed, or 'star'
   const picks = new Map(); let mine = new Set();
-  let sel = -1, col = 0, nextAt = 0, sentAt = 0, starNext = 0;   // sel: a spot, or 'star'   // sentAt: a bauble on its way; the button waits for the answer (3 s at most)
+  let sel = -1, col = 0, tcol = 0, nextAt = 0, sentAt = 0, starNext = 0, treeNext = 0;   // sel: a spot, 'star' or 'tree'   // sentAt: a bauble on its way; the button waits for the answer (3 s at most)
   // a spot (u across, v down the tree's grid) drawn on a tree shape: narrow at the top, wide at the bottom
   const P = (u, v) => [50 + (u - 0.5) * (12 + 76 * v), 12 + v * 96];
   draw = () => {
     const s = status, svg = el('svg'), ns = 'http://www.w3.org/2000/svg', sp = s.spots || [], orn = s.orn || '';
     for (const i of [...picks.keys()]) if (orn[i] !== '0' || i >= sp.length) picks.delete(i);
-    if (sel === 'star' ? !s.starPick : sel >= 0 && !picks.has(sel)) sel = -1;
+    if (sel === 'star' ? !s.starPick : sel === 'tree' ? !s.treePick : sel >= 0 && !picks.has(sel)) sel = -1;
     const maxD = s.maxDeco || 1;
     svg.replaceChildren();
-    const tri = document.createElementNS(ns, 'polygon'); tri.setAttribute('points', '50,6 94,110 6,110'); tri.setAttribute('fill', '#14522b'); tri.setAttribute('stroke', '#2c8a4c'); svg.append(tri);
+    // the tree, in its colour (darker on the phone); a visitor can tap it to change its colour
+    const tc = sel === 'tree' ? (s.treeCols || [])[tcol] || '1e9e3c' : s.treeCol || '1e9e3c';
+    const dk = (h, k) => '#' + [0, 2, 4].map((i) => Math.round(parseInt(h.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('');
+    const tri = document.createElementNS(ns, 'polygon'); tri.setAttribute('points', '50,6 94,110 6,110'); tri.setAttribute('fill', dk(tc, 0.45)); tri.setAttribute('stroke', sel === 'tree' ? '#fff' : dk(tc, 0.8)); tri.setAttribute('stroke-width', sel === 'tree' ? '1' : '0.5');
+    if (s.treePick) { tri.style.cursor = 'pointer'; tri.onclick = () => { sel = 'tree'; picks.clear(); render(); }; }
+    svg.append(tri);
     const trunk = document.createElementNS(ns, 'rect'); trunk.setAttribute('x', 44); trunk.setAttribute('y', 110); trunk.setAttribute('width', 12); trunk.setAttribute('height', 8); trunk.setAttribute('fill', '#5a3412'); svg.append(trunk);
     // the star: in its colour on the lights (or the colour being picked); a visitor can tap it to change its colour
     const star = document.createElementNS(ns, 'polygon'), pts = [];
@@ -130,7 +135,7 @@
       c.style.cursor = 'pointer';
       c.onclick = () => {
         if (orn[i] !== '0') { el('note').textContent = mine.has(i) ? 'That is yours! ✨' : 'This spot is taken. Pick a free one.'; return; }
-        if (sel === 'star') sel = -1;
+        if (sel === 'star' || sel === 'tree') sel = -1;
         if (picks.has(i)) { if (sel === i) { picks.delete(i); sel = picks.size ? [...picks.keys()].pop() : -1; } else { sel = i; const p = picks.get(i); kind = p.k; col = p.c; fx = [...p.f]; } }
         else if (maxD === 1) { picks.clear(); picks.set(i, { k: kind, c: col, f: [...fx] }); sel = i; }
         else if (picks.size >= maxD) el('note').textContent = `Up to ${maxD} decorations at once. Tap a chosen one twice to take it off.`;
@@ -138,7 +143,7 @@
         render(); };
       svg.append(c);
     });
-    el('kinds').classList.toggle('hidden', kl.length < 2 || sel === 'star');
+    el('kinds').classList.toggle('hidden', kl.length < 2 || sel === 'star' || sel === 'tree');
     // the effect: of the decoration, or of the star while the star is picked
     const fl = sel === 'star' ? s.starFxList || [] : s.fxList || [];
     const okKeys = fl.map(([k]) => k), max = s.maxFx || 3;
@@ -146,27 +151,31 @@
     else { fx = fx.filter((k) => okKeys.includes(k)).slice(-max); if (!fx.length && okKeys.length) fx = [okKeys[0]]; }
     const curFx = sel === 'star' ? sfx : fx;
     const upd = () => { if (sel !== 'star' && picks.has(sel)) picks.set(sel, { k: kind, c: col, f: [...fx] }); };   // a change goes to the decoration being changed
-    el('fxs').classList.toggle('hidden', fl.length < 2);
+    el('fxs').classList.toggle('hidden', fl.length < 2 || sel === 'tree');
     el('fxs').replaceChildren(...fl.map(([k, n, e]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = e + ' ' + n; b.setAttribute('aria-pressed', String(curFx.includes(k)));
       b.onclick = () => { if (sel === 'star') sfx = toggle(sfx, k, max); else { fx = toggle(fx, k, max); upd(); try { localStorage.setItem('treeFx2', JSON.stringify(fx)); } catch (er) {} } render(); }; return b; }));
-    el('fxHint').textContent = fl.length > 1 && max > 1 ? `Effects: tap up to ${max}; they take turns on the lights (Steady goes alone).` : '';
+    el('fxHint').textContent = sel === 'tree' ? '' : fl.length > 1 && max > 1 ? `Effects: tap up to ${max}; they take turns on the lights (Steady goes alone).` : '';
     el('kinds').replaceChildren(...kl.map(([k, n, e]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = e + ' ' + n; b.setAttribute('aria-pressed', String(k === kind));
       b.onclick = () => { kind = k; upd(); try { localStorage.setItem('treeKind', k); } catch (er) {} render(); }; return b; }));
-    el('cols').replaceChildren(...(s.colors || []).map((h, k) => { const b = document.createElement('button'); b.type = 'button'; b.style.background = '#' + h; b.setAttribute('aria-label', 'Colour ' + (k + 1)); b.setAttribute('aria-pressed', String(k === col)); b.onclick = () => { col = k; upd(); render(); }; return b; }));
-    const left = Math.ceil(((sel === 'star' ? starNext : nextAt) - Date.now()) / 1000);
-    el('hang').textContent = sel === 'star' ? 'Colour the star!' : picks.size > 1 ? `Show my ${picks.size} decorations on the tree!` : 'Show it on the tree!';
-    el('hang').disabled = !app || (sel !== 'star' && !picks.size) || left > 0 || s.party || s.phase === 'unconfigured' || Date.now() - sentAt < 3000;
+    if (sel === 'tree') el('cols').replaceChildren(...(s.treeCols || []).map((h, k) => { const b = document.createElement('button'); b.type = 'button'; b.style.background = '#' + h; b.setAttribute('aria-label', 'Tree colour ' + (k + 1)); b.setAttribute('aria-pressed', String(k === tcol)); b.onclick = () => { tcol = k; render(); }; return b; }));
+    else el('cols').replaceChildren(...(s.colors || []).map((h, k) => { const b = document.createElement('button'); b.type = 'button'; b.style.background = '#' + h; b.setAttribute('aria-label', 'Colour ' + (k + 1)); b.setAttribute('aria-pressed', String(k === col)); b.onclick = () => { col = k; upd(); render(); }; return b; }));
+    const left = Math.ceil(((sel === 'star' ? starNext : sel === 'tree' ? treeNext : nextAt) - Date.now()) / 1000);
+    el('hang').textContent = sel === 'star' ? 'Colour the star!' : sel === 'tree' ? 'Colour the tree!' : picks.size > 1 ? `Show my ${picks.size} decorations on the tree!` : 'Show it on the tree!';
+    el('hang').disabled = !app || (sel !== 'star' && sel !== 'tree' && !picks.size) || left > 0 || s.party || s.phase === 'unconfigured' || Date.now() - sentAt < 3000;
     const n = sp.length, used = n - [...orn].filter((c) => c === '0').length;
     say(s.phase === 'unconfigured' ? s.message : s.party ? '🎉 The tree is full! Party on the lights!'
+      : sel === 'tree' ? (left > 0 ? 'You can change the tree\'s colour again in ' + left + ' s.' : 'Pick a colour for the tree, then press Colour the tree!')
       : sel === 'star' ? (left > 0 ? 'You can change the star again in ' + left + ' s.' : 'Pick a colour and an effect for the star, then press Colour the star!')
       : left > 0 ? 'You can hang more decorations in ' + left + ' s. (' + used + ' of ' + n + ')'
-      : !picks.size ? (maxD > 1 ? `Tap free spots on the tree (up to ${maxD})` : 'Tap a free spot on the tree') + (s.starPick ? ', or the star to change its colour' : '') + '. (' + used + ' of ' + n + ' decorations)' + (s.round ? ' The tree is shown unrolled: the spots go all the way round it.' : '') : `Pick a decoration, a colour and effects for the one with the white ring. ${picks.size < maxD ? 'Tap more spots, or ' : ''}press Show it on the tree! (tap a chosen one twice to take it off)`);
+      : !picks.size ? (maxD > 1 ? `Tap free spots on the tree (up to ${maxD})` : 'Tap a free spot on the tree') + (s.starPick || s.treePick ? ', or ' + [s.starPick && 'the star', s.treePick && 'the tree'].filter(Boolean).join(' or ') + ' to change its colour' : '') + '. (' + used + ' of ' + n + ' decorations)' + (s.round ? ' The tree is shown unrolled: the spots go all the way round it.' : '') : `Pick a decoration, a colour and effects for the one with the white ring. ${picks.size < maxD ? 'Tap more spots, or ' : ''}press Show it on the tree! (tap a chosen one twice to take it off)`);
   };
   tickGame = () => { if (Math.max(nextAt, starNext) > Date.now() - 1000) draw(); return ''; };   // the countdown (draw only: render calls this)
   onStatus = (o, s) => { if (s.lastBy && app && s.lastBy === app.clientId && s.hung !== o.hung) { mine = new Set(s.lastSet || [s.last]); picks.clear(); sel = -1; nextAt = Date.now() + (s.every || 0) * 1000; sentAt = 0; }
     if (s.starLastBy && app && s.starLastBy === app.clientId && s.starAt !== o.starAt) { sfx = null; starNext = Date.now() + (s.starEvery || 0) * 1000; sentAt = 0; sel = -1; }
+    if (s.treeLastBy && app && s.treeLastBy === app.clientId && s.treeAt !== o.treeAt) { treeNext = Date.now() + (s.starEvery || 0) * 1000; sentAt = 0; sel = -1; }
     if (app && s.notices && s.notices[app.clientId]) sentAt = 0; };
   el('hang').addEventListener('click', () => {
+    if (sel === 'tree') { sentAt = Date.now(); send({ type: 'tree', c: tcol + 1 }); say('Colouring the tree… watch the lights 🎄'); el('hang').disabled = true; return; }
     if (sel === 'star') { sentAt = Date.now(); send({ type: 'star', c: col + 1, ...(sfx && sfx.length ? { f: sfx } : {}) }); say('Colouring the star… watch the lights ✨'); el('hang').disabled = true; return; }
     if (!picks.size) return;
     sentAt = Date.now(); send({ type: 'hang', d: [...picks].map(([i, p]) => [i, p.c + 1, p.k, p.f]) }); say((picks.size > 1 ? 'Hanging them' : 'Hanging it') + '… watch the lights ✨'); el('hang').disabled = true;
