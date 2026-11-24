@@ -45,3 +45,7 @@ The page sends `new` (`name`), `dir` (`d`: 0 up, 1 right, 2 down, 3 left), `quit
 ## Left out of the original
 
 Nothing. In ShowPlay the snake was slow on purpose (the relay took up to a second); here the speed is a setting.
+
+## Changes
+
+- **Version 2:** a swipe that started on an arrow button sent two turns (the button and the swipe); now it is only the button.

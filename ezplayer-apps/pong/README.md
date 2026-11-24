@@ -46,3 +46,7 @@ The page sends `new` (`mode`, `name`), `join` (`name`), `go` (`y` 0-1, sent at m
 ## Left out of the original
 
 The crew's controls of the ShowPlay Mixer page (keyboard and MIDI). New here: two phones can play each other.
+
+## Changes
+
+- **Version 2:** the paddle's position is sent again at the start of each game, even if the finger has not moved since the last one.

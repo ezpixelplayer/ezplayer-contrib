@@ -48,3 +48,7 @@ The page sends `new` (`mode`, `level`, `name`), `join` (`name`), `move` (`col` 0
 ## Left out of the original
 
 Nothing of the game itself; in ShowPlay the board could also go on any side of the cube.
+
+## Changes
+
+- **Version 2:** after a disc was dropped, a status sent just before it could arrive late and unlock the arrows, so the player could try to drop a second disc (the app refused it, with a note). The phone now keeps the board locked until the app answers, and each move carries the move number it was made for, so a late or repeated move is refused.

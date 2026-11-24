@@ -101,7 +101,7 @@ export async function run({ name, Game, cleanSettings, minSize }) {
         if (!d || typeof d !== 'object') return;
         const client = typeof ev.client === 'string' && ev.client ? ev.client : null;
         if (!client) return;
-        if (d.type === 'new' && !config) return note(client, configError);
+        if ((Game.startTypes ?? ['new']).includes(d.type) && !config) return note(client, configError);
         note(client, game.handle(client, d, Date.now()));
     };
 
@@ -124,6 +124,24 @@ export async function run({ name, Game, cleanSettings, minSize }) {
         }
     })();
 
+    // a game that keeps something across restarts (the tree's baubles) has saveState() and restore(saved): kept in the
+    // instance's private "state" document, which a reinstall of the app keeps too
+    let savedJson = '';
+    let savedAt = 0;
+    if (game.saveState) {
+        try {
+            const res = await fetch(appUrl('/data/private/state'), { headers: authHeaders });
+            if (res.ok) { const st = await res.json(); game.restore?.(st); savedJson = JSON.stringify(st); }
+        } catch (e) { console.log(`state: ${e.message}`); }
+    }
+    const saveState = async (now) => {
+        const j = JSON.stringify(game.saveState());
+        if (j === savedJson || now - savedAt < 2000) return;
+        savedAt = now;
+        const res = await fetch(appUrl('/data/private/state'), { method: 'PUT', headers: jsonHeaders, body: j }).catch(() => null);
+        if (res?.ok) savedJson = j;
+    };
+
     let lastJson = '';
     let lastAt = 0;
     let lastPhase = '';
@@ -136,7 +154,7 @@ export async function run({ name, Game, cleanSettings, minSize }) {
                 const c = await loadConfig();
                 config = c.settings ? c : null;
                 configError = c.error ?? '';
-                if (config) game.s = config.settings;
+                if (config) { game.s = config.settings; game.size?.(config.target.width, config.target.height); }
             } catch (e) {
                 config = null;
                 configError = `Player not reachable: ${e.message}`;
@@ -159,6 +177,7 @@ export async function run({ name, Game, cleanSettings, minSize }) {
         }
 
         game.step(Date.now());
+        if (game.saveState) await saveState(now);
 
         if (lease) {
             if (game.phase === 'idle') {
@@ -192,6 +211,7 @@ export async function run({ name, Game, cleanSettings, minSize }) {
         await sleep(lease ? Math.max(5, 1000 / (game.s.fps || 15) - (Date.now() - now)) : IDLE_MS);
     }
 
+    if (game.saveState) { savedAt = 0; await saveState(Date.now()); }
     await closeLease(lease);
     await publishStatus({ phase: 'idle', players: [], message: 'App stopped', notices: {} });
 }

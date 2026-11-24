@@ -84,7 +84,8 @@
     if (!me() || status.phase !== 'input' || pos >= status.round) return;
     pads[c].classList.add('on'); setTimeout(() => pads[c].classList.remove('on'), 180);
     try { navigator.vibrate && navigator.vibrate(25); } catch (e) {}
-    send({ type: 'press', c, i: pos, game: status.game });
+    const i = pos;
+    app.send({ type: 'press', c, i, game: status.game }).catch((e) => { pos = Math.min(pos, i); el('note').textContent = 'Could not send: ' + e.message; lastNoteAt = Date.now(); render(); });
     pos += 1; render();
   }
   draw = () => {

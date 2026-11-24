@@ -1,7 +1,7 @@
 {
     "id": "snake",
     "name": "Snake",
-    "version": "1",
+    "version": "2",
     "description": "Steer a snake on a matrix of the show from your phone; eat the apples, don't hit the walls",
     "icon": "🐍",
     "runtime": "node",

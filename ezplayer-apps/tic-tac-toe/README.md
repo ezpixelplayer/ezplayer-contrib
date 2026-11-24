@@ -54,3 +54,10 @@ keyed by its client id, so only that phone shows it.
 ## Left out of the original
 
 Nothing of the game itself. In ShowPlay the board could also go on any side of the cube; here it is one matrix.
+
+## Changes
+
+- **Version 2:** a player could tap twice before the app answered, and the phone showed two marks in a row (the app
+  refused the second, so it vanished a moment later). Now the phone passes the turn on as soon as a square is tapped
+  and locks the board until the app answers, and keeps the move shown if a status from before it arrives late. Each
+  move also carries how many marks the phone saw, so a late or repeated move is refused.

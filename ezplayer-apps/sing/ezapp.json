@@ -1,0 +1,13 @@
+{
+    "id": "sing",
+    "name": "Sing",
+    "version": "1",
+    "description": "Visitors record a song on their phone and a singing model of the show sings it on the show's speakers",
+    "icon": "🎤",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 600, "perClientPerSecond": 10 }
+}

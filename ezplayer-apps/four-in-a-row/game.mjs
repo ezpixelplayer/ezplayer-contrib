@@ -148,6 +148,7 @@ export class Game {
             if (this.phase !== 'playing' || d.game !== this.id) return 'This game is over.';
             if (me < 0) return 'You are watching this game.';
             if (me !== this.turn) return 'It is not your turn.';
+            if (Number.isInteger(d.n) && d.n !== this.n) return 'It is not your turn.';   // a move made for an older board (late or sent twice)
             if (!Number.isInteger(d.col) || d.col < 0 || d.col >= COLS) return 'Pick a column.';
             if (dropRow(this.b, d.col) < 0) return 'That column is full.';
             this.play(d.col, now);
