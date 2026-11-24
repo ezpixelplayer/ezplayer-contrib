@@ -27,23 +27,36 @@ shows it.
 
 - **Matrix**: any model at least 8 x 5 pixels.
 - **Effects of**: Christmas, Halloween or other celebrations (17 effects in all, the ones of ShowPlay).
-- **Messages**, **Effects**, **Drawings**: which tabs the phones see.
+- **Messages**, **Pictures**, **Effects**, **Drawings**: which tabs the phones see.
+- **Pictures of every theme** (off: only the pictures of the theme above).
 - **Visitors may write their own message**: on, with a word filter; off, they only pick from **Messages to pick
   from** (one a line, up to 40 letters).
-- **Seconds** for a message (at least one full scroll), an effect and a drawing (15 each).
+- **Seconds** for a message (at least one full scroll), an effect and a drawing (15 each), and a picture (10).
 - **Each phone waits** (20 s) and **most requests waiting** (10).
 - **Frames per second** and **brightness**.
 
 ## Use
 
-The phone picks a tab: **Message** (type or tap a ready message, pick a colour), **Effect** (tap one) or **Draw** (paint
+The phone picks a tab: **Message** (type or tap a ready message, pick a colour), **Picture** (one of 73 animated
+GIFs: 29 for Halloween, 27 for Christmas, 17 for other celebrations), **Effect** (tap one) or **Draw** (paint
 on a small grid with 9 colours, at most 32 x 32, stretched to the matrix). **Show it on the lights!** puts it in line;
 the page says when it is next and when it is on.
 
 ## Events
 
-The page sends `text` (`text`, `color`), `fx` (`fx`), `draw` (`w`, `h`, `px`: one digit 0 to 8 a pixel).
+The page sends `text` (`text`, `color`), `gif` (`f`: a file name from `page/gifs/pack.json`), `fx` (`fx`), `draw` (`w`, `h`, `px`: one digit 0 to 8 a pixel).
+
+## Pictures
+
+The GIFs are the ones of the ShowPlay page, in `page/gifs/` with their list `pack.json` (name, theme, file), so the
+phones load the thumbnails from the app's own page. The app reads the same files with `gif.mjs`, a small GIF reader
+(animation, transparency, frame disposal; checked against Pillow on all 73 files), and shows the picture as big as fits
+on the matrix, keeping its shape, in the middle, looping. A GIF added to the folder and to `pack.json` appears too.
 
 ## Left out of the original
 
-The GIF pack of the ShowPlay page (the effects here are drawn by the app instead).
+Picking up to 3 pictures in a row (ShowPlay's page could queue three at once); here it is one at a time.
+
+## Changes
+
+- **Version 2:** the **Picture** tab: the 73 animated GIFs of the ShowPlay page, filtered by the theme.
