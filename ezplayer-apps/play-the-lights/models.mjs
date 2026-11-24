@@ -194,11 +194,12 @@ export function showXml() {
 const attr = (tag, name) => { const m = new RegExp(`\\s${name}="([^"]*)"`).exec(tag); return m ? m[1].replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>') : null; };
 export { attr as xmlAttr };
 
-/** model groups of the show: name -> [models] (groups inside groups opened up; submodels give their model) */
+/** model groups of the show: name -> [models] (groups inside groups opened up; a submodel stays "Model/Submodel",
+ *  which EZPlayer lights on its own, like the star of a Baby Grand Illusion) */
 export function groupsOf(xml) {
     const raw = {};
     for (const m of xml.matchAll(/<modelGroup\b[^>]*>/g)) { const n = attr(m[0], 'name'); if (n) raw[n] = (attr(m[0], 'models') ?? '').split(',').map((x) => x.trim()).filter(Boolean); }
-    const open = (g, seen) => raw[g].flatMap((m) => (raw[m] && !seen.has(m) ? open(m, new Set([...seen, m])) : [m.split('/')[0]]));
+    const open = (g, seen) => raw[g].flatMap((m) => (raw[m] && !seen.has(m) ? open(m, new Set([...seen, m])) : [m]));
     const out = {};
     for (const g of Object.keys(raw)) { const ms = [...new Set(open(g, new Set([g])))]; if (ms.length) out[g] = ms; }
     return out;

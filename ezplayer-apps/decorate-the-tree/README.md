@@ -32,6 +32,8 @@ positions for the model, the app uses its grid instead (`grid` lease), as before
 ## Configure
 
 - **Tree**: a mega tree, a matrix or any model with a grid.
+- **On a matrix**: draw a tree on it (a green triangle, a brown trunk and a star on top, which visitors can colour
+  like a star model) and decorate only the triangle, or decorate the whole matrix.
 - **The star on top** (optional): the star's model, a group of the show (all its models are lit as the star), or
   several separated by commas; the list of the show's models and groups under it puts a name in the box.
   **The star's colour** (gold), **visitors may change it** (tap the star on the phone, pick a colour) and **each phone
@@ -88,3 +90,8 @@ the player (while the number of spots stays the same).
   model worked, and with a group the star could not be changed from the phones.
 
 - **Version 7:** a group made of submodels (for example the stars of two Baby Grand Illusions) lights only those submodels, not the whole models.
+
+- **Version 8:** on a matrix the app draws a tree (triangle, trunk and star) and hangs the decorations on it, sized by
+  the real distances so a wide matrix still gets a tree of tree shape, with no more decorations than fit. A flat model
+  turned at an angle in the 3D layout (for example a matrix at 45°) is now seen as flat; before, it was taken for a round
+  mega tree and its decorations were scattered.
