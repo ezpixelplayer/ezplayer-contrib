@@ -31,10 +31,10 @@
 </head>
 <body>
 <h1>🎄 Decorate the tree settings</h1>
-<p class="hint">Visitors hang baubles on a tree of the show: each phone picks a free spot and one of 8 colours. The tree (a mega tree, a matrix, any model with a grid) gets evenly spread spots; it shows every bauble hung so far for a while after each new one, or all the time. When it is full: a rainbow party, then it starts again. Pick the tree, then Save.</p>
+<p class="hint">Visitors hang baubles on a tree of the show: each phone picks a free spot and one of 8 colours. The tree (a mega tree, a matrix, any model with a grid) gets evenly spread spots, placed by where its pixels really are in the layout, so on a 360° mega tree they go all the way round; it shows every bauble hung so far for a while after each new one, or all the time. A star on top, if you pick one, twinkles gold and shines at each new bauble. When it is full: a rainbow party, then it starts again. Pick the tree, then Save.</p>
 <div id="matrixBlock">
 <h2>The matrix</h2>
-<label for="target">Matrix (any model at least 4 x 4 pixels)</label>
+<label for="target">The tree: a mega tree, a matrix or any model with a grid</label>
 <select id="target"><option value="">Loading models...</option></select>
 <p class="hint" id="targetsNote"></p>
 </div>
@@ -51,7 +51,7 @@
 <script>
   const el = (id) => document.getElementById(id);
   const MIN = { w: 4, h: 4 };
-  const FIELDS = [{"id": "spots", "type": "number", "label": "Baubles", "min": 8, "max": 60, "default": 30}, {"id": "every", "type": "number", "label": "Each phone waits (seconds) between baubles", "min": 0, "max": 600, "default": 60}, {"id": "show", "type": "number", "label": "Show the tree for (seconds) after each new bauble", "min": 10, "max": 300, "default": 30, "end": true}, {"id": "always", "type": "check", "text": "Show the decorated tree all the time (off: the show's sequence plays between baubles)", "default": false}, {"id": "restart", "type": "check", "text": "When the tree is full: a party on the lights, then it starts again empty", "default": true}, {"id": "bg", "type": "select", "label": "The tree between the baubles", "options": [["green", "Dim green"], ["off", "Off"]], "default": "green"}];
+  const FIELDS = [{"id": "star", "type": "text", "label": "The star on top (optional): its model's name", "default": "", "placeholder": "e.g. Mega Tree Star", "end": true}, {"id": "picker", "type": "models", "for": "star", "single": true, "label": "The show's models (tap one to put it in the star's box)"}, {"id": "spots", "type": "number", "label": "Baubles", "min": 8, "max": 60, "default": 30}, {"id": "size", "type": "number", "label": "Size of the baubles (%)", "min": 50, "max": 150, "default": 100}, {"id": "every", "type": "number", "label": "Each phone waits (seconds) between baubles", "min": 0, "max": 600, "default": 60}, {"id": "show", "type": "number", "label": "Show the tree for (seconds) after each new bauble", "min": 10, "max": 300, "default": 30, "end": true}, {"id": "always", "type": "check", "text": "Show the decorated tree all the time (off: the show's sequence plays between baubles)", "default": false}, {"id": "restart", "type": "check", "text": "When the tree is full: a party on the lights, then it starts again empty", "default": true}, {"id": "bg", "type": "select", "label": "The tree between the baubles", "options": [["green", "Dim green"], ["off", "Off"]], "default": "green"}];
   const TARGET = "required";   // 'required', 'optional' (a matrix is not needed) or 'none' (no matrix at all)
   if (TARGET === 'none') el('matrixBlock').querySelectorAll('h2, label, select, .hint').forEach((x) => x.style.display = 'none');
   let app;
@@ -73,6 +73,7 @@
           const b = document.createElement('button'); b.type = 'button'; b.textContent = (g ? '👥 ' : '') + n; if (g) b.className = 'g';
           b.title = g ? 'Group: ' + groups[n].join(', ') : 'Model';
           b.addEventListener('click', () => {
+            if (f.single) { el('f_' + f.for).value = n; return; }   // a box for one model: the name replaces what was there
             const t = el('f_' + f.for), at = t.selectionStart ?? t.value.length, before = t.value.slice(0, at), after = t.value.slice(at);
             const sep = !before || /[|,\n]\s*$/.test(before) ? (/[|,]$/.test(before) ? ' ' : '') : ', ';
             t.value = before + sep + n + after; t.focus(); t.selectionStart = t.selectionEnd = (before + sep + n).length;
