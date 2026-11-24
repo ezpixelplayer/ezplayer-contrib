@@ -5,23 +5,95 @@
  * Decorate the tree: visitors hang baubles on a tree of the show. The tree (a mega tree, a matrix, any model with
  * pixels) gets evenly spread spots, placed by where its pixels really are in the layout, so the baubles are round and
  * go all the way round a 360° mega tree; each phone picks a free spot and a colour, and the tree shows every bauble
- * hung so far for a while after each new one (or all the time). A star on top, if there is one, twinkles gold, shines
- * at each new bauble and joins the party when the tree is full; then it starts again.
+ * hung so far for a while after each new one (or all the time). A star on top, if there is one, twinkles (gold, or the
+ * colour a visitor picked), shines at each new bauble and joins the party when the tree is full; then it starts again.
  */
 
 import { num } from './multi-helpers.mjs';
 
 export const COLORS = ['ff2a2a', 'ffc83c', '2a7bff', 'ffffff', 'ff5fc8', 'a05bff', 'ff8c1a', '3cf0ff'];
-const DEFAULTS = { target: '', star: '', fps: 20, brightness: 100, spots: 30, every: 60, show: 30, always: false, bg: 'green', restart: true, size: 100 };
+/** the decorations: key, name, emoji (the phone draws each one in its colour) */
+export const KINDS = [['bauble', 'Bauble', '🔴'], ['cane', 'Candy cane', '🍭'], ['star', 'Star', '⭐'], ['bell', 'Bell', '🔔'], ['present', 'Present', '🎁'], ['flake', 'Snowflake', '❄️'], ['heart', 'Heart', '❤️']];
+
+/** how a decoration shines, and the star's effects: key, name, emoji (nothing flashes faster than about 3 times a second) */
+export const DECO_FX = [['glow', 'Glow', '✨'], ['steady', 'Steady', '💡'], ['blink', 'Blink', '💫'], ['twinkle', 'Twinkle', '🌟'], ['pulse', 'Pulse', '💓'], ['rainbow', 'Rainbow', '🌈']];
+export const STAR_FX = [['twinkle', 'Twinkle', '🌟'], ['steady', 'Steady', '💡'], ['blink', 'Blink', '💫'], ['pulse', 'Pulse', '💓'], ['spin', 'Spin', '🌀'], ['sparkle', 'Sparkle', '✨'], ['rainbow', 'Rainbow', '🌈']];
+const rnd = (i) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };   // a fixed random number for each pixel
+
+/** a decoration's brightness (0..1) for its effect at time t; rainbow also gives a colour */
+function decoLight(fx, t, sp, i) {
+    switch (fx) {
+        case 'steady': return 1;
+        case 'blink': return Math.floor(t * 3 + rnd(sp) * 2) % 2 ? 1 : 0.06;
+        case 'twinkle': return 0.35 + 0.65 * Math.max(0, Math.sin(t * (3 + rnd(i) * 3) + rnd(i + 7) * 6.3)) ** 3;
+        case 'pulse': return 0.12 + 0.88 * (0.5 + 0.5 * Math.sin(t * 4 + sp * 0.9));
+        case 'rainbow': return 0.85 + 0.15 * Math.sin(t * 2 + sp);
+        default: return 0.75 + 0.25 * Math.sin(t * 2.3 + sp * 1.7);   // glow
+    }
+}
+
+/**
+ * how a decoration lights a pixel at (x across, y up), both in radii from its middle: null = not part of it, else
+ * [colour 0..1 of its own colour, white mix 0..1]. Coarse on purpose: on a tree a decoration is a handful of pixels.
+ */
+export function shapeAt(kind, x, y) {
+    const d = Math.hypot(x, y);
+    switch (kind) {
+        case 'cane': {   // a hook: a stem, then a half circle at the top; stripes across it
+            const stem = Math.abs(x + 0.2) < 0.32 && y > -1 && y < 0.35;
+            const hk = Math.hypot(x - 0.15, y - 0.35), hook = y >= 0.35 && hk > 0.05 && hk < 0.62 && Math.abs(hk - 0.35) < 0.3;
+            if (!stem && !hook) return null;
+            return Math.floor((x + y) * 2.2 + 10) % 2 ? [1, 0] : [0, 1];
+        }
+        case 'star': {   // five points: inside the star polygon (outer radius 0.95, inner 0.4)
+            if (d > 0.95) return null;
+            let a = Math.atan2(x, y);   // 0 = straight up
+            const seg = Math.PI / 5;
+            a = ((a % (2 * seg)) + 2 * seg) % (2 * seg);
+            const t = a <= seg ? a / seg : (2 * seg - a) / seg;   // 0 at a point, 1 between two points
+            // the edge from a point (r 0.95) to the notch (r 0.4), as a straight line in the plane
+            const p1 = [0, 0.95], p2 = [0.4 * Math.sin(seg), 0.4 * Math.cos(seg)];
+            const ang = t * seg, dir = [Math.sin(ang), Math.cos(ang)];
+            const ex = p2[0] - p1[0], ey = p2[1] - p1[1], den = dir[0] * ey - dir[1] * ex;
+            const lim = den ? (p1[0] * ey - p1[1] * ex) / den : 0.95;
+            return d <= lim ? [1, d < 0.18 ? 0.4 : 0] : null;
+        }
+        case 'bell': {   // a dome widening to a rim, a clapper below
+            if (y < -0.75 && y > -1 && Math.abs(x) < 0.2) return [1, 0.6];
+            if (y > 0.9 || y < -0.75) return null;
+            const half = y > 0.35 ? 0.35 * Math.sqrt(Math.max(0, 1 - ((y - 0.35) / 0.55) ** 2)) : 0.35 + (0.35 - y) * 0.45;
+            return Math.abs(x) <= half ? [1, y < -0.55 ? 0.25 : 0] : null;
+        }
+        case 'present': {   // a box with a ribbon across and down, a bow on top
+            if (y > 0.65 && y < 0.95 && Math.abs(Math.abs(x) - 0.22) < 0.2) return [0, 0];   // the bow: gold
+            if (Math.abs(x) > 0.75 || y > 0.65 || y < -0.85) return null;
+            return Math.abs(x) < 0.16 || Math.abs(y + 0.1) < 0.16 ? [0, 0] : [1, 0];
+        }
+        case 'flake': {   // six arms
+            const a = ((Math.atan2(y, x) % (Math.PI / 3)) + Math.PI / 3) % (Math.PI / 3), off = Math.min(a, Math.PI / 3 - a) * d;
+            return d < 0.95 && (off < 0.16 || d < 0.2) ? [1, 0.5] : null;
+        }
+        case 'heart': {
+            const X = x * 1.15, Y = y * 1.15 + 0.15, v = (X * X + Y * Y - 0.55) ** 3 - X * X * Y * Y * Y;
+            return v <= 0 ? [1, 0] : null;
+        }
+        default: return d <= 1 ? [1, d < 0.35 && x < 0 && y > 0 ? 0.35 : 0] : null;   // a bauble with a shine
+    }
+}
+const DEFAULTS = { target: '', star: '', kinds: KINDS.map(([k]) => k), fx: DECO_FX.map(([k]) => k), starFx: 'twinkle', starFxs: STAR_FX.map(([k]) => k), starPick: true, starColor: 'ffbe28', starEvery: 30, fps: 20, brightness: 100, spots: 30, every: 60, show: 30, always: false, bg: 'green', restart: true, size: 100 };
 const PARTY_MS = 15000;
 const MAX_CANDIDATES = 3000;
 
 export function cleanSettings(raw) {
-    const s = { ...DEFAULTS };
+    const s = { ...DEFAULTS, kinds: [...DEFAULTS.kinds], fx: [...DEFAULTS.fx], starFxs: [...DEFAULTS.starFxs] };
     if (!raw || typeof raw !== 'object') return s;
+    for (const [key, list] of [['kinds', KINDS], ['fx', DECO_FX], ['starFxs', STAR_FX]])
+        if (Array.isArray(raw[key])) { const k = list.map(([x]) => x).filter((x) => raw[key].includes(x)); if (k.length) s[key] = k; }
+    if (STAR_FX.some(([k]) => k === raw.starFx)) s.starFx = raw.starFx;
     for (const k of ['target', 'star']) if (typeof raw[k] === 'string') s[k] = raw[k].trim().slice(0, 200);
-    for (const [k, lo, hi] of [['fps', 5, 30], ['brightness', 10, 100], ['spots', 8, 60], ['every', 0, 600], ['show', 10, 300], ['size', 50, 150]]) s[k] = num(raw[k], lo, hi, s[k]);
-    for (const k of ['always', 'restart']) if (typeof raw[k] === 'boolean') s[k] = raw[k];
+    for (const [k, lo, hi] of [['fps', 5, 30], ['brightness', 10, 100], ['starEvery', 0, 600], ['spots', 8, 60], ['every', 0, 600], ['show', 10, 300], ['size', 50, 150]]) s[k] = num(raw[k], lo, hi, s[k]);
+    for (const k of ['always', 'restart', 'starPick']) if (typeof raw[k] === 'boolean') s[k] = raw[k];
+    if (typeof raw.starColor === 'string' && /^#?[0-9a-fA-F]{6}$/.test(raw.starColor)) s.starColor = raw.starColor.replace('#', '').toLowerCase();
     if (raw.bg === 'green' || raw.bg === 'off') s.bg = raw.bg;
     return s;
 }
@@ -78,8 +150,20 @@ export function layout(pts, n, size = 100) {
         let bd = r2;
         for (let k = 0; k < spots.length; k++) { const d = d2(i, spots[k]); if (d <= bd) { bd = d; map[i] = k; } }
     }
+    // where each pixel is in its decoration, in radii: du across (round trees: along the surface, round the trunk), dv up
+    const du = new Float32Array(N), dv = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+        const k = map[i];
+        if (k < 0) continue;
+        const [sx, sy, sz] = pts[spots[k]], [x, y, z] = pts[i];
+        if (round) { const a = Math.atan2(sz - cz, sx - cx); du[i] = ((x - sx) * -Math.sin(a) + (z - sz) * Math.cos(a)) / r; }
+        else du[i] = (x - sx) / r;
+        dv[i] = (y - sy) / r;
+    }
     const r2d = (v) => Math.round(v * 100) / 100;
-    return { spots: spots.map((i) => [r2d(uOf(pts[i])), r2d(vOf(pts[i][1]))]), map, round };
+    const counts = new Int32Array(spots.length);
+    for (let i = 0; i < N; i++) if (map[i] >= 0) counts[map[i]]++;
+    return { spots: spots.map((i) => [r2d(uOf(pts[i])), r2d(vOf(pts[i][1]))]), map, du, dv, counts, round };
 }
 
 async function targetOf(base, model) {
@@ -110,12 +194,13 @@ async function pixelsOf(base, model) {
 }
 
 export class App {
-    static startTypes = ['hang'];
+    static startTypes = ['hang', 'star'];
 
     constructor(s) {
         this.s = s; this.ready = false; this.tree = null; this.star = null; this.lay = null; this.key = '';
-        this.orn = ''; this.by = new Map(); this.last = -1; this.lastAt = 0; this.lastBy = null; this.showUntil = 0; this.partyUntil = 0;
+        this.orn = ''; this.kinds = ''; this.fxs = ''; this.by = new Map(); this.last = -1; this.lastAt = 0; this.lastBy = null; this.showUntil = 0; this.partyUntil = 0;
         this.problems = []; this.twinkle = null;
+        this.starCol = ''; this.starFx = ''; this.starAng = null; this.starBy = new Map(); this.starAt = 0; this.starLastBy = null;   // the star's colour, picked by a visitor ('' = the one in the settings)
     }
 
     async prepare({ base }) {
@@ -130,29 +215,48 @@ export class App {
             this.lay = layout(tree.pts, s.spots, s.size);
             this.key = key;
             const n = this.lay.spots.length;
-            if (this.saved && this.saved.orn.length === n && !this.orn.replace(/0/g, '')) this.orn = this.saved.orn;
+            if (this.saved && this.saved.orn.length === n && !this.orn.replace(/0/g, '')) { this.orn = this.saved.orn; this.kinds = this.saved.kinds; this.fxs = this.saved.fxs; }
             if (this.orn.length !== n) this.orn = '0'.repeat(n);
+            if (this.kinds.length !== n) this.kinds = '0'.repeat(n);
+            if (this.fxs.length !== n) this.fxs = '0'.repeat(n);
             this.saved = null;
         }
         this.tree = tree.geom; this.star = star?.geom ?? null;
         this.twinkle = this.star ? Float32Array.from({ length: this.star.n }, () => Math.random() * 6.3) : null;
+        if (star) {   // each pixel's angle round the star's middle, for the Spin effect
+            const cx = star.pts.reduce((a, p) => a + p[0], 0) / star.pts.length, cy = star.pts.reduce((a, p) => a + p[1], 0) / star.pts.length;
+            this.starAng = Float32Array.from(star.pts, ([x, y]) => ((Math.atan2(y - cy, x - cx) / (2 * Math.PI)) % 1 + 1) % 1);
+        }
         this.ready = true;
     }
 
     /** the baubles survive a restart of the app or the player (kept while the tree and the number of spots stay the same) */
-    saveState() { return { orn: this.orn }; }
-    restore(st) { if (st && typeof st.orn === 'string' && /^[0-8]{1,200}$/.test(st.orn)) this.saved = { orn: st.orn }; }
+    saveState() { return { orn: this.orn, kinds: this.kinds, fxs: this.fxs, star: this.starCol, starFx: this.starFx }; }
+    restore(st) {
+        const same = (x) => (typeof x === 'string' && x.length === st.orn.length && /^[0-9]*$/.test(x) ? x : '0'.repeat(st.orn.length));
+        if (st && typeof st.orn === 'string' && /^[0-8]{1,200}$/.test(st.orn)) this.saved = { orn: st.orn, kinds: same(st.kinds), fxs: same(st.fxs) };
+        if (st && typeof st.star === 'string' && /^([0-9a-f]{6})?$/.test(st.star)) this.starCol = st.star;
+        if (st && STAR_FX.some(([k]) => k === st.starFx)) this.starFx = st.starFx;
+    }
 
     handle(client, d, now) {
+        if (d.type === 'star') return this.colourStar(client, d, now);
         if (d.type !== 'hang') return '';
         if (!this.lay) return 'The tree is not ready yet.';
         const n = this.lay.spots.length;
         if (now < this.partyUntil) return 'The tree is full: party time! Wait a moment.';
         if (!Number.isInteger(d.i) || d.i < 0 || d.i >= n || !Number.isInteger(d.c) || d.c < 1 || d.c > COLORS.length) return '';
         if (this.orn[d.i] !== '0') return 'Someone was faster! Pick another spot.';
+        const kind = d.k === undefined ? 'bauble' : d.k;
+        const ki = KINDS.findIndex(([k]) => k === kind);
+        if (ki < 0 || !this.s.kinds.includes(kind)) return 'Pick one of the decorations.';
+        const fx = d.f === undefined ? this.s.fx[0] : d.f, fi = DECO_FX.findIndex(([k]) => k === fx);
+        if (fi < 0 || !this.s.fx.includes(fx)) return 'Pick one of the effects.';
         const left = Math.ceil(((this.by.get(client) ?? -Infinity) + this.s.every * 1000 - now) / 1000);
-        if (left > 0) return `You can hang another bauble in ${left} s.`;
+        if (left > 0) return `You can hang another decoration in ${left} s.`;
         this.orn = this.orn.slice(0, d.i) + d.c + this.orn.slice(d.i + 1);
+        this.kinds = this.kinds.slice(0, d.i) + ki + this.kinds.slice(d.i + 1);
+        this.fxs = this.fxs.slice(0, d.i) + fi + this.fxs.slice(d.i + 1);
         this.by.set(client, now);
         if (this.by.size > 2000) for (const [k, v] of this.by) if (now - v > 3600000) this.by.delete(k);
         this.last = d.i; this.lastAt = now; this.lastBy = client;
@@ -161,8 +265,25 @@ export class App {
         return '';
     }
 
+    /** a visitor picks the star's colour (one of the 8 decoration colours) and its effect */
+    colourStar(client, d, now) {
+        if (!this.star || !this.s.starPick) return 'The star cannot change right now.';
+        if (now < this.partyUntil) return 'The tree is full: party time! Wait a moment.';
+        if (!Number.isInteger(d.c) || d.c < 1 || d.c > COLORS.length) return '';
+        if (d.f !== undefined && !this.s.starFxs.includes(d.f)) return 'Pick one of the star\'s effects.';
+        const left = Math.ceil(((this.starBy.get(client) ?? -Infinity) + this.s.starEvery * 1000 - now) / 1000);
+        if (left > 0) return `You can change the star again in ${left} s.`;
+        this.starCol = COLORS[d.c - 1];
+        if (d.f !== undefined) this.starFx = d.f;
+        this.starBy.set(client, now);
+        if (this.starBy.size > 2000) for (const [k, v] of this.starBy) if (now - v > 3600000) this.starBy.delete(k);
+        this.starAt = now; this.starLastBy = client;
+        this.showUntil = Math.max(this.showUntil, now + this.s.show * 1000);
+        return '';
+    }
+
     step(now) {
-        if (this.partyUntil && now > this.partyUntil) { this.partyUntil = 0; this.orn = '0'.repeat(this.orn.length); }
+        if (this.partyUntil && now > this.partyUntil) { this.partyUntil = 0; this.orn = '0'.repeat(this.orn.length); this.kinds = '0'.repeat(this.orn.length); this.fxs = '0'.repeat(this.orn.length); this.starCol = ''; this.starFx = ''; }
     }
 
     showing(now) { return this.ready && (this.s.always || now < this.showUntil || now < this.partyUntil); }
@@ -176,18 +297,41 @@ export class App {
             let c = bg;
             if (party) c = hsv(i / g.n * 3 - t * 0.5);
             else if (sp >= 0 && this.orn[sp] !== '0') {
-                if (sp === this.last && now - this.lastAt < 4000 && Math.floor(t * 8) % 2) c = [255, 255, 255];
-                else { const k = 0.75 + 0.25 * Math.sin(t * 2.3 + sp * 1.7); c = hexRgb(COLORS[+this.orn[sp] - 1]).map((v) => v * k); }
+                const kind = KINDS[+this.kinds[sp]]?.[0] ?? 'bauble';
+                let at = shapeAt(kind, this.lay.du[i], this.lay.dv[i]);
+                if (!at && kind !== 'bauble' && this.lay.counts[sp] < 12) {   // too few pixels for the shape: the whole spot, still telling them apart
+                    const y = this.lay.dv[i];
+                    at = kind === 'cane' ? (Math.floor(y * 3 + 10) % 2 ? [1, 0] : [0, 1]) : kind === 'present' ? (Math.abs(y) < 0.2 ? [0, 0] : [1, 0]) : kind === 'flake' || kind === 'star' ? [1, 0.35] : [1, 0];
+                }
+                if (at) {
+                    if (sp === this.last && now - this.lastAt < 4000 && Math.floor(t * 6) % 2) c = [255, 255, 255];
+                    else {
+                        const fx = DECO_FX[+this.fxs[sp]]?.[0] ?? 'glow', k = decoLight(fx, t, sp, i);
+                        const own = fx === 'rainbow' ? hsv(t * 0.25 + sp * 0.13) : hexRgb(COLORS[+this.orn[sp] - 1]);
+                        const other = own.join() === '255,200,60' ? [255, 255, 255] : [255, 200, 60];   // a present's ribbon: gold (white on a gold box)
+                        const base = at[0] ? own : kind === 'cane' ? [255, 255, 255] : other;
+                        c = base.map((v) => (v + (255 - v) * at[1]) * k);
+                    }
+                }
             }
             out[i * 3] = c[0]; out[i * 3 + 1] = c[1]; out[i * 3 + 2] = c[2];
         }
         const list = [{ geom: g, bytes: out }];
         if (this.star) {
-            const sg = this.star, sb = new Uint8Array(sg.n * 3), shine = Math.max(0, 1 - (now - this.lastAt) / 1200);
+            const sg = this.star, sb = new Uint8Array(sg.n * 3), shine = Math.max(0, 1 - (now - Math.max(this.lastAt, this.starAt)) / 1200);
+            const base = hexRgb(this.starCol || this.s.starColor), fx = this.starFx || this.s.starFx;
             for (let i = 0; i < sg.n; i++) {
-                let c;
+                let c, k = 1, col = base, white = 0;
                 if (party) c = hsv(t * 0.6 + i / sg.n);
-                else { const k = 0.55 + 0.45 * Math.sin(t * 3 + this.twinkle[i]); c = [255, 190, 40].map((v) => Math.min(255, v * k + (255 - v * k) * shine)); }
+                else {
+                    if (fx === 'twinkle') k = 0.55 + 0.45 * Math.sin(t * 3 + this.twinkle[i]);
+                    else if (fx === 'blink') k = Math.floor(t * 2.5) % 2 ? 1 : 0.05;
+                    else if (fx === 'pulse') k = 0.12 + 0.88 * (0.5 + 0.5 * Math.sin(t * 3.5));
+                    else if (fx === 'spin') { const a = (((this.starAng?.[i] ?? i / sg.n) - t * 0.5) % 1 + 1) % 1; k = 0.15 + 0.85 * Math.max(0, 1 - a * 3); white = Math.max(0, 1 - a * 8) * 0.6; }
+                    else if (fx === 'sparkle') { k = 0.6; white = Math.max(0, Math.sin(t * (4 + rnd(i) * 5) + rnd(i + 3) * 6.3)) ** 12; k += white * 0.4; }
+                    else if (fx === 'rainbow') col = hsv(t * 0.3 + (this.starAng?.[i] ?? i / sg.n));
+                    c = col.map((v) => { const x = v * k; return Math.min(255, x + (255 - x) * Math.max(shine, white)); });
+                }
                 sb[i * 3] = c[0]; sb[i * 3 + 1] = c[1]; sb[i * 3 + 2] = c[2];
             }
             list.push({ geom: sg, bytes: sb });
@@ -198,11 +342,14 @@ export class App {
     message() {
         if (!this.lay) return 'The tree is not ready yet.';
         const n = this.orn.length, used = n - this.orn.split('').filter((c) => c === '0').length;
-        return Date.now() < this.partyUntil ? '🎉 The tree is full! Party on the lights!' : `${used} of ${n} baubles hung.`;
+        return Date.now() < this.partyUntil ? '🎉 The tree is full! Party on the lights!' : `${used} of ${n} decorations hung.`;
     }
 
     status() {
-        return { spots: this.lay?.spots ?? [], round: !!this.lay?.round, orn: this.orn, colors: COLORS, every: this.s.every, party: Date.now() < this.partyUntil,
-            last: this.last, lastBy: this.lastBy, star: !!this.star, players: [] };
+        return { spots: this.lay?.spots ?? [], round: !!this.lay?.round, orn: this.orn, kinds: this.kinds, kindList: KINDS.filter(([k]) => this.s.kinds.includes(k)), allKinds: KINDS.map(([k]) => k), colors: COLORS, every: this.s.every, party: Date.now() < this.partyUntil,
+            last: this.last, lastBy: this.lastBy, star: !!this.star, starPick: !!this.star && this.s.starPick, starCol: this.starCol || this.s.starColor,
+            starAt: this.starAt, starLastBy: this.starLastBy, starEvery: this.s.starEvery,
+            fxs: this.fxs, fxList: DECO_FX.filter(([k]) => this.s.fx.includes(k)), allFx: DECO_FX.map(([k]) => k),
+            starFx: this.starFx || this.s.starFx, starFxList: STAR_FX.filter(([k]) => this.s.starFxs.includes(k)), players: [] };
     }
 }

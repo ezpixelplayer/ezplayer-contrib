@@ -1,8 +1,8 @@
 {
     "id": "decorate-the-tree",
     "name": "Decorate the tree",
-    "version": "3",
-    "description": "Visitors hang baubles on a tree of the show from their phones: pick a free spot and a colour",
+    "version": "5",
+    "description": "Visitors decorate a tree of the show from their phones: baubles, candy canes, stars, bells, presents and more",
     "icon": "🎄",
     "runtime": "node",
     "start": ["main.mjs"],
