@@ -1,7 +1,7 @@
 {
     "id": "pong",
     "name": "Pong",
-    "version": "2",
+    "version": "4",
     "description": "Pong on a matrix of the show: slide your phone to move your paddle, against the computer or a friend",
     "icon": "🏓",
     "runtime": "node",

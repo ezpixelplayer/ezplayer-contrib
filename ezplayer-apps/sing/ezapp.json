@@ -1,7 +1,7 @@
 {
     "id": "sing",
     "name": "Sing",
-    "version": "2",
+    "version": "3",
     "description": "Visitors record a song on their phone and a singing model of the show sings it on the show's speakers",
     "icon": "🎤",
     "runtime": "node",

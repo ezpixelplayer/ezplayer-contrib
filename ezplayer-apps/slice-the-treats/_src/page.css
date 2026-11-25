@@ -1,0 +1,4 @@
+  .pad { display: block; width: 100%; max-width: 380px; margin: 0 auto; border-radius: 16px; background: linear-gradient(180deg, #0c0818, #1d1430); border: 1px solid var(--line); touch-action: none; }
+  .score2 { display: flex; justify-content: center; gap: 18px; align-items: center; font: 900 30px/1 system-ui, sans-serif; }
+  .clock { text-align: center; font: 700 18px/1 system-ui, sans-serif; color: var(--dim); }
+  .best { margin: 0; padding-left: 24px; font-size: 17px; line-height: 1.6; }

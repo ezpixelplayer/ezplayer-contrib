@@ -1,0 +1,6 @@
+  .pads { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; aspect-ratio: 1; }
+  .pads button { border: 0; border-radius: 22px; opacity: .45; cursor: pointer; transition: opacity .08s, transform .08s; }
+  .pads button.on { opacity: 1; transform: scale(0.97); }
+  .pads.off button { cursor: default; }
+  .score { display: flex; justify-content: space-around; font-weight: 700; color: var(--dim); }
+  .score b { color: var(--text); font-size: 22px; }

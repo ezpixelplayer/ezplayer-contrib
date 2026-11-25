@@ -5,8 +5,7 @@ measured on their phone (tapping, singing, shaking the phone, or running on the 
 to reach the top lights the star in their color. A port of the race game in ShowPlay to the EZPlayer
 app runtime: the player starts `race.mjs`, phones open the app's page, and their efforts reach the game
 as app events. While a race is on the track (and the star, when one is chosen) are painted through
-exclusive overlay leases, taken when the first player joins and released after the race so the show
-has its lights back. When another app has the track, the race says who and does not start. Plain Node
+overlay leases; between races the leases are released so the show has its lights back. Plain Node
 (22+), no dependencies.
 
 ## Install
@@ -82,3 +81,30 @@ one track and a track-and-star pair per player (one target each here); the climb
 and side-by-side splits and the "front of the tree" setting (a grid is always split into column
 groups, climbing up; a nodes target follows its node order); the panel's test race and the saved
 profiles; the rainbow party is always on.
+
+## When someone wins or loses
+
+A section of the settings, **🎉 When someone wins or loses**, all off by default. Tick **When someone wins** and/or
+**When someone loses**, then the parts you want:
+
+- **🔊 Sound:** built in (a short fanfare for a win, a sad "wah wah wah waaah" for a loss, made by the app, no files
+  needed) or your own WAV files (one for a win, one for a loss, on the player computer). Volume, and where it plays:
+  the show's speakers through EZPlayer (at once, or mixed with the show's music), or the computer's own speaker.
+- **🗣️ Say the words out loud:** after the sound, the computer's own voice says the words (Windows and macOS have
+  voices; on Linux or a Raspberry Pi install `espeak-ng`). **Voice language** picks a voice of that language when the
+  computer has one (`en` by default; `pt` for Portuguese, for example Windows' "Helia" voice). No voice: only the sound.
+- **The words** can use `{winner}` (the player's name, or "The computer"), `{colour}` (the winner's colour as a word:
+  Red, Blue…) and `{score}`. Write them in any language.
+- **🫧 A machine** for a few seconds (bubbles, fog, snow, its lights…), reached in the same five ways as 🌨️ snow on
+  request in the fun app (a web address, or DMX through EZPlayer, DDP, Art-Net or E1.31; its README explains each way,
+  with wiring and safety): the DMX channels and seconds for a win, and for a loss (empty: the machine stays off; for
+  example only a red light), and a rest between two runs. With a web address the machine runs for a win, and for a loss
+  only when ticked.
+
+Every part works on its own: only the sound, only the words, only the machine, or everything.
+
+**In this game:** a win is someone reaching the star, or being highest when the time is up. There is no loss, and no words on the lights (the track is not a matrix).
+
+## Changes
+
+- **Version 2:** 🎉 when someone wins or loses: a sound (built in or your own WAV), the words said out loud and/or written across the lights, and a machine (bubbles, fog, lights…) for a few seconds; all off by default.

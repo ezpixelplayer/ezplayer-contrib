@@ -11,6 +11,7 @@
  * moments too (LAG_MS), with a generous reach: what the visitor saw on the lights is what they can slice.
  */
 
+import { cleanEnd, colourName } from './ending.mjs';
 import { painter, cleanName, num, hex, hexRgb } from './player.mjs';
 
 export const minSize = { w: 8, h: 8 };
@@ -28,7 +29,7 @@ const LEVELS = {
 const DEFAULTS = { target: '', fps: 30, brightness: 100, level: 'normal', secs: 60, lives: 5, coal: true, stars: true, missLoses: false,
     friend: true, waitSecs: 60, partySecs: 6, color1: 'ff3c3c', color2: '3c8cff' };
 
-export function cleanSettings(raw) {
+function cleanGame(raw) {
     const s = { ...DEFAULTS };
     if (!raw || typeof raw !== 'object') return s;
     if (typeof raw.target === 'string') s.target = raw.target.trim();
@@ -51,6 +52,9 @@ function segDist(px, py, ax, ay, bx, by, sx) {
     const L = dx * dx + dy * dy, k = L ? Math.max(0, Math.min(1, (qx * dx + qy * dy) / L)) : 0;
     return Math.hypot(qx - k * dx, qy - k * dy);
 }
+
+export const END_TEXTS = {"endWinText": "{winner} wins!", "endLoseText": "Game over! {score} points", "endRecordText": "New record: {score}!"};
+export function cleanSettings(raw) { return cleanEnd(raw, cleanGame(raw), END_TEXTS); }
 
 export class Game {
     constructor(s) { this.s = s; this.id = 0; this.statusMs = 200; this.w = 16; this.h = 16; this.best = []; this.bestDay = ''; this.reset(); }
@@ -195,6 +199,14 @@ export class Game {
             const flight = 2 * -vy / L.g, x1 = Math.max(0.1, Math.min(0.9, x0 + (Math.random() - 0.5) * 0.6));
             this.items.push({ kind, col: COLS[Math.floor(Math.random() * COLS.length)], t0: now + i * 150, x0, y0, vx: (x1 - x0) / flight, vy, cut: false, id: ++this.seq });
         }
+    }
+
+    /** what happened, for the ending: alone, a new best score of the day or game over; with a friend, who won */
+    outcome() {
+        if (!this.winner || this.winner === 3) return null;
+        if (this.players.length < 2) return { kind: this.newBest ? 'record' : 'lose', vars: { winner: this.players[0]?.name ?? 'Player', colour: colourName(this.s.color1), score: this.score[0] } };
+        const w = this.winner - 1;
+        return { kind: 'win', vars: { winner: this.players[w]?.name ?? 'Player ' + this.winner, colour: colourName(w ? this.s.color2 : this.s.color1), score: this.score[w] } };
     }
 
     step(now) {
