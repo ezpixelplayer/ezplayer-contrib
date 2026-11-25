@@ -61,6 +61,38 @@
   <div><label for="partySecs">Seconds of party at the end</label><input id="partySecs" type="number" min="3" max="30" step="1" value="8"></div>
 </div>
 
+<div id="endBox"></div>
+<style>
+  #endBox input[type=text] { width: 100%; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  #endBox .ck { display: flex; align-items: center; gap: 8px; margin: 14px 0 4px; color: var(--text); }
+</style>
+<script>
+  // 🎉 When someone wins or loses: the same fields as in the other ShowPlay games (built from ending.mjs's endFields)
+  const END_FIELDS = [{"section": "🎉 When someone wins or loses"}, {"id": "endWin", "type": "check", "text": "🏆 When someone wins", "default": true}, {"id": "endLose", "type": "check", "text": "😢 When someone loses (or the computer wins)", "default": true}, {"id": "endSound", "type": "select", "label": "🔊 Sound", "options": [["off", "Off"], ["built", "Built in: a fanfare for a win, a \"wah wah\" for a loss"], ["files", "My own WAV files"]], "default": "off"}, {"id": "endVolume", "type": "number", "label": "Volume (5 to 100)", "min": 5, "max": 100, "default": 80}, {"id": "endBus", "type": "select", "label": "Where it plays", "options": [["immediate", "The show's speakers (EZPlayer)"], ["main", "Mixed with the show's music (EZPlayer)"], ["local", "This computer's speaker"]], "default": "immediate", "end": true}, {"id": "endWinWav", "type": "text", "label": "My own sound for a win (a WAV file on this computer)", "default": "", "placeholder": "C:\\Sounds\\win.wav"}, {"id": "endLoseWav", "type": "text", "label": "My own sound for a loss", "default": "", "placeholder": "C:\\Sounds\\lose.wav", "end": true}, {"id": "endVoice", "type": "check", "text": "🗣️ Say the words out loud (the computer's own voice, after the sound)", "default": false}, {"id": "endVoiceLang", "type": "text", "label": "Voice language (en, pt, es…; the computer must have that voice)", "default": "en", "placeholder": "en"}, {"id": "endBanner", "type": "check", "text": "🔤 Write the words across the lights", "default": false}, {"id": "endWinText", "type": "text", "label": "Words for a win: {winner}, {colour}, {score}", "default": "{winner} wins!"}, {"id": "endLoseText", "type": "text", "label": "Words for a loss", "default": "The computer wins!", "end": true}, {"id": "endMachine", "type": "check", "text": "🫧 A machine for a few seconds (bubbles, fog, snow, lights…)", "default": false}, {"id": "endHow", "type": "select", "label": "How the app reaches the machine", "options": [["url", "Web address (smart plug, relay, Shelly, Tasmota)"], ["ezp", "DMX through EZPlayer (a model in the layout)"], ["ddp", "DMX by DDP (WLED or a board with a DMX output)"], ["artnet", "DMX by Art-Net (a DMX node)"], ["e131", "DMX by E1.31 / sACN (a DMX node)"]], "default": "url", "end": true}, {"id": "endOnUrl", "type": "text", "label": "Web address: for on", "default": "", "placeholder": "http://192.168.1.50/relay/0?turn=on"}, {"id": "endOffUrl", "type": "text", "label": "Web address: for off", "default": "", "placeholder": "http://192.168.1.50/relay/0?turn=off"}, {"id": "endLoseUrl", "type": "check", "text": "Web address: also when someone loses", "default": false, "end": true}, {"id": "endHost", "type": "text", "label": "DMX by DDP / Art-Net / E1.31: the board's IP address", "default": "", "placeholder": "192.168.1.60"}, {"id": "endUniverse", "type": "number", "label": "Art-Net / E1.31: universe", "min": 0, "max": 63999, "default": 1, "end": true}, {"id": "endModel", "type": "text", "label": "DMX through EZPlayer: the model", "default": "", "placeholder": "BubbleMachine", "end": true}, {"id": "endWinCh", "type": "text", "label": "DMX for a win: channel=value (e.g. 1=255, 2=180, 3=220, 5=255, 9=255)", "default": "1=255"}, {"id": "endWinSecs", "type": "number", "label": "Seconds for a win", "min": 1, "max": 60, "default": 5}, {"id": "endLoseCh", "type": "text", "label": "DMX for a loss (empty: the machine stays off; e.g. only a red light 5=255, 6=255)", "default": ""}, {"id": "endLoseSecs", "type": "number", "label": "Seconds for a loss", "min": 1, "max": 60, "default": 3}, {"id": "endGap", "type": "number", "label": "The machine rests between two (seconds)", "min": 0, "max": 600, "default": 20, "end": true, "hint": "Every other DMX channel is 0, and all go back to 0 at the end. The fun README explains each way of reaching a machine, and DMX channels."}];
+  (() => {
+    const box = document.getElementById('endBox');
+    for (const f of END_FIELDS) {
+      if (f.section) { const h = document.createElement('h2'); h.textContent = f.section; box.append(h); continue; }
+      if (f.type === 'check') { const l = document.createElement('label'); l.className = 'ck'; const c = document.createElement('input'); c.type = 'checkbox'; c.id = 'end_' + f.id; c.checked = !!f.default; l.append(c, ' ' + f.text); box.append(l); continue; }
+      const l = document.createElement('label'); l.htmlFor = 'end_' + f.id; l.textContent = f.label; box.append(l);
+      let i;
+      if (f.type === 'select') { i = document.createElement('select'); for (const [v, t] of f.options) i.append(new Option(t, v)); }
+      else { i = document.createElement('input'); i.type = f.type; if (f.placeholder) i.placeholder = f.placeholder; if (f.type === 'number') { i.min = f.min; i.max = f.max; } }
+      i.id = 'end_' + f.id; i.value = f.default ?? ''; box.append(i);
+      if (f.hint) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = f.hint; box.append(p); }
+    }
+  })();
+  function endFill(s) {
+    for (const f of END_FIELDS) { if (f.section || !(f.id in s)) continue; const e = document.getElementById('end_' + f.id); if (f.type === 'check') e.checked = !!s[f.id]; else e.value = s[f.id]; }
+  }
+  function endGather() {
+    const out = {};
+    for (const f of END_FIELDS) { if (f.section) continue; const e = document.getElementById('end_' + f.id);
+      out[f.id] = f.type === 'check' ? e.checked : f.type === 'number' ? Math.round(Math.min(f.max, Math.max(f.min, Number(e.value) || f.min))) : e.value.trim(); }
+    return out;
+  }
+</script>
+
 <button id="save" disabled>Save</button><span id="note"></span>
 
 <details>
@@ -118,13 +150,13 @@
     app.onStatus((s) => { el('status').textContent = JSON.stringify(s, null, 2); });
     let settings = null;
     try { settings = await app.get('private', 'settings'); } catch (e) { /* not readable here; the form keeps its defaults */ }
-    fill(settings || {});
+    fill(settings || {}); endFill(settings || {});
     try { await loadTargets(settings?.target); } catch (e) { el('note').textContent = `Could not list models: ${e.message}`; }
     el('save').disabled = false;
   }
 
   el('save').addEventListener('click', async () => {
-    const body = gather();
+    const body = Object.assign(gather(), endGather());
     if (!body.target) { el('note').textContent = 'Pick a matrix first.'; return; }
     if (!body.cpu && !body.friend) { el('note').textContent = 'Tick at least one way to play.'; return; }
     if (body.cpu && !body.levels.length) { el('note').textContent = 'Tick at least one computer level.'; return; }

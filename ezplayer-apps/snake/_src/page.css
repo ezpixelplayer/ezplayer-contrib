@@ -1,0 +1,6 @@
+  .pad { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 8px; width: 100%; aspect-ratio: 1; max-width: 340px; margin: 0 auto; touch-action: none; }
+  .pad button { border: 0; border-radius: 18px; background: var(--raise); color: var(--text); font: 900 42px/1 system-ui, sans-serif; cursor: pointer; }
+  .pad button:active, .pad button.on { background: #3a2f12; }
+  .pad .mid { background: transparent; font-size: 15px; color: var(--dim); font-weight: 700; display: flex; align-items: center; justify-content: center; text-align: center; }
+  .score { display: flex; justify-content: space-around; font-weight: 700; color: var(--dim); }
+  .score b { color: var(--text); font-size: 22px; }
