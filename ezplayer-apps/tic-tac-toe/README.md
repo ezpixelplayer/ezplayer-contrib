@@ -55,7 +55,33 @@ keyed by its client id, so only that phone shows it.
 
 Nothing of the game itself. In ShowPlay the board could also go on any side of the cube; here it is one matrix.
 
+## When someone wins or loses
+
+A section of the settings, **🎉 When someone wins or loses**, all off by default. Tick **When someone wins** and/or
+**When someone loses**, then the parts you want:
+
+- **🔊 Sound:** built in (a short fanfare for a win, a sad "wah wah wah waaah" for a loss, made by the app, no files
+  needed) or your own WAV files (one for a win, one for a loss, on the player computer). Volume, and where it plays:
+  the show's speakers through EZPlayer (at once, or mixed with the show's music), or the computer's own speaker.
+- **🗣️ Say the words out loud:** after the sound, the computer's own voice says the words (Windows and macOS have
+  voices; on Linux or a Raspberry Pi install `espeak-ng`). **Voice language** picks a voice of that language when the
+  computer has one (`en` by default; `pt` for Portuguese, for example Windows' "Helia" voice). No voice: only the sound.
+- **🔤 Write the words across the lights:** the words scroll once over the end of the game, on a darker picture.
+- **The words** can use `{winner}` (the player's name, or "The computer"), `{colour}` (the winner's colour as a word:
+  Red, Blue…) and `{score}`. Write them in any language.
+- **🫧 A machine** for a few seconds (bubbles, fog, snow, its lights…), reached in the same five ways as 🌨️ snow on
+  request in the fun app (a web address, or DMX through EZPlayer, DDP, Art-Net or E1.31; its README explains each way,
+  with wiring and safety): the DMX channels and seconds for a win, and for a loss (empty: the machine stays off; for
+  example only a red light), and a rest between two runs. With a web address the machine runs for a win, and for a loss
+  only when ticked.
+
+Every part works on its own: only the sound, only the words, only the machine, or everything.
+
+**In this game:** a win is a person winning (against the computer or a friend); a loss is the computer winning. A draw does nothing.
+
 ## Changes
+
+- **Version 3:** 🎉 when someone wins or loses: a sound (built in or your own WAV), the words said out loud and/or written across the lights, and a machine (bubbles, fog, lights…) for a few seconds; all off by default.
 
 - **Version 2:** a player could tap twice before the app answered, and the phone showed two marks in a row (the app
   refused the second, so it vanished a moment later). Now the phone passes the turn on as soon as a square is tapped

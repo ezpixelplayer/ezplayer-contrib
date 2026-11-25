@@ -7,7 +7,9 @@
  * extra one for each wave cleared.
  */
 
+import { cleanEnd, colourName } from './ending.mjs';
 import { hexRgb, painter, cleanName, num, pick } from './player.mjs';
+import { sensor, SENSOR_DEFAULTS, cleanSensor, StepTurns } from './sensor.mjs';
 
 export const minSize = { w: 12, h: 12 };
 const ROWS = [['ff3cff', 30], ['3cffff', 20], ['3cff5a', 10]];   // colour and points of each row, top first
@@ -16,9 +18,9 @@ const LEVELS = {      // ship speed, shot speed, bomb speed, invaders' first ste
     normal: { ship: 10, shot: 20, bomb: 5, step: 1.0, minStep: 0.25, bombs: 2, gap: [1.6, 3.2], ufo: 4 },
     hard: { ship: 14, shot: 22, bomb: 8, step: 0.55, minStep: 0.08, bombs: 2, gap: [1.0, 2.2], ufo: 5 },
 };
-const DEFAULTS = { target: '', fps: 20, brightness: 100, level: 'normal', fire: 'auto', maxMinutes: 7, partySecs: 8 };
+const DEFAULTS = { ...SENSOR_DEFAULTS, target: '', fps: 20, brightness: 100, level: 'normal', fire: 'auto', maxMinutes: 7, partySecs: 8 };
 
-export function cleanSettings(raw) {
+function cleanGame(raw) {
     const s = { ...DEFAULTS };
     if (!raw || typeof raw !== 'object') return s;
     if (typeof raw.target === 'string') s.target = raw.target.trim();
@@ -28,8 +30,15 @@ export function cleanSettings(raw) {
     if (raw.fire === 'auto' || raw.fire === 'button') s.fire = raw.fire;
     s.maxMinutes = num(raw.maxMinutes, 1, 20, s.maxMinutes);
     s.partySecs = num(raw.partySecs, 3, 30, s.partySecs);
+    cleanSensor(raw, s);
     return s;
 }
+
+const ctlOf = (d) => (d && (d.control === 'tilt' || d.control === 'body') ? d.control : 'finger');
+const NO_SENSOR = 'The body sensor is not answering: play with the finger or tilt.';
+
+export const END_TEXTS = {"endWinText": "{winner} defended the show!", "endLoseText": "Game over! {score} points", "endRecordText": "New record: {score}!"};
+export function cleanSettings(raw) { return cleanEnd(raw, cleanGame(raw), END_TEXTS); }
 
 export class Game {
     constructor(s) { this.s = s; this.id = 0; this.best = 0; this.W = 16; this.H = 16; this.statusMs = 300; this.reset(); }
@@ -46,6 +55,7 @@ export class Game {
         this.adx = 1; this.nextStep = 0; this.nextFire = 0; this.nextBomb = 0; this.firePending = false;
         this.ufo = null; this.ufoNext = 0; this.hitAt = 0; this.boom = [];
         this.t0 = 0; this.endsAt = 0; this.last = 0; this.touched = 0; this.died = 0; this.until = 0; this.reason = '';
+        this.ctl = 'finger';
     }
 
     L() { return LEVELS[this.s.level]; }
@@ -54,9 +64,12 @@ export class Game {
         const mine = this.players[0]?.id === client;
         if (d.type === 'new') {
             if (this.phase === 'ready' || this.phase === 'playing') return 'A game is already on. Wait for it to end.';
+            if (ctlOf(d) === 'body' && !sensor.ok()) return NO_SENSOR;
             this.reset();
+            this.ctl = ctlOf(d);
             this.id += 1;
             this.players = [{ id: client, name: cleanName(d.name, 'Player') }];
+            this.bestBefore = this.best;
             const hy = this.H - 4;
             for (let c = 1; c < 4; c++) for (const x of [Math.floor(c * this.W / 4) - 1, Math.floor(c * this.W / 4)]) this.shields.add(x + ',' + hy);
             this.phase = 'ready'; this.t0 = now; this.touched = now;
@@ -96,7 +109,26 @@ export class Game {
         this.best = Math.max(this.best, this.score);
     }
 
+    /** a player who plays with the body: walking left and right moves the ship, which fires by itself */
+    useSensor(now) {
+        sensor.configure(this.s);
+        const body = (this.phase === 'ready' || this.phase === 'playing') && this.ctl === 'body';
+        sensor.tick(now, !body);
+        if (!body) return;
+        const pos = sensor.player(0, 1);
+        if (pos) { this.target = pos.u * (this.W - 1); this.touched = now; }
+    }
+
+    /** what happened, for the ending: a new best score, the time up with lives left, or game over */
+    outcome() {
+        if (this.reason === 'You stopped the game.' || this.reason === 'Nobody was playing.') return null;
+        const vars = { winner: this.players[0]?.name ?? 'Player', colour: '', score: this.score };
+        if (this.score > 0 && this.score > (this.bestBefore ?? 0)) return { kind: 'record', vars };
+        return { kind: this.reason === 'Time is up!' ? 'win' : 'lose', vars };
+    }
+
     step(now) {
+        this.useSensor(now);
         if (this.phase === 'over') { if (now > this.until) this.reset(); this.last = now; return; }
         if (this.phase !== 'ready' && this.phase !== 'playing') { this.last = now; return; }
         if (now > this.endsAt || now - this.touched > 90000) { this.finish(now > this.endsAt ? 'Time is up!' : 'Nobody was playing.', now); return; }
@@ -106,7 +138,7 @@ export class Game {
         const L = this.L(), W = this.W, H = this.H;
         this.ship += Math.max(-L.ship * dt, Math.min(L.ship * dt, this.target - this.ship));
         this.ship = Math.max(1, Math.min(W - 2, this.ship));
-        const canFire = this.s.fire === 'auto' ? now >= this.nextFire && !this.shots.length : this.firePending && this.shots.length < 2;
+        const canFire = this.s.fire === 'auto' || this.ctl === 'body' ? now >= this.nextFire && !this.shots.length : this.firePending && this.shots.length < 2;
         if (canFire) { this.shots.push({ x: Math.round(this.ship), y: H - 3, was: H - 3 }); this.nextFire = now + 550; this.firePending = false; }
         for (const s of this.shots) { s.was = s.y; s.y -= L.shot * dt; }
         for (const b of this.bombs) { b.was = b.y; b.y += L.bomb * dt; }
@@ -170,7 +202,7 @@ export class Game {
     }
 
     status() {
-        return { game: this.id, players: this.players.map((p) => ({ id: p.id, name: p.name })), score: this.score, best: this.best,
+        return { game: this.id, players: this.players.map((p) => ({ id: p.id, name: p.name })), score: this.score, best: this.best, sensor: sensor.state(), ctl: this.ctl,
             lives: this.lives, wave: this.wave, fire: this.s.fire, x: Math.round(this.ship / Math.max(1, this.W - 1) * 1000) / 1000,
             endsAt: this.phase === 'playing' ? this.endsAt : null };
     }

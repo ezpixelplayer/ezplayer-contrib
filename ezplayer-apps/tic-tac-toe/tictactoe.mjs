@@ -16,6 +16,7 @@
  */
 
 import { Game, cleanSettings, render } from './game.mjs';
+import { Ending } from './ending.mjs';
 
 const base = (process.env.EZP_API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
 const instance = process.env.EZP_APP_INSTANCE;
@@ -61,11 +62,10 @@ async function loadConfig() {
 }
 
 async function openLease(body) {
-    // The app token puts the instance title on the lease, so a refused game names who has the matrix.
     const res = await fetch(`${base}/api/ezp/overlays`, {
         method: 'POST',
-        headers: jsonHeaders,
-        body: JSON.stringify({ ...body, mode: 'exclusive', blend: 'replace', ttlMs: 10_000 }),
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...body, blend: 'replace', ttlMs: 10_000 }),
     });
     const opened = await res.json().catch(() => ({}));
     if (!opened.ok || !opened.lease) throw new Error(opened.error ?? `HTTP ${res.status}`);
@@ -147,6 +147,8 @@ async function main() {
 
     let lastJson = '';
     let lastAt = 0;
+    const ending = new Ending();   // a sound, the words, a machine when someone wins or loses
+    let endPhase = game.phase;
     while (!quit) {
         const now = Date.now();
         if (game.phase === 'idle' && now - lastConfigCheck > 5000) {   // settings are re-read between games
@@ -185,6 +187,10 @@ async function main() {
         }
 
         game.step(now);
+        if (game.phase !== endPhase) {
+            endPhase = game.phase;
+            if (endPhase === 'finished') { try { const o = game.outcome(); if (o) ending.fire(game.s, o.kind, o.vars); } catch (e) { console.log('ending:', e.message); } }
+        }
 
         if (lease) {
             if (game.phase === 'idle') {
@@ -193,6 +199,7 @@ async function main() {
                 await closeLease(l);
             } else {
                 render(lease.payload, lease.width, lease.height, game, game.s, now);
+                ending.draw(lease.payload, lease.width, lease.height, now);
                 await putFrame(lease);
             }
         }

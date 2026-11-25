@@ -3,6 +3,7 @@
 
 /** Snake for one player: the phone sends the turns, the snake moves on a square board drawn as big as fits. */
 
+import { cleanEnd, colourName } from './ending.mjs';
 import { painter, cleanName, num, pick } from './player.mjs';
 
 export const minSize = { w: 8, h: 8 };
@@ -10,7 +11,7 @@ const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];            // up, right, down, 
 const SPEEDS = { slow: [800, 420], normal: [560, 260], fast: [400, 170] };   // ms per step: at the start, at the fastest
 const DEFAULTS = { target: '', fps: 20, brightness: 100, size: 10, speed: 'normal', maxMinutes: 5, partySecs: 8 };
 
-export function cleanSettings(raw) {
+function cleanGame(raw) {
     const s = { ...DEFAULTS };
     if (!raw || typeof raw !== 'object') return s;
     if (typeof raw.target === 'string') s.target = raw.target.trim();
@@ -22,6 +23,9 @@ export function cleanSettings(raw) {
     s.partySecs = num(raw.partySecs, 3, 30, s.partySecs);
     return s;
 }
+
+export const END_TEXTS = {"endWinText": "{winner} made it to the end!", "endLoseText": "Game over! {score} points", "endRecordText": "New record: {score}!"};
+export function cleanSettings(raw) { return cleanEnd(raw, cleanGame(raw), END_TEXTS); }
 
 export class Game {
     constructor(s) { this.s = s; this.id = 0; this.best = 0; this.n = s.size; this.statusMs = 300; this.reset(); }
@@ -51,6 +55,7 @@ export class Game {
             this.reset();
             this.id += 1;
             this.players = [{ id: client, name: cleanName(d.name, 'Player') }];
+            this.bestBefore = this.best;
             const m = Math.floor(this.n / 2);
             this.body = [[m - 1, m], [m - 2, m], [m - 3, m]];
             this.dir = 1;
@@ -75,6 +80,14 @@ export class Game {
     finish(reason, now) {
         this.phase = 'over'; this.reason = reason; this.died = now; this.until = now + this.s.partySecs * 1000;
         this.best = Math.max(this.best, this.score);
+    }
+
+    /** what happened, for the ending: a new best score, a full board or the time up, or game over */
+    outcome() {
+        if (this.reason === 'You stopped the game.') return null;
+        const vars = { winner: this.players[0]?.name ?? 'Player', colour: '', score: this.score };
+        if (this.score > 0 && this.score > (this.bestBefore ?? 0)) return { kind: 'record', vars };
+        return { kind: this.reason === 'The board is full!' || this.reason === 'Time is up!' ? 'win' : 'lose', vars };
     }
 
     step(now) {

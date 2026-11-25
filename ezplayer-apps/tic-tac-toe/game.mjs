@@ -6,6 +6,8 @@
  * another way of talking to the phones (ShowPlay's ntfy.sh bridge, for example) by changing only tictactoe.mjs.
  */
 
+import { cleanEnd, colourName } from './ending.mjs';
+
 export const LINES = [
     [0, 1, 2], [3, 4, 5], [6, 7, 8],
     [0, 3, 6], [1, 4, 7], [2, 5, 8],
@@ -29,7 +31,7 @@ export const DEFAULTS = {
 const PARTY_MIN = 3;
 
 /** Settings as saved by the config page, every field checked and defaulted. */
-export function cleanSettings(raw) {
+function cleanGame(raw) {
     const s = { ...DEFAULTS, levels: [...DEFAULTS.levels] };
     if (!raw || typeof raw !== 'object') return s;
     const num = (v, lo, hi, d) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(Math.min(hi, Math.max(lo, v))) : d);
@@ -103,6 +105,9 @@ const clean = (name) => String(name ?? '').replace(/[^\p{L}\p{N} '.-]/gu, '').tr
  * One game at a time. Phases: idle, waiting (for a friend), playing, finished (a short party on the lights).
  * Players are { id, name, mark }; id is the phone's client id, or "cpu".
  */
+export const END_TEXTS = { endWinText: '{winner} wins!', endLoseText: 'The computer wins!' };
+export function cleanSettings(raw) { return cleanEnd(raw, cleanGame(raw), END_TEXTS); }
+
 export class Game {
     constructor(settings) {
         this.s = settings;
@@ -201,6 +206,15 @@ export class Game {
         if (!p) return;
         if (this.phase === 'waiting') this.reset();
         else if (this.phase === 'playing') this.finish(p.mark === 'X' ? 'O' : 'X', null, `${p.name} left the game.`, now);
+    }
+
+    /** what happened, for the ending (a sound, the words, a machine): null for a draw */
+    outcome() {
+        if (!this.winner || this.winner === 'draw') return null;
+        const p = this.players.find((x) => x.mark === this.winner);
+        if (!p) return null;
+        const colour = colourName(this.winner === 'X' ? this.s.colorX : this.s.colorO);
+        return p.id === 'cpu' ? { kind: 'lose', vars: { winner: 'The computer', colour, score: '' } } : { kind: 'win', vars: { winner: p.name, colour, score: '' } };
     }
 
     finish(mark, line, reason, now) {

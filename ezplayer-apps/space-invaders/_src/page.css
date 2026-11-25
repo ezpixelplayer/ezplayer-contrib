@@ -1,0 +1,6 @@
+  .strip { position: relative; height: 110px; border-radius: 18px; background: linear-gradient(180deg, #120c22, #261d3a); border: 1px solid var(--line); touch-action: none; overflow: hidden; }
+  .strip .ship { position: absolute; bottom: 14px; font-size: 40px; transform: translateX(-50%); pointer-events: none; }
+  .strip .finger { position: absolute; top: 0; bottom: 0; width: 4px; background: #39d353; transform: translateX(-50%); pointer-events: none; opacity: .8; }
+  .stats { display: flex; justify-content: space-around; font-weight: 700; color: var(--dim); }
+  .stats b { color: var(--text); font-size: 20px; }
+  #fire { min-height: 70px; font-size: 22px; background: #ff4a4a; color: #fff; }
