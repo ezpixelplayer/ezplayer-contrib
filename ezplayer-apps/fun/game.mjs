@@ -5,7 +5,8 @@
  * Fun: eight extras for visitors on one page, each switched on in the settings.
  *   photo frame, wheel of fortune, pick an animal, paint by numbers: shown on the matrix in turn;
  *   ring the bell: a bell on the player computer's speaker and a gold flash;
- *   snow on request: the app opens a web address to switch a snow (or bubble) machine on, then one to switch it off;
+ *   snow on request: the app switches a snow (or bubble) machine on for a few seconds, by web address (smart plug, relay)
+ *     or by DMX (through EZPlayer, DDP, Art-Net or E1.31; see machine.mjs);
  *   treasure hunt: clues on the phones, word or number answers, a celebration on the matrix;
  *   guess the song: a round for up to 8 phones with WAV songs from a folder on the player computer.
  */
@@ -13,8 +14,28 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { num } from './player.mjs';
+import { cleanEnd } from './ending.mjs';
 import { Anim, Text, Fx, FX_NAMES, PAL, hexRgb, hsv, plain, isBad, bigGlyph } from './lights.mjs';
 import { playSound, readWav } from './audio.mjs';
+import { runMachine, dmxValues, dmxFrame, machineModes, MachineLink, MACHINE_HOWS, MACHINE_COLOURS } from './machine.mjs';
+
+/** snow can be offered: url needs the on address; DMX needs channels and where to send them */
+export function snowReady(s) {
+    if ((s.snowHow ?? 'url') === 'url') return !!s.snowOn;
+    if (s.snowMulti ? !machineModes(s.snowModes).length : !dmxValues(s.snowChannels)) return false;
+    return s.snowHow === 'ezp' ? !!s.snowModel : !!s.snowHost;
+}
+
+/** the machine as dmxFrame() wants it, from the settings */
+export function machineOf(s) {
+    const n = (v) => (Number.isInteger(v) && v >= 1 && v <= 512 ? v : 0);
+    return {
+        channels: s.snowChannels, multi: !!s.snowMulti, modes: s.snowMulti ? machineModes(s.snowModes) : [], fixed: s.snowFixed,
+        lights: s.snowLights ? { dim: n(s.snowChDim), r: n(s.snowChR), g: n(s.snowChG), b: n(s.snowChB), a: n(s.snowChA), w: n(s.snowChW), macro: n(s.snowChMacro),
+            macroVal: s.snowMacroVal, speed: n(s.snowChSpeed), speedVal: s.snowSpeedVal, strobe: s.snowStrobeOk ? n(s.snowChStrobe) : 0, strobeVal: s.snowStrobeVal, strobeMax: s.snowStrobeMax } : null,
+        runLight: s.snowLightRun, runColour: s.snowRunColour, idle: s.snowIdle, idleColour: s.snowIdleColour,
+    };
+}
 
 export const minSize = { w: 8, h: 8 };
 export const KEYS = ['photo', 'wheel', 'animal', 'paint', 'bell', 'snow', 'hunt', 'song'];
@@ -29,13 +50,17 @@ const DEFAULTS = {
     animal: true, animals: ANIMALS.map(([k]) => k), animalCross: 6, animalEvery: 20,
     paint: true, paintHold: 15, paintEvery: 30,
     bell: false, bellVolume: 80, bellFlash: true, bellEvery: 10,
-    snow: false, snowOn: '', snowOff: '', snowRun: 10, snowGap: 120, snowNight: 20, snowFrom: 17, snowTo: 23, snowCube: true,
+    snow: false, snowHow: 'url', snowOn: '', snowOff: '', snowHost: '', snowUniverse: 1, snowChannels: '1=255', snowModel: '',
+    snowMulti: false, snowModes: '🫧 Bubbles | 1=255, 3=200\n🌫️ Fog | 2=200, 3=150 | 8\n🎉 Everything | 1=255, 2=180, 3=220', snowFixed: '4=0',
+    snowLights: false, snowChDim: 5, snowChR: 6, snowChG: 7, snowChB: 8, snowChA: 9, snowChW: 0, snowChMacro: 10, snowMacroVal: 200, snowChSpeed: 12, snowSpeedVal: 128,
+    snowChStrobe: 11, snowStrobeOk: false, snowStrobeVal: 100, snowStrobeMax: 150, snowPickColour: true, snowPickRainbow: true, snowPickStrobe: false,
+    snowLightRun: 'colour', snowRunColour: 'ffffff', snowIdle: 'off', snowIdleColour: '402000', snowLightOnly: true, snowRun: 10, snowGap: 120, snowNight: 20, snowFrom: 17, snowTo: 23, snowCube: true,
     hunt: false, huntClues: "How many reindeer pull Santa's sleigh (without Rudolph)? | 8\nWhat do you put on top of the Christmas tree? | star\nWhat is the snowman's nose made of? | carrot", huntOrder: true,
     soundBus: 'immediate',
     song: false, songFolder: '', songClip: 6, songRounds: 5, songAnswer: 12, songVolume: 90,
 };
 
-export function cleanSettings(raw) {
+function cleanGame(raw) {
     const s = { ...DEFAULTS, photoFrames: [...DEFAULTS.photoFrames], animals: [...DEFAULTS.animals] };
     if (!raw || typeof raw !== 'object') return s;
     if (typeof raw.target === 'string') s.target = raw.target.trim();
@@ -47,6 +72,20 @@ export function cleanSettings(raw) {
     if (Array.isArray(raw.photoFrames)) { const f = FRAMES.map(([k]) => k).filter((k) => raw.photoFrames.includes(k)); if (f.length) s.photoFrames = f; }
     if (Array.isArray(raw.animals)) { const a = ANIMALS.map(([k]) => k).filter((k) => raw.animals.includes(k)); if (a.length) s.animals = a; }
     for (const k of ['wheelSlices', 'huntClues']) if (typeof raw[k] === 'string') s[k] = raw[k].slice(0, 4000);
+    if (MACHINE_HOWS.includes(raw.snowHow)) s.snowHow = raw.snowHow;
+    for (const k of ['snowMulti', 'snowLights', 'snowStrobeOk', 'snowPickColour', 'snowPickRainbow', 'snowPickStrobe', 'snowLightOnly']) if (typeof raw[k] === 'boolean') s[k] = raw[k];
+    for (const [k, lo, hi] of [['snowChDim', 0, 512], ['snowChR', 0, 512], ['snowChG', 0, 512], ['snowChB', 0, 512], ['snowChA', 0, 512], ['snowChW', 0, 512], ['snowChMacro', 0, 512],
+        ['snowChSpeed', 0, 512], ['snowChStrobe', 0, 512], ['snowMacroVal', 0, 255], ['snowSpeedVal', 0, 255], ['snowStrobeVal', 0, 255], ['snowStrobeMax', 0, 255]])
+        if (raw[k] !== '' && raw[k] !== null && Number.isFinite(+raw[k])) s[k] = Math.max(lo, Math.min(hi, Math.round(+raw[k])));
+    if (typeof raw.snowModes === 'string') s.snowModes = raw.snowModes.slice(0, 1500);
+    if (typeof raw.snowFixed === 'string' && (raw.snowFixed.trim() === '' || dmxValues(raw.snowFixed))) s.snowFixed = raw.snowFixed.trim().slice(0, 300);
+    if (['off', 'colour', 'rainbow'].includes(raw.snowLightRun)) s.snowLightRun = raw.snowLightRun;
+    if (['off', 'colour'].includes(raw.snowIdle)) s.snowIdle = raw.snowIdle;
+    for (const k of ['snowRunColour', 'snowIdleColour']) if (typeof raw[k] === 'string' && /^#?[0-9a-f]{6}$/i.test(raw[k])) s[k] = raw[k].replace('#', '').toLowerCase();
+    if (typeof raw.snowHost === 'string' && (raw.snowHost === '' || /^[\w.-]{1,253}$/.test(raw.snowHost.trim()))) s.snowHost = raw.snowHost.trim();
+    if (typeof raw.snowChannels === 'string' && (raw.snowChannels.trim() === '' || dmxValues(raw.snowChannels))) s.snowChannels = raw.snowChannels.trim().slice(0, 300);
+    if (typeof raw.snowModel === 'string') s.snowModel = raw.snowModel.trim().slice(0, 200);
+    if (Number.isFinite(+raw.snowUniverse) && raw.snowUniverse !== '' && raw.snowUniverse !== null) s.snowUniverse = Math.max(0, Math.min(63999, Math.round(+raw.snowUniverse)));
     for (const k of ['snowOn', 'snowOff']) if (typeof raw[k] === 'string' && (raw[k] === '' || /^https?:\/\/\S+$/.test(raw[k].trim()))) s[k] = raw[k].trim();
     if (['immediate', 'main', 'local'].includes(raw.soundBus)) s.soundBus = raw.soundBus;
     if (typeof raw.songFolder === 'string') s.songFolder = raw.songFolder.trim().slice(0, 400);
@@ -240,6 +279,9 @@ class SongPulse extends Anim {
 }
 
 // ------------------------------------------------------------------------------------------- the app ----
+export const END_TEXTS = { endWinText: '{winner} wins!' };
+export function cleanSettings(raw) { return cleanEnd(raw, cleanGame(raw), END_TEXTS); }
+
 export class Game {
     static startTypes = ['photo', 'wheel', 'animal', 'paint', 'bell', 'snow', 'hunt', 'song'];
 
@@ -258,7 +300,7 @@ export class Game {
     ready() {
         const s = this.s;
         if (this.songsFor !== s.songFolder || Date.now() - this.songsAt > 30000) { this.songs = songsOf(s.songFolder); this.songsAt = Date.now(); this.songsFor = s.songFolder; }
-        return KEYS.filter((k) => s[k] && (k !== 'snow' || s.snowOn) && (k !== 'hunt' || cluesOf(s).length) && (k !== 'song' || this.songs.length >= 4));
+        return KEYS.filter((k) => s[k] && (k !== 'snow' || snowReady(s)) && (k !== 'hunt' || cluesOf(s).length) && (k !== 'song' || this.songs.length >= 4));
     }
 
     wait(client, key, every, now) {
@@ -297,7 +339,7 @@ export class Game {
             const w = this.wait(client, k, s.bellEvery, now); if (w) return `You can ring again in ${w} s.`;
             void this.ring();
             if (s.bellFlash) this.queue.unshift({ kind: 'bell', client, label: 'the bell', secs: 2 });
-        } else if (k === 'snow') return this.snow(client, now);
+        } else if (k === 'snow') return this.snow(client, now, d);
         else if (k === 'hunt') return this.hunt(client, d, now);
         else if (k === 'song') return this.songMsg(client, d, now);
         this.results.set(client, { k, ok: true, at: now });
@@ -326,27 +368,86 @@ export class Game {
         const s = this.s, h = new Date(now).getHours();
         const hours = s.snowFrom < s.snowTo ? h >= s.snowFrom && h < s.snowTo : h >= s.snowFrom || h < s.snowTo;
         const runs = this.snowRuns.filter((r) => r === this.nightKey(now)).length;
-        return { busy: this.snowBusy, next: Math.max(0, Math.ceil((this.snowNext - now) / 1000)), hours, left: Math.max(0, s.snowNight - runs), from: s.snowFrom, to: s.snowTo };
+        const st = { busy: this.snowBusy, next: Math.max(0, Math.ceil((this.snowNext - now) / 1000)), hours, left: Math.max(0, s.snowNight - runs), from: s.snowFrom, to: s.snowTo };
+        if (s.snowHow !== 'url') {   // a machine with several functions and lights (DMX only)
+            const m = machineOf(s), L = m.lights;
+            if (m.multi) st.modes = m.modes.map((x) => x.name);
+            if (L) {
+                if (s.snowPickColour && (L.r || L.g || L.b)) st.colours = MACHINE_COLOURS.map(([k, n, e]) => [k, n, e]);
+                if (s.snowPickRainbow && L.macro) st.rainbow = true;
+                if (s.snowPickStrobe && L.strobe) st.strobe = true;
+                if (s.snowLightOnly && (L.r || L.g || L.b || L.macro)) st.lightOnly = true;
+            }
+        }
+        return st;
     }
-    snow(client, now) {
-        const st = this.snowState(now), s = this.s;
+    /** what the phone picked: { mode, colour, strobe }, checked against the settings ('' when fine, else why not) */
+    snowChoice(d) {
+        const st = this.snowState(), c = { mode: 0, colour: '', strobe: false };
+        if (d.light === true) { if (!st.lightOnly) return null; c.mode = -1; }
+        else if (st.modes) { if (!Number.isInteger(d.mode) || d.mode < 0 || d.mode >= st.modes.length) return null; c.mode = d.mode; }
+        if (typeof d.colour === 'string' && d.colour) {
+            if (d.colour === 'rainbow' ? !st.rainbow : !(st.colours ?? []).some((x) => x[0] === d.colour)) return null;
+            c.colour = d.colour;
+        }
+        if (d.strobe === true) { if (!st.strobe) return null; c.strobe = true; }
+        return c;
+    }
+    snow(client, now, d = {}) {
+        const st = this.snowState(now), s = this.s, c = this.snowChoice(d);
+        if (!c) return 'That choice is not offered right now.';
+        if (st.busy) return 'The machine is on already!';
+        if (c.mode === -1) {   // only the lights: allowed while the machine rests and out of hours, not counted in the night's runs
+            const w = this.wait(client, 'snowlight', 10, now); if (w) return `You can light it again in ${w} s.`;
+            void this.snowRun(s.snowRun, c);
+            this.results.set(client, { k: 'snow', ok: true, light: true, at: now });
+            return '';
+        }
         if (!st.hours) return `Snow is open from ${s.snowFrom}:00 to ${s.snowTo}:00.`;
-        if (st.busy) return 'It is snowing already!';
         if (st.next) return `The snow machine is resting. Try again in ${st.next} s.`;
         if (!st.left) return 'No more snow tonight. Come back tomorrow!';
+        const mode = st.modes ? machineModes(s.snowModes)[c.mode] : null, secs = mode?.secs ? Math.min(s.snowRun, mode.secs) : s.snowRun;
         this.snowRuns = this.snowRuns.filter((r) => r === this.nightKey(now)).concat(this.nightKey(now));
-        this.snowNext = now + (s.snowRun + s.snowGap) * 1000;
-        void this.snowRun(s.snowRun);
-        if (s.snowCube) this.enqueue({ kind: 'fx', client, label: 'falling snow', fx: 'snowfall', secs: s.snowRun + 2 });
+        this.snowNext = now + (secs + s.snowGap) * 1000;
+        void this.snowRun(secs, c);
+        if (s.snowCube) this.enqueue({ kind: 'fx', client, label: mode ? mode.name : 'falling snow', fx: 'snowfall', secs: secs + 2 });
         this.results.set(client, { k: 'snow', ok: true, at: now });
         return '';
     }
-    async snowRun(secs) {
-        const call = (u) => (u ? fetch(u, { signal: AbortSignal.timeout(6000) }).then((r) => r.text()) : Promise.resolve());
+    machineCfg() {
+        const s = this.s;
+        return { how: s.snowHow, on: s.snowOn, off: s.snowOff, host: s.snowHost, universe: s.snowUniverse, channels: s.snowChannels, model: s.snowModel };
+    }
+    /** the waiting colour, when the lights stay on between runs (DMX only) */
+    idleFrame() {
+        const s = this.s;
+        if (s.snowHow === 'url' || !s.snow || !s.snowLights || s.snowIdle !== 'colour' || !snowReady(s)) return null;
+        return dmxFrame(machineOf(s), { wait: true });
+    }
+    async snowRun(secs, choice = { mode: 0 }) {
+        const s = this.s, cfg = this.machineCfg();
         this.snowBusy = true;
-        try { await call(this.s.snowOn); console.log(`snow: on for ${secs} s`); await new Promise((r) => setTimeout(r, secs * 1000)); }
-        catch (e) { console.log('snow: the machine could not be switched on:', e.message); }
-        finally { await call(this.s.snowOff).catch((e) => console.log('snow: the machine could not be switched off:', e.message)); this.snowBusy = false; }
+        this.link ??= new MachineLink((...a) => console.log('snow:', ...a));
+        try {
+            if (cfg.how !== 'url') { cfg.values = dmxFrame(machineOf(s), choice); cfg.after = this.idleFrame(); }
+            await runMachine(cfg, secs, (...a) => console.log('snow:', ...a), this.link);
+        } catch (e) { console.log('snow: the machine could not be switched on:', e.message); }
+        finally { this.snowBusy = false; }
+    }
+    /** keeps the waiting colour alive (every 0.5 s), and switches it off when it is no longer wanted */
+    machineStep(now) {
+        if (this.snowBusy || this.idleSending || now - (this.idleAt ?? 0) < 500) return;
+        this.idleAt = now;
+        let f = this.idleFrame();
+        const cfg = this.machineCfg();
+        if (f && this.idleOn && JSON.stringify(this.idleOn.cfg) !== JSON.stringify(cfg)) f = null;   // moved: the old one goes dark first
+        if (!f && !this.idleOn) return;
+        this.link ??= new MachineLink((...a) => console.log('snow:', ...a));
+        this.idleSending = true;
+        const job = f ? this.link.send(cfg, f).then(() => { this.idleOn = { cfg, n: f.length }; })
+            : (async () => { const o = this.idleOn; this.idleOn = null; for (let i = 0; i < 3; i++) await this.link.send(o.cfg, new Uint8Array(o.n)).catch(() => undefined); await this.link.close(); })();
+        job.catch((e) => { if (!this.idleWarned) { this.idleWarned = true; console.log('snow: the waiting colour could not be sent:', e.message); } })
+            .finally(() => { this.idleSending = false; });
     }
 
     // --- treasure hunt
@@ -358,6 +459,7 @@ export class Game {
         const norm = (x) => plain(x).toLowerCase().replace(/[^a-z0-9]/g, '');
         const ok = c.k === 'number' ? /^\s*-?\d{1,6}\s*$/.test(a) && +a === +c.a : norm(a) !== '' && norm(a) === norm(c.a);
         const last = i === cl.length - 1;
+        if (ok && last) this.ending?.fire(this.s, 'win', { winner: 'The treasure hunter', colour: '', score: '' });
         if (ok) this.enqueue(last ? { kind: 'fx', client, label: 'treasure found!', fx: 'fireworks', secs: 10 } : { kind: 'fx', client, label: `clue ${i + 1} solved`, fx: 'bursts', secs: 5 });
         this.results.set(client, { k: 'hunt', ok, i, last, at: now });
         return '';
@@ -418,6 +520,7 @@ export class Game {
             }
             q.st = 'over'; q.until = Date.now() + 60000;
             const best = Math.max(...q.players.map((p) => q.scores.get(p.id) ?? 0));
+            if (best > 0) this.ending?.fire(this.s, 'win', { winner: q.players.filter((p) => (q.scores.get(p.id) ?? 0) === best).map((p) => p.name).join(' and '), colour: '', score: best });
             this.enqueue({ kind: 'title', label: 'guess the song: winner', text: `WINNER ${best} POINTS!`, color: '39d353', secs: 8 });
         } catch (e) { console.log('guess the song:', e.message); q.st = 'idle'; }
     }
@@ -438,6 +541,7 @@ export class Game {
     }
 
     step(now) {
+        this.machineStep(now);
         if (this.quiz.st === 'over' && now > this.quiz.until) this.quiz.st = 'idle';
         for (const [c, r] of this.results) if (now - r.at > 60000) this.results.delete(c);
         if (this.cur && now < this.cur.until) return;

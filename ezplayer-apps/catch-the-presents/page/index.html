@@ -48,6 +48,8 @@
 <div class="panel" id="setup">
   <label>Play</label>
   <div class="seg" id="modes"></div>
+  <label>Play with</label>
+  <div class="seg hidden" id="ctl"></div>
   <button class="btn" id="go" disabled>New game</button>
   <button class="btn hidden" id="join">Join the game</button>
 </div>
@@ -86,7 +88,62 @@
   }
   const secsLeft = (at) => Math.max(0, Math.ceil((at - nowMs()) / 1000));
   let draw = () => {}, tickGame = () => '', onStatus = () => {};
+  // ---- how a visitor plays (the same in every game that moves): 👆 finger, 📱 tilting the phone, 🧍 the body sensor ----
+  // Tilt needs a phone with a motion sensor and the page opened in https (browsers keep the sensor from plain http
+  // pages); on an iPhone the visitor allows it once. The body sensor shows only when the app has one that answers.
+  const CTL_NAMES = { finger: '👆 Finger', tilt: '📱 Tilt', body: '🧍 Body' };
+  let ctl = 'finger';
+  try { ctl = localStorage.getItem('ezCtl') || 'finger'; } catch (e) { /* private mode */ }
+  const ctlClamp = (v) => Math.max(0, Math.min(1, v));
+  const tiltOk = () => typeof window.DeviceOrientationEvent !== 'undefined' && window.isSecureContext !== false;
+  const ctlList = (s) => ['finger', tiltOk() && 'tilt', s && s.sensor && s.sensor.ok && 'body'].filter(Boolean);
+  function ctlDraw(box, s) {
+    const l = ctlList(s);
+    if (!l.includes(ctl)) ctl = 'finger';
+    box.classList.toggle('hidden', l.length < 2);
+    seg(box, l.map((k) => [k, CTL_NAMES[k]]), ctl, (v) => { ctl = v; try { localStorage.setItem('ezCtl', v); } catch (e) { /* */ } if (v === 'tilt') tiltAsk(); });
+  }
+  function ctlHint(s) {
+    if (ctl === 'tilt') return tilt.got ? 'Tilt your phone left and right (hold it the way you like: that is the middle).' : 'Tilt: move your phone a little so it can feel the tilt…';
+    if (ctl === 'body') return 'Move left and right in front of the lights: the sensor sees you' + (s && s.sensor ? ' (' + s.sensor.n + ' ' + (s.sensor.n === 1 ? 'person' : 'people') + ' seen)' : '') + '.';
+    return '';
+  }
+  const tilt = { on: false, got: false, x: 0.5, y: 0.5, cx: null, cy: null, raw: [0, 0], range: 22, fns: [] };
+  async function tiltAsk() {
+    try {
+      if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const r = await DeviceOrientationEvent.requestPermission();
+        if (r === 'denied') { el('note').textContent = 'The motion sensor was not allowed: play with the finger.'; ctl = 'finger'; render(); return false; }
+      }
+    } catch (e) { /* asked outside a tap, or not needed */ }
+    if (!tilt.on) { addEventListener('deviceorientation', onTilt); tilt.on = true; }
+    return true;
+  }
+  function onTilt(e) {
+    if (e.gamma == null || e.beta == null) return;
+    const a = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    let lr = e.gamma, fb = e.beta;
+    if (a === 90) { lr = e.beta; fb = -e.gamma; } else if (a === -90 || a === 270) { lr = -e.beta; fb = e.gamma; }
+    tilt.raw = [lr, fb]; tilt.got = true;
+    if (tilt.cx === null) { tilt.cx = lr; tilt.cy = fb; }
+    tilt.x = ctlClamp(0.5 + (lr - tilt.cx) / (2 * tilt.range));
+    tilt.y = ctlClamp(0.5 + (fb - tilt.cy) / (2 * tilt.range));
+    if (ctl === 'tilt') for (const f of tilt.fns) f(tilt);
+  }
+  /** the way the phone is held now becomes the middle (at the start of each game) */
+  function tiltCentre() { if (tilt.got) { tilt.cx = tilt.raw[0]; tilt.cy = tilt.raw[1]; } tilt.x = tilt.y = 0.5; }
+  function onTiltMove(f) { tilt.fns.push(f); }
+  /** for games that turn (Snake): a tilt past about 18 degrees from the middle is a direction */
+  function tiltDir() {
+    const dx = tilt.raw[0] - (tilt.cx ?? tilt.raw[0]), dy = tilt.raw[1] - (tilt.cy ?? tilt.raw[1]);
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) return null;
+    return Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+  }
+
   const choice = { mode: 'solo' };
+  // tilting the phone moves the sleigh like the finger does
+  onTiltMove((t) => { if (!playing()) return; goal = t.x; el('sleigh').style.left = goal * 100 + '%'; sendGoal(); });
+  const playing = () => meIndex() >= 0 && status.phase === 'playing';
   let goal = 0.5, sentAt = 0, timer = null, lastSent = -1, sentFor = -1;
   function sendGoal() {
     clearTimeout(timer);
@@ -98,7 +155,7 @@
     sentAt = Date.now(); lastSent = v; send({ type: 'go', x: v });
   }
   function slide(e) {
-    if (meIndex() < 0 || status.phase !== 'playing') return;
+    if (meIndex() < 0 || status.phase !== 'playing' || ctl !== 'finger') return;
     const r = el('strip').getBoundingClientRect();
     goal = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
     el('sleigh').style.left = goal * 100 + '%';
@@ -114,6 +171,7 @@
     if (!modes.some(([v]) => v === choice.mode)) choice.mode = 'solo';
     seg(el('modes'), modes, choice.mode, (v) => { choice.mode = v; });
     el('modes').classList.toggle('hidden', modes.length < 2);
+    ctlDraw(el('ctl'), s);
     const busy = s.phase === 'waiting' || s.phase === 'playing';
     el('go').disabled = !app || busy || s.phase === 'unconfigured';
     el('go').textContent = s.phase === 'over' ? 'Play again' : 'New game';
@@ -133,7 +191,7 @@
     el('clock').textContent = s.phase === 'playing' ? (s.startsIn ? 'Get ready… ' + s.startsIn : '⏱️ ' + s.left + ' s') : '';
     el('coalHint').classList.toggle('hidden', s.coal === false);
     const playing = i >= 0 && s.phase === 'playing';
-    el('strip').classList.toggle('hidden', !playing);
+    el('strip').classList.toggle('hidden', !playing || ctl === 'body');
     el('sleigh').style.background = 'var(--c' + (i + 1) + ')';
     if (playing && lastSent < 0 && s.pos) el('sleigh').style.left = s.pos[i] * 100 + '%';
     const best = s.best || [];
@@ -141,13 +199,14 @@
     el('best').replaceChildren(...best.map((b) => { const li = document.createElement('li'); li.textContent = b.name + ' — ' + b.score; return li; }));
     let t = s.message || '';
     if (s.phase === 'waiting' && m) t = 'Waiting for a friend: ask them to open this page and tap Join.';
-    if (playing) t = 'Slide your finger to move your sleigh' + (two ? ' (' + (i === 0 ? 'the first colour' : 'the second colour') + ')' : '') + ' and catch the presents!';
+    if (playing && ctl !== 'finger') t = ctlHint(s) + ' Catch the presents!';
+    else if (playing) t = 'Slide your finger to move your sleigh' + (two ? ' (' + (i === 0 ? 'the first colour' : 'the second colour') + ')' : '') + ' and catch the presents!';
     if (s.phase === 'over' && m) t = (ps.length === 1 || s.winner === i + 1 ? '🎉 ' : s.winner === 3 ? '🤝 ' : '😅 ') + s.message;
     say(t);
   };
   tickGame = () => status.phase === 'waiting' && status.waitEndsAt ? 'The game is open for ' + secsLeft(status.waitEndsAt) + ' s' : '';
-  el('go').addEventListener('click', () => { el('go').disabled = true; lastSent = -1; send({ type: 'new', mode: choice.mode, name: myName() }); say('Starting…'); setTimeout(render, 1500); });
-  el('join').addEventListener('click', () => { lastSent = -1; send({ type: 'join', name: myName() }); say('Joining…'); });
+  el('go').addEventListener('click', () => { el('go').disabled = true; lastSent = -1; tiltCentre(); send({ type: 'new', mode: choice.mode, name: myName(), control: ctl }); say('Starting…'); setTimeout(render, 1500); });
+  el('join').addEventListener('click', () => { lastSent = -1; tiltCentre(); send({ type: 'join', name: myName(), control: ctl }); say('Joining…'); });
   el('quit').addEventListener('click', () => send({ type: 'quit' }));
 
   function render() {

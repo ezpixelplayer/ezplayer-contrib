@@ -34,13 +34,39 @@ const HEAT = [...Array(256)].map((_, heat) => {
 });
 
 // ---- words ----
-const BAD = ['merda', 'caralho', 'foda', 'fodase', 'puta', 'cabrao', 'cona', 'piroca', 'pila', 'paneleiro', 'filhodaputa', 'corno', 'cu', 'mamas',
-    'boceta', 'porra', 'fuck', 'shit', 'bitch', 'dick', 'pussy', 'cunt', 'nigger', 'nazi', 'hitler'];
+// Blocked words in Portuguese (Portugal and Brazil) and English. HIDE words are also caught inside another word
+// (merdoso, superfuck…); WORD words only on their own (so normal words that contain them still pass). Accents, capitals,
+// letters swapped for numbers or symbols (f0d4, $hit), repeated letters (fuuuck) and letters spaced out (m e r d a,
+// m.e.r.d.a) are all seen through. setBadExtra() adds the show's own words from the settings.
+const HIDE = ['merda', 'merdoso', 'merdosa', 'caralho', 'fodase', 'fodasse', 'foder', 'fodido', 'fodida', 'filhodaputa', 'cabrao', 'cabroes', 'piroca',
+    'paneleiro', 'punheta', 'punheteiro', 'boceta', 'buceta', 'arrombado', 'arrombada', 'colhoes', 'cornudo',
+    'fuck', 'shit', 'bitch', 'pussy', 'asshole', 'arsehole', 'bastard', 'motherfucker', 'bullshit', 'wanker',
+    'whore', 'nigger', 'nigga', 'faggot', 'hitler', 'cunt', 'dildo', 'porno'];
+const WORD = ['foda', 'fode', 'fodam', 'fodes', 'fdx', 'fdp', 'pqp', 'vsf', 'krl', 'crl', 'puta', 'putas', 'putaria', 'cona',
+    'conas', 'pila', 'pilas', 'pissa', 'corno', 'cu', 'cus', 'porra', 'cacete', 'viado', 'maricas', 'vadia', 'merdas',
+    'caralhos', 'cagalhao', 'mongoloide', 'putinha', 'putona', 'fck', 'fuk', 'wtf', 'stfu', 'ass', 'arse', 'dick', 'dicks', 'cock', 'twat',
+    'slut', 'piss', 'boobs', 'tits', 'penis', 'porn', 'sex', 'sexy', 'nude', 'nudes', 'fag', 'retard', 'nazi', 'heil', 'kkk'];
+let BAD_EXTRA = [];
 export const plain = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7e]/g, '');
+const squeeze = (w) => w.replace(/(.)\1+/g, '$1');
+const HIDE_SQ = HIDE.map(squeeze), WORD_ALL = new Set([...WORD, ...HIDE]), WORD_SQ = new Set([...WORD_ALL].map(squeeze));
+/** the show's own blocked words (a comma or line separated list from the settings) */
+export function setBadExtra(list) {
+    BAD_EXTRA = String(list || '').split(/[\n,;]+/).map((w) => plain(w).toLowerCase().replace(/[^a-z]/g, '')).filter((w) => w.length >= 2).slice(0, 200);
+}
 export function isBad(s) {
-    const n = plain(s).toLowerCase().replace(/[0@1!345$]/g, (c) => ({ 0: 'o', '@': 'o', 1: 'i', '!': 'i', 3: 'e', 4: 'a', 5: 's', $: 's' })[c]);
-    const words = n.split(/[^a-z]+/), joined = n.replace(/[^a-z]/g, '');
-    return BAD.some((b) => words.includes(b) || (b.length >= 5 && joined.includes(b)));
+    const n = plain(s).toLowerCase().replace(/[0@1!345$7]/g, (c) => ({ 0: 'o', '@': 'a', 1: 'i', '!': 'i', 3: 'e', 4: 'a', 5: 's', $: 's', 7: 't' })[c]);
+    const toks = n.split(/[^a-z]+/).filter(Boolean), words = [...toks];
+    for (let i = 0; i < toks.length;) {                 // letters spaced out (m e r d a): joined back into a word
+        let j = i; while (j < toks.length && toks[j].length === 1) j++;
+        if (j - i >= 3) words.push(toks.slice(i, j).join(''));
+        i = Math.max(j, i + 1);
+    }
+    return words.some((w) => {
+        const q = squeeze(w);
+        return WORD_ALL.has(w) || WORD_SQ.has(q) || HIDE.some((b) => w.includes(b)) || HIDE_SQ.some((b) => q.includes(b))
+            || BAD_EXTRA.some((b) => w === b || q === squeeze(b) || (b.length >= 5 && w.includes(b)));
+    });
 }
 
 // ---- animations ----

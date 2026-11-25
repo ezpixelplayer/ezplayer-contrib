@@ -6,6 +6,7 @@
  * many times one of them flashed. A point for each right answer; after the last round, a podium.
  */
 
+import { cleanEnd, colourName } from './ending.mjs';
 import { hexRgb, painter, cleanName, num } from './player.mjs';
 
 export const minSize = { w: 4, h: 4 };
@@ -14,7 +15,7 @@ export const AVATARS = ['🦊', '🐼', '🐸', '🐧', '🦁', '🐯', '🐨', 
 const DEFAULTS = { target: '', fps: 20, brightness: 100, rounds: 5, lobbySecs: 25, answerSecs: 12, speed: 'normal', maxPlayers: 8 };
 const SPEEDS = { slow: 1.3, normal: 1, fast: 0.8 };
 
-export function cleanSettings(raw) {
+function cleanGame(raw) {
     const s = { ...DEFAULTS };
     if (!raw || typeof raw !== 'object') return s;
     if (typeof raw.target === 'string') s.target = raw.target.trim();
@@ -29,6 +30,9 @@ export function cleanSettings(raw) {
 }
 
 const RESULT_MS = 4000, END_MS = 12000, INTRO_MS = 2000;
+
+export const END_TEXTS = {"endWinText": "{winner} wins!", "endLoseText": "Better luck next time!"};
+export function cleanSettings(raw) { return cleanEnd(raw, cleanGame(raw), END_TEXTS); }
 
 export class Game {
     constructor(s) { this.s = s; this.id = 0; this.reset(); }
@@ -103,6 +107,15 @@ export class Game {
     }
 
     finish(reason, now) { this.phase = 'over'; this.reason = reason; this.t0 = now; this.until = now + END_MS; }
+
+    /** what happened, for the ending: who scored most (ties together), or nobody scored */
+    outcome() {
+        if (this.reason) return null;      // stopped
+        const top = Math.max(0, ...this.players.map((p) => p.score));
+        const best = this.players.filter((p) => p.score === top && top > 0).map((p) => p.name);
+        if (!best.length) return { kind: 'lose', vars: { winner: '', colour: '', score: 0 } };
+        return { kind: 'win', vars: { winner: best.join(' and '), colour: '', score: top } };
+    }
 
     step(now) {
         if (this.phase === 'idle' || now <= this.until) return;

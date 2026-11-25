@@ -44,11 +44,54 @@ the matrix goes back to the show. A game with no slide for 45 s ends.
 The best 5 scores of the day are kept in the instance's private `state` document, so they survive a restart; a new day
 starts a new list.
 
+## Ways to play (version 2)
+
+Before **New game** the phone asks **Play with**:
+- **👆 Finger**: as before;
+- **📱 Tilt**: tilting the phone left and right moves the sleigh. The way the phone is held at the start is the middle. It needs a phone with a motion
+  sensor and the page opened in **https** (browsers keep the motion sensor from plain http pages); on an iPhone the
+  visitor allows it once. When it cannot work, the choice is not shown;
+- **🧍 Body**: with the body sensor (an ESP32 with an HLK-LD2450 radar, see `body-sensor/`): the sleigh follows the person (two people: a lane each). Shown only
+  when the sensor is set up and answers.
+
+Body sensor settings (section **Body sensor**): its address (for example `192.168.1.80` or `showplay-sensor.local`),
+the width of the play area (3 m), where it starts and ends (0.5 m to 4 m from the sensor) and whether the sensor faces
+the players (on: their left is its right). `sensor.mjs` reads it 20 times a second during a game played with the body,
+and once a second otherwise, so the phones know it answers.
+
 ## Events
 
 The page sends `new` (`mode`: `solo` or `friend`, `name`), `join` (`name`), `go` (`x` 0-1, sent at most about 11 times
 a second), `quit`.
 
+## When someone wins or loses
+
+A section of the settings, **🎉 When someone wins or loses**, all off by default. Tick **When someone wins** and/or
+**When someone loses**, then the parts you want:
+
+- **🔊 Sound:** built in (a short fanfare for a win, a sad "wah wah wah waaah" for a loss, made by the app, no files
+  needed) or your own WAV files (one for a win, one for a loss, on the player computer). Volume, and where it plays:
+  the show's speakers through EZPlayer (at once, or mixed with the show's music), or the computer's own speaker.
+- **🗣️ Say the words out loud:** after the sound, the computer's own voice says the words (Windows and macOS have
+  voices; on Linux or a Raspberry Pi install `espeak-ng`). **Voice language** picks a voice of that language when the
+  computer has one (`en` by default; `pt` for Portuguese, for example Windows' "Helia" voice). No voice: only the sound.
+- **🔤 Write the words across the lights:** the words scroll once over the end of the game, on a darker picture.
+- **The words** can use `{winner}` (the player's name, or "The computer"), `{colour}` (the winner's colour as a word:
+  Red, Blue…) and `{score}`. Write them in any language.
+- **🫧 A machine** for a few seconds (bubbles, fog, snow, its lights…), reached in the same five ways as 🌨️ snow on
+  request in the fun app (a web address, or DMX through EZPlayer, DDP, Art-Net or E1.31; its README explains each way,
+  with wiring and safety): the DMX channels and seconds for a win, and for a loss (empty: the machine stays off; for
+  example only a red light), and a rest between two runs. With a web address the machine runs for a win, and for a loss
+  only when ticked.
+
+Every part works on its own: only the sound, only the words, only the machine, or everything.
+
+**In this game:** alone, a new best score of the day is a win (with its own words, `New record: {score}!`) and any other end is a loss (`Game over! {score} points`); with a friend, the winner's win. A draw does nothing.
+
 ## Changes
 
+- **Version 3:** 🎉 when someone wins or loses: a sound (built in or your own WAV), the words said out loud and/or written across the lights, and a machine (bubbles, fog, lights…) for a few seconds; all off by default.
+
 - **Version 1:** first version.
+
+- **Version 2:** new ways to play: 📱 tilting the phone and 🧍 the body sensor, next to the finger. The `new` (and `join`) event carries `control`: `finger`, `tilt` or `body`.

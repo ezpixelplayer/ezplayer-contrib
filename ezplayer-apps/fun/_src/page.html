@@ -1,0 +1,50 @@
+<div class="pick" id="pick"></div>
+<div class="panel hidden" id="fPhoto">
+  <label>Pick a frame, stand in front of the lights and smile!</label>
+  <div class="choose" id="frames"></div>
+  <button class="btn" id="photoGo" type="button">Start the 3-2-1</button>
+</div>
+<div class="panel hidden" id="fWheel">
+  <svg id="wheel" viewBox="-56 -58 112 112" aria-label="The wheel of fortune"></svg>
+  <button class="btn" id="wheelGo" type="button">Spin the wheel!</button>
+</div>
+<div class="panel hidden" id="fAnimal">
+  <label>Pick an animal to walk across the lights</label>
+  <div class="choose" id="animals"></div>
+  <button class="btn" id="animalGo" type="button">Send it!</button>
+</div>
+<div class="panel hidden" id="fPaint">
+  <label>Pick a drawing, a colour, then tap the areas</label>
+  <div class="choose small" id="pbList"></div>
+  <div class="pbgrid" id="pbGrid"></div>
+  <div class="sw" id="pbCols"></div>
+  <div id="pbInfo" class="hint"></div>
+  <button class="btn" id="paintGo" type="button">Show it on the lights!</button>
+</div>
+<div class="panel hidden" id="fBell">
+  <button class="bell" id="bellGo" type="button" aria-label="Ring the bell">🔔</button>
+  <div class="hint" style="text-align:center">Tap to ring the bell at the show!</div>
+</div>
+<div class="panel hidden" id="fSnow">
+  <div class="choose" id="snowModes"></div>
+  <div class="choose small" id="snowCols"></div>
+  <button class="btn ghost hidden" id="snowStrobe" type="button" aria-pressed="false">⚡ Strobe: off</button>
+  <button class="bell" id="snowGo" type="button" aria-label="Ask for snow">❄️</button>
+  <button class="btn ghost hidden" id="snowLight" type="button">💡 Only the lights</button>
+  <div class="hint" id="snowInfo" style="text-align:center"></div>
+</div>
+<div class="panel hidden" id="fHunt">
+  <div class="big" id="huHead" style="font-size:24px"></div>
+  <div id="huList" class="choose small"></div>
+  <div id="huClue" class="clue"></div>
+  <input type="text" id="huAns" maxlength="30" autocomplete="off" placeholder="Your answer">
+  <button class="btn" id="huGo" type="button">Check my answer</button>
+  <button class="btn ghost hidden" id="huReset" type="button">Start the hunt again</button>
+</div>
+<div class="panel hidden" id="fSong">
+  <div class="big" id="soHead" style="font-size:24px"></div>
+  <div class="hint" id="soInfo"></div>
+  <div class="opts" id="soOpts"></div>
+  <div class="scores" id="soScores"></div>
+  <div class="row2" id="soBtns"></div>
+</div>

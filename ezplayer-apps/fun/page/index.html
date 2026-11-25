@@ -97,7 +97,11 @@
   <div class="hint" style="text-align:center">Tap to ring the bell at the show!</div>
 </div>
 <div class="panel hidden" id="fSnow">
+  <div class="choose" id="snowModes"></div>
+  <div class="choose small" id="snowCols"></div>
+  <button class="btn ghost hidden" id="snowStrobe" type="button" aria-pressed="false">⚡ Strobe: off</button>
   <button class="bell" id="snowGo" type="button" aria-label="Ask for snow">❄️</button>
+  <button class="btn ghost hidden" id="snowLight" type="button">💡 Only the lights</button>
   <div class="hint" id="snowInfo" style="text-align:center"></div>
 </div>
 <div class="panel hidden" id="fHunt">
@@ -273,12 +277,27 @@
     el('namePanel').classList.toggle('hidden', !(q.st === 'idle' || q.st === 'over' || (q.st === 'lobby' && mine < 0)));
   }
 
+  let snowMode = 0, snowCol = '', snowStrobe = false;
   function snowDraw() {
     const sn = status.snow, next = sn ? Math.max(0, sn.next - Math.floor((Date.now() - statusAt) / 1000)) : 0;
+    const modes = (sn && sn.modes) || [], cols = ((sn && sn.colours) || []).concat(sn && sn.rainbow ? [['rainbow', 'Rainbow', '🌈']] : []);
+    if (snowMode >= modes.length) snowMode = 0;
+    if (snowCol && !cols.some((c) => c[0] === snowCol)) snowCol = '';
+    el('snowModes').classList.toggle('hidden', !modes.length);
+    if (modes.length) chooser(el('snowModes'), modes.map((n, i) => [i, n]), snowMode, (k) => { snowMode = k; });
+    el('snowCols').classList.toggle('hidden', !cols.length);
+    if (cols.length) chooser(el('snowCols'), cols, snowCol, (k) => { snowCol = snowCol === k ? '' : k; });
+    if (!(sn && sn.strobe)) snowStrobe = false;
+    el('snowStrobe').classList.toggle('hidden', !(sn && sn.strobe));
+    el('snowStrobe').setAttribute('aria-pressed', String(snowStrobe)); el('snowStrobe').textContent = snowStrobe ? '⚡ Strobe: on' : '⚡ Strobe: off';
+    el('snowLight').classList.toggle('hidden', !(sn && sn.lightOnly));
+    el('snowLight').disabled = closed() || !sn || sn.busy;
     el('snowGo').disabled = closed() || !sn || sn.busy || !sn.hours || sn.left <= 0 || next > 0;
-    el('snowInfo').textContent = !sn ? '' : sn.busy ? '❄️ It is snowing right now!' : !sn.hours ? `Snow is open from ${sn.from}:00 to ${sn.to}:00.`
-      : sn.left <= 0 ? 'No more snow tonight. Come back tomorrow!' : next > 0 ? `The snow machine is resting. Try again in ${next} s.` : 'Tap the snowflake to make it snow!';
+    el('snowInfo').textContent = !sn ? '' : sn.busy ? '❄️ The machine is on right now!' : !sn.hours ? `Snow is open from ${sn.from}:00 to ${sn.to}:00.`
+      : sn.left <= 0 ? 'No more snow tonight. Come back tomorrow!' : next > 0 ? `The snow machine is resting. Try again in ${next} s.`
+      : modes.length ? 'Pick what the machine does, then tap the snowflake!' : 'Tap the snowflake to make it snow!';
   }
+
 
   onStatus = (old, s) => {
     statusAt = Date.now();
@@ -289,7 +308,7 @@
       if (r.ok) { const d = huDone(); if (!d.includes(r.i)) d.push(r.i); try { localStorage.setItem(huKey(), JSON.stringify(d)); } catch (e) {} huAt = -1;
         el('note').textContent = ''; say(r.last ? '🏆 You found the treasure! Watch the lights!' : '✅ Right! Watch the lights, then the next clue.'); }
       else { el('note').textContent = '❌ Not quite. Try again!'; lastNoteAt = Date.now(); }
-    } else if (r.k === 'snow') say('❄️ Let it snow! Watch the show!');
+    } else if (r.k === 'snow') say(r.light ? '💡 Watch the machine light up!' : '❄️ Let it snow! Watch the show!');
   };
 
   draw = () => {
@@ -331,7 +350,9 @@
     send({ type: 'paint', ...pbPicture() }); sent('Sent! Watch each area fill in…');
   });
   el('bellGo').addEventListener('click', () => { const b = el('bellGo'); b.classList.remove('ring'); void b.offsetWidth; b.classList.add('ring'); send({ type: 'bell' }); });
-  el('snowGo').addEventListener('click', () => { send({ type: 'snow' }); sent('Asking for snow…'); });
+  el('snowGo').addEventListener('click', () => { send({ type: 'snow', mode: snowMode, colour: snowCol, strobe: snowStrobe }); sent('Asking for snow…'); });
+  el('snowLight').addEventListener('click', () => { send({ type: 'snow', light: true, colour: snowCol, strobe: snowStrobe }); sent('Asking for the lights…'); });
+  el('snowStrobe').addEventListener('click', () => { snowStrobe = !snowStrobe; snowDraw(); });
   el('huGo').addEventListener('click', () => {
     const a = el('huAns').value.trim();
     if (!a) { el('note').textContent = 'Write your answer first.'; lastNoteAt = Date.now(); return; }

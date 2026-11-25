@@ -8,7 +8,9 @@
  * fall faster as the game goes on. The best scores of the day are kept.
  */
 
+import { cleanEnd, colourName } from './ending.mjs';
 import { painter, cleanName, num, hex, hexRgb } from './player.mjs';
+import { sensor, SENSOR_DEFAULTS, cleanSensor, StepTurns } from './sensor.mjs';
 
 export const minSize = { w: 6, h: 8 };
 // speed: falling, in heights per second (at the start; it grows to x1.8); every: seconds between two drops (shrinks)
@@ -19,10 +21,10 @@ const LEVELS = {
 };
 const PRESENT_COLS = [[255, 40, 40], [40, 120, 255], [60, 220, 90], [255, 95, 200], [160, 90, 255], [255, 140, 26], [60, 240, 255]];
 const GOLD = [255, 200, 60];
-const DEFAULTS = { target: '', fps: 30, brightness: 100, level: 'normal', secs: 60, coal: true, stars: true, friend: true, waitSecs: 60,
+const DEFAULTS = { ...SENSOR_DEFAULTS, target: '', fps: 30, brightness: 100, level: 'normal', secs: 60, coal: true, stars: true, friend: true, waitSecs: 60,
     partySecs: 6, snow: true, color1: 'ff3c3c', color2: '3c8cff' };
 
-export function cleanSettings(raw) {
+function cleanGame(raw) {
     const s = { ...DEFAULTS };
     if (!raw || typeof raw !== 'object') return s;
     if (typeof raw.target === 'string') s.target = raw.target.trim();
@@ -34,10 +36,16 @@ export function cleanSettings(raw) {
     s.waitSecs = num(raw.waitSecs, 15, 300, s.waitSecs);
     s.partySecs = num(raw.partySecs, 3, 30, s.partySecs);
     for (const k of ['color1', 'color2']) s[k] = hex(raw[k], s[k]);
+    cleanSensor(raw, s);
     return s;
 }
 
+const ctlOf = (d) => (d && (d.control === 'tilt' || d.control === 'body') ? d.control : 'finger');
+const NO_SENSOR = 'The body sensor is not answering: play with the finger or tilt.';
 const day = (now) => new Date(now).toISOString().slice(0, 10);
+
+export const END_TEXTS = {"endWinText": "{winner} wins!", "endLoseText": "Game over! {score} points", "endRecordText": "New record: {score}!"};
+export function cleanSettings(raw) { return cleanEnd(raw, cleanGame(raw), END_TEXTS); }
 
 export class Game {
     constructor(s) { this.s = s; this.id = 0; this.statusMs = 200; this.w = 16; this.h = 16; this.best = []; this.bestDay = ''; this.reset(); }
@@ -53,6 +61,7 @@ export class Game {
         this.drops = []; this.pops = [];
         this.started = 0; this.endsAt = 0; this.nextDrop = 0; this.last = 0; this.touched = [0, 0];
         this.winner = 0; this.reason = ''; this.until = 0; this.waitEndsAt = null; this.newBest = false;
+        this.ctl = ['finger', 'finger'];
     }
 
     L() { return LEVELS[this.s.level]; }
@@ -67,7 +76,9 @@ export class Game {
             if (this.phase === 'waiting' || this.phase === 'playing') return 'A game is already on. Wait for it to end.';
             const mode = d.mode === 'friend' ? 'friend' : 'solo';
             if (mode === 'friend' && !this.s.friend) return 'Playing with a friend is switched off.';
+            if (ctlOf(d) === 'body' && !sensor.ok()) return NO_SENSOR;
             this.reset();
+            this.ctl[0] = ctlOf(d);
             this.id += 1;
             this.mode = mode;
             this.players = [{ id: client, name: cleanName(d.name, 'Player 1') }];
@@ -78,6 +89,8 @@ export class Game {
         if (d.type === 'join') {
             if (this.phase !== 'waiting') return 'There is no game waiting for a friend.';
             if (me >= 0) return 'You are already in this game. Ask a friend to join from their phone.';
+            if (ctlOf(d) === 'body' && !sensor.ok()) return NO_SENSOR;
+            this.ctl[1] = ctlOf(d);
             this.players.push({ id: client, name: cleanName(d.name, 'Player 2') });
             this.start(now);
             return '';
@@ -130,7 +143,25 @@ export class Game {
         this.drops.push({ x, y: -this.box() / this.h, v: sp, kind, col: PRESENT_COLS[Math.floor(Math.random() * PRESENT_COLS.length)] });
     }
 
+    /** players who play with the body: the sensor moves their sleigh (each in their own lane, left to right) */
+    useSensor(now) {
+        sensor.configure(this.s);
+        const n = this.players.length, body = this.phase === 'playing' && this.ctl.slice(0, n).includes('body');
+        sensor.tick(now, !body);
+        if (!body) return;
+        for (let p = 0; p < n; p++) if (this.ctl[p] === 'body') { const pos = sensor.player(p, n); if (pos) { this.goal[p] = pos.u; this.touched[p] = now; } }
+    }
+
+    /** what happened, for the ending: alone, a new best score of the day or game over; with a friend, who won */
+    outcome() {
+        if (!this.winner || this.winner === 3) return null;
+        if (this.players.length < 2) return { kind: this.newBest ? 'record' : 'lose', vars: { winner: this.players[0]?.name ?? 'Player', colour: colourName(this.s.color1), score: this.score[0] } };
+        const w = this.winner - 1;
+        return { kind: 'win', vars: { winner: this.players[w]?.name ?? 'Player ' + this.winner, colour: colourName(w ? this.s.color2 : this.s.color1), score: this.score[w] } };
+    }
+
     step(now) {
+        this.useSensor(now);
         if (this.phase === 'waiting' && now > this.waitEndsAt) { this.reset(); return; }
         if (this.phase === 'over') { if (now > this.until) this.reset(); return; }
         if (this.phase !== 'playing') return;
@@ -200,7 +231,7 @@ export class Game {
             winner: this.winner, pos: this.pos.map((v) => Math.round(v * 1000) / 1000), secs: s.secs,
             left: this.phase === 'playing' ? Math.max(0, Math.ceil((this.endsAt - Math.max(now, this.started)) / 1000)) : 0,
             startsIn: this.phase === 'playing' && now < this.started ? Math.ceil((this.started - now) / 1000) : 0,
-            colors: [s.color1, s.color2], friend: s.friend, coal: s.coal, stars: s.stars, waitEndsAt: this.waitEndsAt,
+            colors: [s.color1, s.color2], friend: s.friend, coal: s.coal, sensor: sensor.state(), ctl: this.ctl.slice(0, this.players.length), stars: s.stars, waitEndsAt: this.waitEndsAt,
             best: this.bestDay === day(now) ? this.best : [] };
     }
 

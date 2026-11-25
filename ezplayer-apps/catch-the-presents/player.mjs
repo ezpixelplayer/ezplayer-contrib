@@ -14,6 +14,8 @@
  * Settings come from the instance's private data key "settings".
  */
 
+import { Ending } from './ending.mjs';
+
 const MAX_GRID_PIXELS = 40000;
 const NOTICE_MS = 5000;
 const IDLE_MS = 250;
@@ -57,11 +59,10 @@ export async function run({ name, Game, cleanSettings, minSize }) {
     }
 
     async function openLease(body) {
-        // The app token puts the instance title on the lease, so a refused game names who has the matrix.
         const res = await fetch(`${base}/api/ezp/overlays`, {
             method: 'POST',
-            headers: jsonHeaders,
-            body: JSON.stringify({ ...body, mode: 'exclusive', blend: 'replace', ttlMs: 10_000 }),
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ ...body, blend: 'replace', ttlMs: 10_000 }),
         });
         const opened = await res.json().catch(() => ({}));
         if (!opened.ok || !opened.lease) throw new Error(opened.error ?? `HTTP ${res.status}`);
@@ -92,6 +93,9 @@ export async function run({ name, Game, cleanSettings, minSize }) {
     let configError = 'Starting up';
     let lastConfigCheck = -Infinity;
     let game = new Game(cleanSettings(null));
+    const ending = new Ending();   // a sound, the words, a machine when someone wins or loses (game.outcome())
+    game.ending = ending;
+    let endPhase = game.phase;
     let lease = null;
     const notices = new Map();
     const note = (client, text) => { if (client && text) notices.set(client, { text, at: Date.now() }); };
@@ -178,6 +182,12 @@ export async function run({ name, Game, cleanSettings, minSize }) {
         }
 
         game.step(Date.now());
+        if (game.phase !== endPhase) {
+            endPhase = game.phase;
+            if ((endPhase === 'finished' || endPhase === 'over') && game.outcome) {
+                try { const o = game.outcome(); if (o) ending.fire(game.s, o.kind, o.vars); } catch (e) { console.log('ending:', e.message); }
+            }
+        }
         if (game.saveState) await saveState(now);
 
         if (lease) {
@@ -188,6 +198,7 @@ export async function run({ name, Game, cleanSettings, minSize }) {
             } else {
                 lease.payload.fill(0);
                 game.render(lease.payload, lease.width, lease.height, Date.now());
+                ending.draw(lease.payload, lease.width, lease.height, Date.now());
                 const k = (game.s.brightness ?? 100) / 100;
                 if (k < 1) for (let i = 0; i < lease.payload.length; i++) lease.payload[i] = lease.payload[i] * k;
                 await putFrame(lease);

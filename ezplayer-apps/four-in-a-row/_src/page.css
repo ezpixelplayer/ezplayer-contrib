@@ -1,0 +1,8 @@
+  .board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; background: #0028a0; padding: 6px; border-radius: 14px; width: 100%; }
+  .board div { aspect-ratio: 1; border-radius: 50%; background: #0d0a16; }
+  .board div.c1 { background: var(--c1); } .board div.c2 { background: var(--c2); }
+  .board div.win { box-shadow: 0 0 0 3px #fff inset; }
+  .board.can { cursor: pointer; }
+  .arrows { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 0 6px; }
+  .arrows button { min-height: 40px; border: 0; border-radius: 10px; background: var(--raise); color: var(--text); font: 800 18px/1 system-ui, sans-serif; cursor: pointer; }
+  .arrows.off button { opacity: .3; cursor: default; }
