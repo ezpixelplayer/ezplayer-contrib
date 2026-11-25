@@ -61,10 +61,11 @@ async function loadConfig() {
 }
 
 async function openLease(body) {
+    // The app token puts the instance title on the lease, so a refused game names who has the matrix.
     const res = await fetch(`${base}/api/ezp/overlays`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...body, blend: 'replace', ttlMs: 10_000 }),
+        headers: jsonHeaders,
+        body: JSON.stringify({ ...body, mode: 'exclusive', blend: 'replace', ttlMs: 10_000 }),
     });
     const opened = await res.json().catch(() => ({}));
     if (!opened.ok || !opened.lease) throw new Error(opened.error ?? `HTTP ${res.status}`);

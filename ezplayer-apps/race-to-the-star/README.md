@@ -5,7 +5,8 @@ measured on their phone (tapping, singing, shaking the phone, or running on the 
 to reach the top lights the star in their color. A port of the race game in ShowPlay to the EZPlayer
 app runtime: the player starts `race.mjs`, phones open the app's page, and their efforts reach the game
 as app events. While a race is on the track (and the star, when one is chosen) are painted through
-overlay leases; between races the leases are released so the show has its lights back. Plain Node
+exclusive overlay leases, taken when the first player joins and released after the race so the show
+has its lights back. When another app has the track, the race says who and does not start. Plain Node
 (22+), no dependencies.
 
 ## Install
