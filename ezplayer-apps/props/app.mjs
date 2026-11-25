@@ -11,7 +11,7 @@ import { num } from './multi-helpers.mjs';
 import { PALETTES, PROP_FX, FX_EMOJI, SPEEDS, MY_COLS, PropFx, coloursOf, propsOf, geomsFor } from './models.mjs';
 
 const DEFAULTS = {
-    fps: 20, brightness: 100, props: '🦋 Wings | WingLeft, WingRight\n🌈 Arches | Arch1, Arch2, Arch3 | across',
+    fps: 20, brightness: 100, props: '',
     secs: 20, waitSecs: 20, queue: true, queueMax: 5, fx: Object.keys(PROP_FX), pals: Object.keys(PALETTES), mine: true,
 };
 

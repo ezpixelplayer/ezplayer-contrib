@@ -48,3 +48,5 @@ Nothing. (In ShowPlay a key was only a tap, because of the relay's delay; here a
 ## Changes
 
 - **Version 2:** a group made of submodels lights only those submodels (before, it lit the whole models they belong to).
+
+- **Version 3:** on the settings page, tapping a group or model on an empty line makes a whole prop line, with an icon and a name guessed from it (🌈 for arches, 🍭 for canes, 🎄 for trees…), which you can change; tapping more adds them to that prop, and **➕ New prop** starts the next one. A new instance starts with no props (the example Wings and Arches are gone, so there is no "not in the show" problem).

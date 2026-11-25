@@ -7,7 +7,9 @@
  * the bottom (player 1) and the top (player 2). First to the winning score.
  */
 
+import { cleanEnd, colourName } from './ending.mjs';
 import { painter, cleanName, num, pick } from './player.mjs';
+import { sensor, SENSOR_DEFAULTS, cleanSensor, StepTurns } from './sensor.mjs';
 
 export const minSize = { w: 8, h: 8 };
 const LEVELS = {
@@ -15,10 +17,10 @@ const LEVELS = {
     normal: { ball: 0.36, max: 0.9, accel: 1.06, cpu: 0.33, cpuUp: 0.025, react: 0.42, aim: 0.27, half: 0.21, serve: 1300 },
     hard: { ball: 0.45, max: 1.4, accel: 1.07, cpu: 0.4, cpuUp: 0.03, react: 0.4, aim: 0.22, half: 0.16, serve: 1000 },
 };
-const DEFAULTS = { target: '', fps: 30, brightness: 100, level: 'normal', points: 5, cpu: true, friend: true, waitSecs: 60, partySecs: 6,
+const DEFAULTS = { ...SENSOR_DEFAULTS, target: '', fps: 30, brightness: 100, level: 'normal', points: 5, cpu: true, friend: true, waitSecs: 60, partySecs: 6,
     color1: 'ff3c3c', color2: '3c8cff' };
 
-export function cleanSettings(raw) {
+function cleanGame(raw) {
     const s = { ...DEFAULTS };
     if (!raw || typeof raw !== 'object') return s;
     if (typeof raw.target === 'string') s.target = raw.target.trim();
@@ -31,8 +33,15 @@ export function cleanSettings(raw) {
     s.waitSecs = num(raw.waitSecs, 15, 300, s.waitSecs);
     s.partySecs = num(raw.partySecs, 3, 30, s.partySecs);
     for (const k of ['color1', 'color2']) { const c = String(raw[k] ?? '').replace(/^#/, '').toLowerCase(); if (/^[0-9a-f]{6}$/.test(c)) s[k] = c; }
+    cleanSensor(raw, s);
     return s;
 }
+
+const ctlOf = (d) => (d && (d.control === 'tilt' || d.control === 'body') ? d.control : 'finger');
+const NO_SENSOR = 'The body sensor is not answering: play with the finger or tilt.';
+
+export const END_TEXTS = {"endWinText": "{winner} wins!", "endLoseText": "The computer wins!"};
+export function cleanSettings(raw) { return cleanEnd(raw, cleanGame(raw), END_TEXTS); }
 
 export class Game {
     constructor(s) { this.s = s; this.id = 0; this.statusMs = 250; this.w = 32; this.h = 16; this.reset(); }
@@ -52,6 +61,7 @@ export class Game {
         this.ball = [0.5, 0.5]; this.vel = [0, 0];
         this.serveAt = 0; this.last = 0; this.touched = 0; this.flash = 0; this.aim = 0;
         this.winner = 0; this.reason = ''; this.until = 0; this.waitEndsAt = null;
+        this.ctl = ['finger', 'finger'];
     }
 
     L() { return LEVELS[this.s.level]; }
@@ -64,7 +74,9 @@ export class Game {
             const mode = d.mode === 'friend' ? 'friend' : 'cpu';
             if (mode === 'cpu' && !this.s.cpu) return 'Playing the computer is switched off.';
             if (mode === 'friend' && !this.s.friend) return 'Playing a friend is switched off.';
+            if (ctlOf(d) === 'body' && !sensor.ok()) return NO_SENSOR;
             this.reset();
+            this.ctl[0] = ctlOf(d);
             this.id += 1;
             this.mode = mode;
             this.players = [{ id: client, name: cleanName(d.name, 'Player 1') }];
@@ -75,6 +87,8 @@ export class Game {
         if (d.type === 'join') {
             if (this.phase !== 'waiting') return 'There is no game waiting for a friend.';
             if (me >= 0) return 'You are already in this game. Ask a friend to join from their phone.';
+            if (ctlOf(d) === 'body' && !sensor.ok()) return NO_SENSOR;
+            this.ctl[1] = ctlOf(d);
             this.players.push({ id: client, name: cleanName(d.name, 'Player 2') });
             this.start(now);
             return '';
@@ -104,7 +118,25 @@ export class Game {
 
     finish(winner, reason, now) { this.phase = 'over'; this.winner = winner; this.reason = reason; this.until = now + this.s.partySecs * 1000; }
 
+    /** players who play with the body: walking left and right moves their paddle (each in their own lane) */
+    useSensor(now) {
+        sensor.configure(this.s);
+        const humans = this.players.filter((p) => p.id !== 'cpu').length, body = this.phase === 'playing' && this.ctl.slice(0, humans).includes('body');
+        sensor.tick(now, !body);
+        if (!body) return;
+        for (let p = 0; p < humans; p++) if (this.ctl[p] === 'body') { const pos = sensor.player(p, humans); if (pos) { this.goal[p] = pos.u; this.touched = now; } }
+    }
+
+    /** what happened, for the ending (a sound, the words, a machine) */
+    outcome() {
+        const p = this.players[this.winner - 1];
+        if (!p || this.winner > 2) return null;
+        const colour = colourName(this.winner === 1 ? this.s.color1 : this.s.color2), score = `${this.score[0]} - ${this.score[1]}`;
+        return p.id === 'cpu' ? { kind: 'lose', vars: { winner: 'The computer', colour, score } } : { kind: 'win', vars: { winner: p.name, colour, score } };
+    }
+
     step(now) {
+        this.useSensor(now);
         if (this.phase === 'waiting' && now > this.waitEndsAt) { this.reset(); return; }
         if (this.phase === 'over') { if (now > this.until) this.reset(); return; }
         if (this.phase !== 'playing') return;
@@ -156,7 +188,7 @@ export class Game {
     status() {
         const s = this.s;
         return { game: this.id, mode: this.mode, players: this.players.map((p) => ({ id: p.id, name: p.name })), score: this.score,
-            winner: this.winner, turned: this.turned(), pad: this.pad.map((v) => Math.round(v * 1000) / 1000), points: s.points,
+            winner: this.winner, turned: this.turned(), sensor: sensor.state(), ctl: this.ctl.slice(0, this.players.length), pad: this.pad.map((v) => Math.round(v * 1000) / 1000), points: s.points,
             colors: [s.color1, s.color2], cpu: s.cpu, friend: s.friend, waitEndsAt: this.waitEndsAt };
     }
 

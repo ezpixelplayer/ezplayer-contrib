@@ -18,6 +18,11 @@
  * Settings come from the instance's private data key "settings".
  */
 
+import { Ending, cleanEnd, colourName } from './ending.mjs';
+
+const ending = new Ending();   // a sound, the words, a machine when someone reaches the star
+const END_TEXTS = { endWinText: '{winner} reached the star!' };
+
 const base = (process.env.EZP_API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
 const instance = process.env.EZP_APP_INSTANCE;
 const token = process.env.EZP_APP_TOKEN;
@@ -69,7 +74,9 @@ const CLIMBER_ROWS = 50; // "auto" style: a little figure from this many pixels 
 const MAX_GRID_PIXELS = 40000;
 
 /** Settings as saved by the config page, with every field checked and defaulted. */
-function cleanSettings(raw) {
+function cleanSettings(raw) { return cleanEnd(raw, cleanRace(raw), END_TEXTS); }
+
+function cleanRace(raw) {
     const s = { ...DEFAULTS, levels: { ...DEFAULTS.levels }, colors: [...DEFAULTS.colors], modes: [...DEFAULTS.modes] };
     if (!raw || typeof raw !== 'object') return s;
     const num = (v, lo, hi, dflt) =>
@@ -233,7 +240,11 @@ class Race {
         this.winner = winner;
         this.message = message;
         this.partyEndsAt = now + (winner !== null ? PARTY_MS : NO_WINNER_MS);
-        if (winner !== null) this.players[winner].done = true;
+        if (winner !== null) {
+            this.players[winner].done = true;
+            const p = this.players[winner];
+            ending.fire(this.s, 'win', { winner: p.name, colour: colourName(p.color), score: '' });
+        }
         console.log(`Race over: ${message}`);
     }
 
@@ -500,11 +511,10 @@ async function loadConfig() {
 }
 
 async function openLease(body) {
-    // The app token puts the instance title on the lease, so a refused race names who has the track.
     const res = await fetch(`${base}/api/ezp/overlays`, {
         method: 'POST',
-        headers: jsonHeaders,
-        body: JSON.stringify({ ...body, mode: 'exclusive', blend: 'replace', ttlMs: 10_000 }),
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...body, blend: 'replace', ttlMs: 10_000 }),
     });
     const opened = await res.json().catch(() => ({}));
     if (!opened.ok || !opened.lease) throw new Error(opened.error ?? `HTTP ${res.status}`);
@@ -671,31 +681,24 @@ async function main() {
             if (!config) {
                 notice = configError;
             } else {
-                race = new Race(config.settings);
-                race.open(now);
-                notice = data ? race.addPlayer(client, data, now) : '';
+                try {
+                    race = new Race(config.settings);
+                    await openLeases();
+                    race.open(now);
+                    notice = data ? race.addPlayer(client, data, now) : '';
+                } catch (e) {
+                    race.reset();
+                    notice = `Could not start: ${e.message}`;
+                    console.log(notice);
+                    lastConfigCheck = -Infinity;
+                }
             }
         }
 
         race.step(now);
 
-        // The track is taken only while someone is in the race, so an empty waiting room
-        // leaves the lights to the show and to other apps.
-        const wanted = race.phase !== 'idle' && race.players.length > 0;
-        if (wanted && !trackLease) {
-            try {
-                await openLeases();
-            } catch (e) {
-                race.reset();
-                notice = `Could not start: ${e.message}`;
-                noticeAt = now;
-                console.log(notice);
-                lastConfigCheck = -Infinity;
-            }
-        }
-
         if (trackLease) {
-            if (!wanted) {
+            if (race.phase === 'idle') {
                 await releaseLeases();
             } else {
                 const sc = starColor(race, now);

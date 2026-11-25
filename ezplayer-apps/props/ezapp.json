@@ -1,7 +1,7 @@
 {
     "id": "props",
     "name": "Props of the show",
-    "version": "2",
+    "version": "3",
     "description": "Visitors light up real models of the show (wings, bats, arches) with an effect and colours of their choice",
     "icon": "✨",
     "runtime": "node",

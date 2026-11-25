@@ -1,0 +1,19 @@
+<div class="panel" id="setup">
+  <label>Play</label>
+  <div class="seg" id="modes"></div>
+  <button class="btn" id="go" disabled>New game</button>
+  <button class="btn hidden" id="join">Join the game</button>
+</div>
+<div class="panel hidden" id="play">
+  <div class="players" id="players"></div>
+  <div class="score2" id="score"></div>
+  <div class="clock" id="clock"></div>
+  <canvas class="pad" id="pad" width="360" height="360"></canvas>
+  <div class="hint" style="text-align:center" id="padHint">Swipe across the treats you see on the lights!</div>
+  <div class="hint" style="text-align:center">🍬 1 point · ⭐ 5 points · combo bonus<span id="coalHint"> · ⚫ coal costs a life</span></div>
+  <button class="btn ghost hidden" id="quit">Leave the game</button>
+</div>
+<div class="panel hidden" id="bestBox">
+  <label>🏆 Best of the day</label>
+  <ol class="best" id="best"></ol>
+</div>

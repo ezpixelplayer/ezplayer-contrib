@@ -7,6 +7,7 @@
  * Each round adds a colour and goes a little faster. One player; anyone can watch.
  */
 
+import { cleanEnd, colourName } from './ending.mjs';
 import { hexRgb, painter, cleanName, num, hex } from './player.mjs';
 
 export const minSize = { w: 4, h: 4 };
@@ -14,7 +15,7 @@ const DEFAULTS = { target: '', fps: 20, brightness: 100, speed: 'normal', maxRou
     colors: ['39d353', 'ff2a2a', 'ffd23f', '2a7bff'] };
 const SPEEDS = { slow: 1.35, normal: 1, fast: 0.75 };
 
-export function cleanSettings(raw) {
+function cleanGame(raw) {
     const s = { ...DEFAULTS, colors: [...DEFAULTS.colors] };
     if (!raw || typeof raw !== 'object') return s;
     if (typeof raw.target === 'string') s.target = raw.target.trim();
@@ -27,6 +28,9 @@ export function cleanSettings(raw) {
     for (let i = 0; i < 4; i++) s.colors[i] = hex(raw['color' + i], s.colors[i]);
     return s;
 }
+
+export const END_TEXTS = {"endWinText": "{winner} did all the rounds!", "endLoseText": "Game over! {score} rounds", "endRecordText": "New record: {score} rounds!"};
+export function cleanSettings(raw) { return cleanEnd(raw, cleanGame(raw), END_TEXTS); }
 
 export class Game {
     constructor(s) { this.s = s; this.id = 0; this.best = 0; this.reset(); }
@@ -55,6 +59,7 @@ export class Game {
             this.reset();
             this.id += 1;
             this.players = [{ id: client, name: cleanName(d.name, 'Player') }];
+            this.bestBefore = this.best;
             this.seq = [Math.floor(Math.random() * 4)];
             this.show(false, now);
             return '';
@@ -92,6 +97,14 @@ export class Game {
         this.phase = 'finished'; this.reason = reason; this.won = won; this.finishedAt = now;
         this.until = now + this.s.partySecs * 1000;
         this.best = Math.max(this.best, this.score);
+    }
+
+    /** what happened, for the ending: a new best score, all the rounds, or game over */
+    outcome() {
+        if (this.reason === 'You stopped the game.') return null;
+        const vars = { winner: this.players[0]?.name ?? 'Player', colour: '', score: this.score };
+        if (this.score > 0 && this.score > (this.bestBefore ?? 0)) return { kind: 'record', vars };
+        return { kind: this.won ? 'win' : 'lose', vars };
     }
 
     step(now) {

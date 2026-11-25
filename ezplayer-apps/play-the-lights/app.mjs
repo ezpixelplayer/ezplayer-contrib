@@ -13,7 +13,7 @@ import { PROP_FX, PropFx, propsOf, geomsFor } from './models.mjs';
 export const COLS = ['ff2a2a', 'ff8a1a', 'ffd23f', '39d353', '2ad4ff', '2a7bff', 'a35cff', 'ff5cc8', 'ffffff'];
 const MAX_KEYS = 48;
 const DEFAULTS = {
-    fps: 25, brightness: 100, props: '🦋 Wings | WingLeft, WingRight\n🌈 Arches | Arch1, Arch2, Arch3',
+    fps: 25, brightness: 100, props: '',
     order: 'layout', turnSecs: 30, idleSecs: 10, queueMax: 20, pulse: 0.5, attack: 0, release: 0.8, fx: 'solid', rainbow: true,
 };
 
