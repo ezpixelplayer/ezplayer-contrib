@@ -46,3 +46,31 @@ The page sends `new` (`name`), `join` (`name`), `start`, `answer` (`value`, `rou
 ## Left out of the original
 
 Nothing.
+
+## When someone wins or loses
+
+A section of the settings, **🎉 When someone wins or loses**, all off by default. Tick **When someone wins** and/or
+**When someone loses**, then the parts you want:
+
+- **🔊 Sound:** built in (a short fanfare for a win, a sad "wah wah wah waaah" for a loss, made by the app, no files
+  needed) or your own WAV files (one for a win, one for a loss, on the player computer). Volume, and where it plays:
+  the show's speakers through EZPlayer (at once, or mixed with the show's music), or the computer's own speaker.
+- **🗣️ Say the words out loud:** after the sound, the computer's own voice says the words (Windows and macOS have
+  voices; on Linux or a Raspberry Pi install `espeak-ng`). **Voice language** picks a voice of that language when the
+  computer has one (`en` by default; `pt` for Portuguese, for example Windows' "Helia" voice). No voice: only the sound.
+- **🔤 Write the words across the lights:** the words scroll once over the end of the game, on a darker picture.
+- **The words** can use `{winner}` (the player's name, or "The computer"), `{colour}` (the winner's colour as a word:
+  Red, Blue…) and `{score}`. Write them in any language.
+- **🫧 A machine** for a few seconds (bubbles, fog, snow, its lights…), reached in the same five ways as 🌨️ snow on
+  request in the fun app (a web address, or DMX through EZPlayer, DDP, Art-Net or E1.31; its README explains each way,
+  with wiring and safety): the DMX channels and seconds for a win, and for a loss (empty: the machine stays off; for
+  example only a red light), and a rest between two runs. With a web address the machine runs for a win, and for a loss
+  only when ticked.
+
+Every part works on its own: only the sound, only the words, only the machine, or everything.
+
+**In this game:** the players with the most points win together (`Ana and Rui wins!` can be worded `{winner} win!`); nobody scoring is a loss. A stopped game does nothing.
+
+## Changes
+
+- **Version 2:** 🎉 when someone wins or loses: a sound (built in or your own WAV), the words said out loud and/or written across the lights, and a machine (bubbles, fog, lights…) for a few seconds; all off by default.

@@ -3,6 +3,7 @@
 
 /** Four in a Row: the rules, the computer and the drawing, with nothing about the player's API (that is player.mjs). */
 
+import { cleanEnd, colourName } from './ending.mjs';
 import { hexRgb, hsv, painter, cleanName, num, hex, pick } from './player.mjs';
 
 export const COLS = 7, ROWS = 6;
@@ -11,7 +12,7 @@ export const minSize = { w: 7, h: 7 };
 const DEFAULTS = { target: '', fps: 15, brightness: 100, color1: 'ff2a2a', color2: 'ffd23f', colorBoard: '0028a0',
     cpu: true, friend: true, levels: [...LEVELS], turnSecs: 45, waitSecs: 90, partySecs: 8 };
 
-export function cleanSettings(raw) {
+function cleanGame(raw) {
     const s = { ...DEFAULTS, levels: [...DEFAULTS.levels] };
     if (!raw || typeof raw !== 'object') return s;
     if (typeof raw.target === 'string') s.target = raw.target.trim();
@@ -96,6 +97,9 @@ export function cpuMove(b, me, level) {
     return pick(moves.filter((c) => scores.get(c) >= top - (level === 'hard' ? 0 : 2)));
 }
 
+export const END_TEXTS = {"endWinText": "{winner} wins!", "endLoseText": "The computer wins!"};
+export function cleanSettings(raw) { return cleanEnd(raw, cleanGame(raw), END_TEXTS); }
+
 export class Game {
     constructor(s) { this.s = s; this.id = 0; this.reset(); }
 
@@ -174,6 +178,15 @@ export class Game {
     finish(winner, reason, now) {
         this.phase = 'finished'; this.winner = winner; this.reason = reason;
         this.turnEndsAt = null; this.finishedAt = now; this.cpuAt = 0;
+    }
+
+    /** what happened, for the ending (a sound, the words, a machine): null for a draw */
+    outcome() {
+        if (!this.winner || this.winner === 3) return null;
+        const p = this.players[this.winner - 1];
+        if (!p) return null;
+        const colour = colourName(this.winner === 1 ? this.s.color1 : this.s.color2);
+        return p.id === 'cpu' ? { kind: 'lose', vars: { winner: 'The computer', colour, score: '' } } : { kind: 'win', vars: { winner: p.name, colour, score: '' } };
     }
 
     step(now) {

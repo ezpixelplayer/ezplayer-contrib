@@ -43,3 +43,7 @@ The page sends `open` (`door`: 1 to 24).
 ## Left out of the original
 
 Nothing.
+
+## Changes
+
+- **Version 2:** the longer word filter (Portuguese and English) for the doors' texts.

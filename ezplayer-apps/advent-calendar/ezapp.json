@@ -1,7 +1,7 @@
 {
     "id": "advent-calendar",
     "name": "Advent calendar",
-    "version": "1",
+    "version": "2",
     "description": "24 doors that open one a day from 1 December; tap an open door to see its surprise on a matrix of the show",
     "icon": "📅",
     "runtime": "node",
