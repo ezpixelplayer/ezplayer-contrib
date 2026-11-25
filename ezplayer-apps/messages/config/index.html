@@ -51,7 +51,7 @@
 <script>
   const el = (id) => document.getElementById(id);
   const MIN = { w: 8, h: 5 };
-  const FIELDS = [{"id": "theme", "type": "select", "label": "Effects of", "options": [["xm", "Christmas"], ["hw", "Halloween"], ["ev", "Other celebrations"]], "default": "xm", "end": true}, {"id": "text", "type": "check", "text": "Messages", "default": true}, {"id": "gif", "type": "check", "text": "Pictures (73 animated GIFs of the season)", "default": true}, {"id": "fx", "type": "check", "text": "Effects", "default": true}, {"id": "draw", "type": "check", "text": "Drawings", "default": true}, {"id": "gifAll", "type": "check", "text": "Pictures of every theme (off: only those of the theme above)", "default": false}, {"id": "free", "type": "check", "text": "Visitors may write their own message (word filter on); off: only the messages below", "default": true}, {"id": "presets", "type": "textarea", "label": "Messages to pick from (one a line, up to 40 letters)", "default": "Merry Christmas!\nHappy holidays!\nHo ho ho!\nLet it snow!", "end": true}, {"section": "Timing"}, {"id": "textSecs", "type": "number", "label": "Seconds for a message (at least one full scroll)", "min": 5, "max": 120, "default": 15}, {"id": "fxSecs", "type": "number", "label": "Seconds for an effect", "min": 5, "max": 120, "default": 15}, {"id": "gifSecs", "type": "number", "label": "Seconds for a picture", "min": 3, "max": 120, "default": 10}, {"id": "drawSecs", "type": "number", "label": "Seconds for a drawing", "min": 5, "max": 120, "default": 15, "end": true}, {"id": "waitSecs", "type": "number", "label": "Each phone waits (seconds)", "min": 0, "max": 600, "default": 20}, {"id": "queueMax", "type": "number", "label": "Most requests waiting", "min": 1, "max": 50, "default": 10}];
+  const FIELDS = [{"id": "theme", "type": "select", "label": "Effects of", "options": [["xm", "Christmas"], ["hw", "Halloween"], ["ev", "Other celebrations"]], "default": "xm", "end": true}, {"id": "text", "type": "check", "text": "Messages", "default": true}, {"id": "gif", "type": "check", "text": "Pictures (73 animated GIFs of the season)", "default": true}, {"id": "fx", "type": "check", "text": "Effects", "default": true}, {"id": "draw", "type": "check", "text": "Drawings", "default": true}, {"id": "gifAll", "type": "check", "text": "Pictures of every theme (off: only those of the theme above)", "default": false}, {"id": "free", "type": "check", "text": "Visitors may write their own message (word filter on); off: only the messages below", "default": true}, {"id": "presets", "type": "textarea", "label": "Messages to pick from (one a line, up to 40 letters)", "default": "Merry Christmas!\nHappy holidays!\nHo ho ho!\nLet it snow!", "end": true}, {"id": "badWords", "type": "textarea", "label": "Extra blocked words, on top of the built-in Portuguese and English list (separated by commas or one a line)", "default": "", "placeholder": "e.g. a name, a team, a word you don't want on the lights"}, {"section": "Timing"}, {"id": "textSecs", "type": "number", "label": "Seconds for a message (at least one full scroll)", "min": 5, "max": 120, "default": 15}, {"id": "fxSecs", "type": "number", "label": "Seconds for an effect", "min": 5, "max": 120, "default": 15}, {"id": "gifSecs", "type": "number", "label": "Seconds for a picture", "min": 3, "max": 120, "default": 10}, {"id": "drawSecs", "type": "number", "label": "Seconds for a drawing", "min": 5, "max": 120, "default": 15, "end": true}, {"id": "waitSecs", "type": "number", "label": "Each phone waits (seconds)", "min": 0, "max": 600, "default": 20}, {"id": "queueMax", "type": "number", "label": "Most requests waiting", "min": 1, "max": 50, "default": 10}];
   const TARGET = "required";   // 'required', 'optional' (a matrix is not needed) or 'none' (no matrix at all)
   if (TARGET === 'none') el('matrixBlock').querySelectorAll('h2, label, select, .hint').forEach((x) => x.style.display = 'none');
   let app;
@@ -64,8 +64,31 @@
       if (app.apiBase !== null) { const r = await fetch(`${app.apiBase}/api/ezp/overlays/targets`); if (r.ok) models = ((await r.json()).targets || []).map((t) => t.model); }
     } catch (e) { /* listed only on the home network */ }
     try { groups = (await app.get('private', 'groups')) || {}; } catch (e) { /* the app writes the groups once it has read the show */ }
+    // a box of prop lines ("icon name | models | ..."): a tap on an empty line makes a whole prop line, with an icon and
+    // a name guessed from the model or group; a tap on a line that has one adds the model or group to it
+    const ICONS = [[/wing|butterfl/, '🦋'], [/\bbats?\b|bat \d|bat_/, '🦇'], [/spider|web|widow/, '🕷️'], [/ghost|boo\b/, '👻'], [/skull|tomb|grave/, '💀'],
+      [/pumpkin|jack|lantern/, '🎃'], [/dragon/, '🐉'], [/cane/, '🍭'], [/arch/, '🌈'], [/snow ?man/, '⛄'], [/flake|snow/, '❄️'], [/star|peace/, '⭐'],
+      [/tree|pine/, '🎄'], [/present|gift/, '🎁'], [/wreath/, '🎀'], [/bell/, '🔔'], [/sing|face|bulb|mouth/, '🎤'], [/spinner|spin|fan/, '🌀'],
+      [/icicle/, '🧊'], [/window|door/, '🪟'], [/roof|outline|house|trim|eave/, '🏠'], [/matrix|panel|screen/, '🟦'], [/candle/, '🕯️'],
+      [/deer|reindeer/, '🦌'], [/angel/, '👼'], [/santa/, '🎅'], [/hedge|bush|flower|bed/, '🌳'], [/firework|burst/, '🎆'], [/heart/, '❤️']];
+    const iconFor = (n) => (ICONS.find(([re]) => re.test(n.toLowerCase())) || [0, '✨'])[1];
+    const niceName = (n) => n.replace(/[_]+/g, ' ').replace(/^(all|ge|ppd|nsr|boscoyo|chromaglow)\s+/i, '').replace(/^(ge|ppd|nsr|boscoyo|chromaglow)\s+/i, '')
+      .replace(/\s*\/.*$/, '').replace(/\s+/g, ' ').trim().slice(0, 24) || n.slice(0, 24);
+    function addToLine(t, n) {
+      const v = t.value, at = Math.min(t.selectionStart ?? v.length, v.length);
+      const s0 = v.lastIndexOf('\n', at - 1) + 1, e0 = v.indexOf('\n', at) < 0 ? v.length : v.indexOf('\n', at);
+      const line = v.slice(s0, e0);
+      let nl;
+      if (!line.trim()) nl = iconFor(n) + ' ' + niceName(n) + ' | ' + n;
+      else if (!line.includes('|')) nl = line.trimEnd() + ' | ' + n;
+      else { const parts = line.split('|'); const ms = parts[1].trim(); if (ms.split(',').map((x) => x.trim()).includes(n)) return; parts[1] = ' ' + (ms ? ms + ', ' : '') + n + (parts.length > 2 ? ' ' : ''); nl = parts.join('|'); }
+      t.value = v.slice(0, s0) + nl + v.slice(e0); t.focus(); t.selectionStart = t.selectionEnd = s0 + nl.length;
+    }
     for (const f of pk) {
       const box = el('pk_' + f.id), q = el('pq_' + f.id);
+      if (f.lines && el('nl_' + f.id)) el('nl_' + f.id).addEventListener('click', () => {   // a new prop: an empty line at the end
+        const t = el('f_' + f.for); t.value = t.value.replace(/\s*$/, '') + (t.value.trim() ? '\n' : ''); t.focus(); t.selectionStart = t.selectionEnd = t.value.length;
+      });
       const show = () => {
         const s = q.value.trim().toLowerCase();
         const items = [...Object.keys(groups).map((g) => [g, true]), ...models.map((m) => [m, false])].filter(([n]) => !s || n.toLowerCase().includes(s)).slice(0, 300);
@@ -73,6 +96,8 @@
           const b = document.createElement('button'); b.type = 'button'; b.textContent = (g ? '👥 ' : '') + n; if (g) b.className = 'g';
           b.title = g ? 'Group: ' + groups[n].join(', ') : 'Model';
           b.addEventListener('click', () => {
+            if (f.single) { el('f_' + f.for).value = n; return; }   // a box for one model: the name replaces what was there
+            if (f.lines) { addToLine(el('f_' + f.for), n); return; }
             const t = el('f_' + f.for), at = t.selectionStart ?? t.value.length, before = t.value.slice(0, at), after = t.value.slice(at);
             const sep = !before || /[|,\n]\s*$/.test(before) ? (/[|,]$/.test(before) ? ' ' : '') : ', ';
             t.value = before + sep + n + after; t.focus(); t.selectionStart = t.selectionEnd = (before + sep + n).length;
@@ -106,7 +131,13 @@
         const l = document.createElement('label'); l.textContent = f.label; l.htmlFor = 'pq_' + f.id;
         const q = document.createElement('input'); q.type = 'text'; q.id = 'pq_' + f.id; q.placeholder = 'Search models and groups (👥)…';
         const pkb = document.createElement('div'); pkb.className = 'picker'; pkb.id = 'pk_' + f.id; pkb.textContent = 'Loading…';
-        wrap.append(l, q, pkb); box.append(wrap); row = null;
+        wrap.append(l, q, pkb);
+        if (f.lines) {   // a button for a new prop line, and how the taps work
+          const nb = document.createElement('button'); nb.type = 'button'; nb.id = 'nl_' + f.id; nb.textContent = '➕ New prop'; nb.style.marginTop = '8px';
+          const h = document.createElement('p'); h.className = 'hint'; h.textContent = 'Tap a group or model on an empty line: a whole prop line is made, with an icon and a name you can change. Tap more to add them to that prop. ➕ New prop starts the next one.';
+          wrap.append(nb, h);
+        }
+        box.append(wrap); row = null;
         if (f.hint) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = f.hint; box.append(p); }
         continue;
       }

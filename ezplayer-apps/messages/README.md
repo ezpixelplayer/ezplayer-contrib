@@ -60,3 +60,5 @@ Picking up to 3 pictures in a row (ShowPlay's page could queue three at once); h
 ## Changes
 
 - **Version 2:** the **Picture** tab: the 73 animated GIFs of the ShowPlay page, filtered by the theme.
+
+- **Version 3:** the word filter is much longer (Portuguese and English), sees through letters spaced out (`m e r d a`) and repeated letters (`fuuuck`), no longer joins separate words (so "por nossa senhora" passes), and a new setting **Extra blocked words** adds your own words (commas or one a line).

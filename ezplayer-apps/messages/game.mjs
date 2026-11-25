@@ -8,7 +8,7 @@
 
 import { num } from './player.mjs';
 import fs from 'node:fs';
-import { Text, Fx, Anim, FX_LIST, FX_NAMES, PAL, hexRgb, plain, isBad } from './lights.mjs';
+import { Text, Fx, Anim, FX_LIST, FX_NAMES, PAL, hexRgb, plain, isBad, setBadExtra } from './lights.mjs';
 import { readGif } from './gif.mjs';
 
 /** the pictures: the GIFs of the ShowPlay page, in page/gifs (served with the phones' page) */
@@ -24,7 +24,7 @@ function gifOf(f) {
 }
 
 export const minSize = { w: 8, h: 5 };
-const DEFAULTS = { target: '', fps: 25, brightness: 100, theme: 'xm', free: true, presets: 'Merry Christmas!\nHappy holidays!\nHo ho ho!\nLet it snow!',
+const DEFAULTS = { target: '', fps: 25, brightness: 100, theme: 'xm', free: true, presets: 'Merry Christmas!\nHappy holidays!\nHo ho ho!\nLet it snow!', badWords: '',
     textSecs: 15, fxSecs: 15, drawSecs: 15, gifSecs: 10, waitSecs: 20, queueMax: 10, text: true, fx: true, draw: true, gif: true, gifAll: false };
 
 export function cleanSettings(raw) {
@@ -36,6 +36,8 @@ export function cleanSettings(raw) {
     if (FX_LIST[raw.theme]) s.theme = raw.theme;
     for (const k of ['free', 'text', 'fx', 'draw', 'gif', 'gifAll']) if (typeof raw[k] === 'boolean') s[k] = raw[k];
     if (typeof raw.presets === 'string') s.presets = raw.presets.slice(0, 2000);
+    if (typeof raw.badWords === 'string') s.badWords = raw.badWords.slice(0, 3000);
+    setBadExtra(s.badWords);   // the show's own blocked words, on top of the built-in Portuguese and English list
     for (const [k, lo, hi] of [['textSecs', 5, 120], ['fxSecs', 5, 120], ['drawSecs', 5, 120], ['gifSecs', 3, 120], ['waitSecs', 0, 600], ['queueMax', 1, 50]]) s[k] = num(raw[k], lo, hi, s[k]);
     return s;
 }

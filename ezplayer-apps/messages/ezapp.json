@@ -1,7 +1,7 @@
 {
     "id": "messages",
     "name": "Messages on the lights",
-    "version": "2",
+    "version": "3",
     "description": "Visitors put a message, an animated picture, an effect or their own drawing on a matrix of the show from their phones, one after another",
     "icon": "💬",
     "runtime": "node",
