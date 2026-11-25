@@ -3626,7 +3626,7 @@ def open_lease(i):
 
 
 def open_overlay(model, fmt, w, h, name):
-    body = {"model": model, "format": fmt, "blend": "replace", "ttlMs": 8000, "name": "ShowPlay: " + name}
+    body = {"model": model, "format": fmt, "mode": "exclusive", "blend": "replace", "ttlMs": 8000, "name": "ShowPlay: " + name}
     if fmt == "grid":
         body.update(width=w, height=h)
     r = ezp_call("POST", "/api/ezp/overlays", body)

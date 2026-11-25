@@ -76,7 +76,8 @@ default).
    - **Groups:** read from `xlights_rgbeffects.xml` through EZPlayer's file API.
 3. **Drawing.** The palette is blended into 256 colours. Twenty times a second, each pixel gets a place in that palette
    and a brightness from its position, the time and the speed.
-4. **Sending.** The bridge opens one overlay per model (`POST /api/ezp/overlays`):
+4. **Sending.** The bridge opens one exclusive overlay lease per model (`POST /api/ezp/overlays`); a model another
+   app is painting is refused, and the error names that app:
    - **Format:** nodes format (one RGB value per pixel, in the model's pixel order) for pixel models, grid format for
      matrices and trees.
    - **Frames:** they go to EZPlayer's overlay port as `EZO1` UDP packets of up to 1,400 bytes.
