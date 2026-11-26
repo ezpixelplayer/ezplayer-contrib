@@ -1,0 +1,16 @@
+{"title": "Guestbook", "icon": "📝", "min": [8, 5], "fps": 25,
+ "intro": "Visitors leave their name and a short note from their phone. A new note scrolls across the matrix at once, and every few minutes the book is read: its title, then the latest notes. In between the show plays. Names and notes go through a word filter, also the ones already in the book: a word added to the blocked list takes a note out. The book survives a restart. Pick the matrix, then Save.",
+ "fields": [
+  {"id": "title", "type": "text", "label": "The book's title, shown before reading it (empty: no title)", "default": "Our guestbook"},
+  {"id": "titleColor", "type": "color", "label": "The title's colour", "default": "ffd23f", "end": true},
+  {"id": "showNew", "type": "check", "text": "Show each new note on the lights at once", "default": true},
+  {"id": "everyMins", "type": "number", "label": "Read the book every … minutes (0: never)", "min": 0, "max": 240, "default": 5},
+  {"id": "readCount", "type": "number", "label": "How many of the latest notes are read", "min": 1, "max": 30, "default": 5, "end": true},
+  {"id": "free", "type": "check", "text": "Visitors may write their own note (word filter on); off: only the notes below", "default": true},
+  {"id": "presets", "type": "textarea", "label": "Notes to pick from (one a line, up to 40 letters)", "default": "Merry Christmas!\nWe loved the lights!\nSee you next year!\nThank you!", "end": true},
+  {"id": "badWords", "type": "textarea", "label": "Extra blocked words, on top of the built-in Portuguese and English list (separated by commas or one a line); notes already in the book with them are taken out too", "default": "", "placeholder": "e.g. a name you don't want on the lights"},
+  {"section": "The book"},
+  {"id": "waitSecs", "type": "number", "label": "Each phone waits before writing again (seconds)", "min": 0, "max": 3600, "default": 120},
+  {"id": "keep", "type": "number", "label": "Most notes kept (the oldest go first)", "min": 10, "max": 1000, "default": 300},
+  {"id": "book", "type": "number", "label": "Book number: change it to start a new, empty book (e.g. every season)", "min": 1, "max": 9999, "default": 1, "end": true}
+ ]}

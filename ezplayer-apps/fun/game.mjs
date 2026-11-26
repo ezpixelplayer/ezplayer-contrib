@@ -15,8 +15,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { num } from './player.mjs';
 import { cleanEnd } from './ending.mjs';
+import { THEME } from './theme.mjs';
+import { SPRITES as SPRITES8, spriteCell } from './sprites.mjs';
 import { Anim, Text, Fx, FX_NAMES, PAL, hexRgb, hsv, plain, isBad, bigGlyph } from './lights.mjs';
-import { playSound, readWav } from './audio.mjs';
+import { playSound, busFor, readWav } from './audio.mjs';
 import { runMachine, dmxValues, dmxFrame, machineModes, MachineLink, MACHINE_HOWS, MACHINE_COLOURS } from './machine.mjs';
 
 /** snow can be offered: url needs the on address; DMX needs channels and where to send them */
@@ -39,14 +41,14 @@ export function machineOf(s) {
 
 export const minSize = { w: 8, h: 8 };
 export const KEYS = ['photo', 'wheel', 'animal', 'paint', 'bell', 'snow', 'hunt', 'song'];
-export const FRAMES = [['snow', 'Snowflakes'], ['hearts', 'Hearts'], ['stars', 'Stars'], ['santa', 'Santa'], ['rainbow', 'Rainbow']];
-export const ANIMALS = [['penguin', 'Penguin', '🐧'], ['reindeer', 'Reindeer', '🦌'], ['snowman', 'Snowman', '⛄'], ['bear', 'Polar bear', '🐻‍❄️'], ['robin', 'Robin', '🐦']];
+export const FRAMES = THEME.frames ?? [['snow', 'Snowflakes'], ['hearts', 'Hearts'], ['stars', 'Stars'], ['santa', 'Santa'], ['rainbow', 'Rainbow']];
+export const ANIMALS = THEME.animals ?? [['penguin', 'Penguin', '🐧'], ['reindeer', 'Reindeer', '🦌'], ['snowman', 'Snowman', '⛄'], ['bear', 'Polar bear', '🐻‍❄️'], ['robin', 'Robin', '🐦']];
 const WHEEL_COLS = ['ff2a2a', 'ffd23f', '39d353', '2bb7ff', '9b5cff', 'ff7a1a', 'ff4fd8', 'ffffff', 'ff2a2a', '39d353', '2bb7ff', 'ffd23f'];
 const COLOUR_NAMES = { ff2a2a: 'Red', '39d353': 'Green', '2bb7ff': 'Blue', ffd23f: 'Gold', ffffff: 'White', '9b5cff': 'Purple', ff7a1a: 'Orange', ff4fd8: 'Pink' };
 const DEFAULTS = {
     target: '', fps: 25, brightness: 100,
     photo: true, photoFrames: FRAMES.map(([k]) => k), photoHold: 8, photoEvery: 30,
-    wheel: true, wheelSlices: 'fx: snowfall\ntext: Merry Christmas!\ncolour: ff2a2a\nfx: fireworks\nagain\nfx: twinkle\ncolour: 39d353\ntext: Ho ho ho!', wheelResult: 12, wheelEvery: 30,
+    wheel: true, wheelSlices: THEME.wheelSlices ?? 'fx: snowfall\ntext: Merry Christmas!\ncolour: ff2a2a\nfx: fireworks\nagain\nfx: twinkle\ncolour: 39d353\ntext: Ho ho ho!', wheelResult: 12, wheelEvery: 30,
     animal: true, animals: ANIMALS.map(([k]) => k), animalCross: 6, animalEvery: 20,
     paint: true, paintHold: 15, paintEvery: 30,
     bell: false, bellVolume: 80, bellFlash: true, bellEvery: 10,
@@ -55,8 +57,8 @@ const DEFAULTS = {
     snowLights: false, snowChDim: 5, snowChR: 6, snowChG: 7, snowChB: 8, snowChA: 9, snowChW: 0, snowChMacro: 10, snowMacroVal: 200, snowChSpeed: 12, snowSpeedVal: 128,
     snowChStrobe: 11, snowStrobeOk: false, snowStrobeVal: 100, snowStrobeMax: 150, snowPickColour: true, snowPickRainbow: true, snowPickStrobe: false,
     snowLightRun: 'colour', snowRunColour: 'ffffff', snowIdle: 'off', snowIdleColour: '402000', snowLightOnly: true, snowRun: 10, snowGap: 120, snowNight: 20, snowFrom: 17, snowTo: 23, snowCube: true,
-    hunt: false, huntClues: "How many reindeer pull Santa's sleigh (without Rudolph)? | 8\nWhat do you put on top of the Christmas tree? | star\nWhat is the snowman's nose made of? | carrot", huntOrder: true,
-    soundBus: 'immediate',
+    hunt: false, huntClues: THEME.huntClues ?? "How many reindeer pull Santa's sleigh (without Rudolph)? | 8\nWhat do you put on top of the Christmas tree? | star\nWhat is the snowman's nose made of? | carrot", huntOrder: true,
+    soundBus: 'immediate', piHost: '', piKey: '',
     song: false, songFolder: '', songClip: 6, songRounds: 5, songAnswer: 12, songVolume: 90,
 };
 
@@ -87,7 +89,9 @@ function cleanGame(raw) {
     if (typeof raw.snowModel === 'string') s.snowModel = raw.snowModel.trim().slice(0, 200);
     if (Number.isFinite(+raw.snowUniverse) && raw.snowUniverse !== '' && raw.snowUniverse !== null) s.snowUniverse = Math.max(0, Math.min(63999, Math.round(+raw.snowUniverse)));
     for (const k of ['snowOn', 'snowOff']) if (typeof raw[k] === 'string' && (raw[k] === '' || /^https?:\/\/\S+$/.test(raw[k].trim()))) s[k] = raw[k].trim();
-    if (['immediate', 'main', 'local'].includes(raw.soundBus)) s.soundBus = raw.soundBus;
+    if (['immediate', 'main', 'local', 'pi'].includes(raw.soundBus)) s.soundBus = raw.soundBus;
+    if (typeof raw.piHost === 'string' && (raw.piHost.trim() === '' || /^[\w.-]{1,253}(:\d{1,5})?$/.test(raw.piHost.trim()))) s.piHost = raw.piHost.trim();
+    if (typeof raw.piKey === 'string') s.piKey = raw.piKey.trim().slice(0, 64);
     if (typeof raw.songFolder === 'string') s.songFolder = raw.songFolder.trim().slice(0, 400);
     return s;
 }
@@ -127,6 +131,15 @@ export function songsOf(folder) {
 }
 
 // ---------------------------------------------------------------------------- the matrix's animations ----
+/** the colours of the theme packs' photo frames */
+const FRAME_PALS = {
+    confetti: [[255, 60, 60], [255, 200, 60], [60, 160, 255], [80, 220, 100], [255, 110, 200], [170, 90, 255]], gold: [[255, 200, 60], [255, 230, 140], [255, 255, 255], [200, 150, 30]],
+    silver: [[200, 205, 220], [255, 255, 255], [150, 160, 190]], leaves: [[255, 120, 20], [200, 70, 10], [255, 190, 40], [150, 60, 20]], petals: [[255, 150, 200], [255, 255, 255], [255, 90, 160]],
+    spooky: [[255, 120, 0], [140, 60, 255], [80, 220, 60], [255, 120, 0]], pastel: [[255, 170, 210], [170, 220, 255], [255, 240, 150], [180, 255, 190], [210, 180, 255]],
+    babyblue: [[140, 200, 255], [255, 255, 255], [90, 160, 255]], babypink: [[255, 160, 200], [255, 255, 255], [255, 110, 170]], night: [[40, 60, 160], [255, 255, 255], [255, 200, 60]],
+    usa: [[255, 40, 40], [255, 255, 255], [50, 90, 255]],
+};
+
 class PhotoFrame extends Anim {
     constructor(w, h, style) {
         super(w, h);
@@ -145,7 +158,8 @@ class PhotoFrame extends Anim {
             else if (this.style === 'santa') {
                 c = d === bw - 1 && bw > 1 ? [255, 255, 255] : [230, 0, 0];
                 if ((x < bw * 2 || x >= w - bw * 2) && (y < bw * 2 || y >= h - bw * 2)) c = (x + y) % 2 ? [0, 170, 40] : [255, 0, 0];
-            } else c = hsv(((x + y) / (w + h) - t * 0.3) % 1 + 1);
+            } else if (FRAME_PALS[this.style]) { const pal = FRAME_PALS[this.style], q = pal[(n * 7 + Math.floor(t * 2)) % pal.length]; c = q.map((v) => v * tw); }   // a theme pack's frame
+            else c = hsv(((x + y) / (w + h) - t * 0.3) % 1 + 1);
             this.px(x, y, c);
         });
     }
@@ -222,22 +236,29 @@ class AnimalAnim extends Anim {
     constructor(w, h, animal, cross) {
         super(w, h);
         this.fr = SPRITES[animal]; this.cross = cross;
+        if (!this.fr && SPRITES8[animal]) {   // a theme pack's animal: an 8 x 8 picture of sprites.mjs, in the middle of the 12 x 12 box
+            const rows = [...Array(12)].map((_, r) => [...Array(12)].map((__, c) => (r >= 3 && r < 11 && c >= 2 && c < 10 ? `${animal}:${c - 2}:${r - 3}` : null)));
+            this.fr = [rows, rows]; this.map8 = animal;
+        }
         this.sc = Math.max(1, Math.min(Math.floor(h / 16), Math.floor(w / 14)));
         this.sw = 12 * this.sc; this.sh = 12 * this.sc; this.ground = Math.max(1, Math.floor(h / 10));
         this.flakes = [...Array(Math.max(4, Math.floor(w * h / 40)))].map(() => [Math.random(), Math.random(), 0.15 + Math.random() * 0.2]);
     }
     frame(t) {
         const { w, h } = this;
-        for (let y = 0; y < h; y++) { const c = y >= h - this.ground ? [255, 255, 255] : [0, 0, 8 + 30 * y / h]; for (let x = 0; x < w; x++) this.px(x, y, c); }
-        for (const [fx, fy, sp] of this.flakes) this.px(fx * w, ((fy + t * sp) % 1) * (h - this.ground), [150, 150, 170]);
+        const ground = THEME.ground ?? [255, 255, 255], sky = THEME.sky ?? [0, 0, 38], flake = THEME.flake ?? [150, 150, 170];
+        for (let y = 0; y < h; y++) { const c = y >= h - this.ground ? ground : [sky[0] * y / h, sky[1] * y / h, 8 + (sky[2] - 8) * y / h]; for (let x = 0; x < w; x++) this.px(x, y, c); }
+        for (const [fx, fy, sp] of this.flakes) this.px(fx * w, ((fy + t * sp) % 1) * (h - this.ground), flake);
         const trick = 2, hopAt = 1.5 * this.cross;
         const tt = t < hopAt ? t : t < hopAt + trick ? hopAt : t - trick;
         const hop = t >= hopAt && t < hopAt + trick ? Math.floor(Math.abs(Math.sin((t - hopAt) / trick * 3 * Math.PI)) * this.sh * 0.5) : 0;
         const u = (tt / this.cross) % 1, x = Math.floor(u * (w + this.sw)) - this.sw;
         const f = this.fr[hop ? 0 : Math.floor(t * 4) % 2], y0 = h - this.ground - this.sh - hop;
         f.forEach((row, r) => [...row].forEach((ch, c) => {
-            if (ch === '.') return;
-            for (let dy = 0; dy < this.sc; dy++) for (let dx = 0; dx < this.sc; dx++) this.px(x + c * this.sc + dx, y0 + r * this.sc + dy, SPRITE_COLS[ch]);
+            let col;
+            if (this.map8) { if (!ch) return; const [, gx, gy] = ch.split(':'); col = spriteCell(this.map8, +gx, +gy, THEME.animalCol ?? [255, 255, 255]); if (!col) return; }
+            else { if (ch === '.') return; col = SPRITE_COLS[ch]; }
+            for (let dy = 0; dy < this.sc; dy++) for (let dx = 0; dx < this.sc; dx++) this.px(x + c * this.sc + dx, y0 + r * this.sc + dy, col);
         }));
         if (hop) for (let k = 0; k < 3; k++) this.px(x + Math.random() * this.sw, y0 - 1 - Math.random() * 2, [255, 230, 80]);
         return this.buf;
@@ -350,14 +371,14 @@ export class Game {
     async ring() {
         if (this.audioBusy) return;
         this.audioBusy = true;
-        const rate = 22050, n = Math.floor(rate * 1.8), a = new Int16Array(n);
+        const rate = 22050, n = Math.floor(rate * 1.8), a = new Int16Array(n), hz = THEME.bellHz ?? 880;
         const parts = [[1, 1], [2.76, 0.55], [5.4, 0.3], [8.93, 0.18]];
         for (let i = 0; i < n; i++) {
             const t = i / rate;
-            const v = parts.reduce((acc, [m, amp]) => acc + amp * Math.sin(2 * Math.PI * 880 * m * t) * Math.exp(-t * (2.2 + m * 0.9)), 0);
+            const v = parts.reduce((acc, [m, amp]) => acc + amp * Math.sin(2 * Math.PI * hz * m * t) * Math.exp(-t * (2.2 + m * 0.9)), 0);
             a[i] = Math.max(-1, Math.min(1, v / 2.1)) * 32000;
         }
-        try { if (!(await playSound(a, rate, this.s.bellVolume / 100, this.s.soundBus))) console.log('bell: nothing could play the sound here'); }
+        try { if (!(await playSound(a, rate, this.s.bellVolume / 100, busFor(this.s.soundBus, this.s.piHost, this.s.piKey)))) console.log('bell: nothing could play the sound here'); }
         catch (e) { console.log('bell:', e.message); }
         finally { this.audioBusy = false; }
     }
@@ -509,7 +530,7 @@ export class Game {
                 if (this.cur && this.cur.kind !== 'pulse') this.cur.until = 0;
                 while (this.audioBusy) await sleep(100);
                 this.audioBusy = true;
-                void playSound(clip, wav.rate, s.songVolume / 100, s.soundBus).catch(() => false).finally(() => { this.audioBusy = false; });
+                void playSound(clip, wav.rate, s.songVolume / 100, busFor(s.soundBus, s.piHost, s.piKey)).catch(() => false).finally(() => { this.audioBusy = false; });
                 const start0 = Date.now();
                 while (Date.now() < q.until && q.answers.size < q.players.length) await sleep(150);
                 for (const [pid, [c, at]] of q.answers) if (c === q.right) q.scores.set(pid, (q.scores.get(pid) ?? 0) + 100 + Math.round(Math.max(0, s.songAnswer - (at - start0) / 1000) * 5));

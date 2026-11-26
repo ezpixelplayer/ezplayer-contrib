@@ -250,7 +250,8 @@ A section of the settings, **🎉 When someone wins or loses**, all off by defau
 
 - **🔊 Sound:** built in (a short fanfare for a win, made by the app, no files
   needed) or your own WAV files (on the player computer). Volume, and where it plays:
-  the show's speakers through EZPlayer (at once, or mixed with the show's music), or the computer's own speaker.
+  the show's speakers through EZPlayer (at once, or mixed with the show's music), the computer's own speaker, or a
+  Raspberry Pi on the network running the ShowPlay speaker (`pi-speaker/`: its IP address and key).
 - **🗣️ Say the words out loud:** after the sound, the computer's own voice says the words (Windows and macOS have
   voices; on Linux or a Raspberry Pi install `espeak-ng`). **Voice language** picks a voice of that language when the
   computer has one (`en` by default; `pt` for Portuguese, for example Windows' "Helia" voice). No voice: only the sound.
@@ -266,6 +267,10 @@ Every part works on its own: only the sound, only the words, only the machine, o
 **In this app:** a win is finding the treasure (the last clue of the hunt) and the winner of guess the song. There is no loss.
 
 ## Changes
+
+- **Version 7:** ready for the theme packs (New Year, wedding, baptism, Easter, Halloween, Thanksgiving; later also Carnival, Valentine's Day, birthday, Children's Day and 4th of July, with a "Stars and stripes" photo frame): a `theme.mjs` next to the app (empty here, so this Christmas app looks and plays exactly as before) and the small pictures of `sprites.mjs`. The packs are made from this app by `_themes/make_pack.py`.
+
+- **Version 6:** 🔈 sounds can also play on **a Raspberry Pi on the network** running the ShowPlay speaker (see `pi-speaker/`): pick it in "Where it plays" and put in the Pi's IP address (and its key, if you set one). If the Pi does not answer, the sound plays on this computer.
 
 - **Version 5:** 🎉 when someone wins or loses: a sound (built in or your own WAV), the words said out loud and/or written across the lights, and a machine (bubbles, fog, lights…) for a few seconds; all off by default.
 
