@@ -13,11 +13,13 @@
 
 import { cleanEnd, colourName } from './ending.mjs';
 import { painter, cleanName, num, hex, hexRgb } from './player.mjs';
+import { THEME } from './theme.mjs';
+import { drawSprite } from './sprites.mjs';
 
 export const minSize = { w: 8, h: 8 };
 const LAG_MS = 700;               // how far back a swipe is checked (the time for a swipe to reach the player)
 const COAL_LAG_MS = 400;          // for coal: only around where it was about a moment ago (strict)
-const KINDS = ['bauble', 'cane', 'ginger', 'present'];
+const KINDS = THEME.kinds ?? ['bauble', 'cane', 'ginger', 'present'];   // a theme pack: its own (pictures of sprites.mjs)
 const COLS = [[255, 40, 40], [40, 120, 255], [60, 220, 90], [255, 95, 200], [160, 90, 255], [255, 140, 26], [60, 240, 255]];
 const GOLD = [255, 200, 60];
 // gravity (heights per second²), how often treats are thrown (seconds), how likely coal is, how many at once at most
@@ -277,6 +279,8 @@ export class Game {
         const keep = (x, y) => half === undefined || (side === 'v' ? (half ? x >= b / 2 : x < b / 2) : (half ? y >= b / 2 : y < b / 2));
         const P = (x, y, c, k) => { if (keep(x, y)) set(x0 + x, y0 + y, c, k); };
         const m = (b - 1) / 2;
+        const spr = kind === 'coal' ? THEME.bad : kind === 'star' ? THEME.bonus : THEME.kinds ? kind : null;
+        if (spr) { drawSprite(P, spr, col, b, kind === 'star' ? 0.85 + 0.15 * Math.sin(t * 14) : 1); return; }
         for (let y = 0; y < b; y++) for (let x = 0; x < b; x++) {
             const dx = x - m, dy = y - m, d = Math.hypot(dx, dy);
             if (kind === 'bauble') { if (d <= r - 0.1) P(x, y, (dx < -r * 0.2 && dy < -r * 0.2 && d > r * 0.3 && d < r * 0.75) ? [255, 255, 255] : col); }
@@ -306,7 +310,7 @@ export class Game {
         }
         if (this.phase === 'waiting') {
             const k = 0.3 + 0.3 * Math.sin(t * 4);
-            this.paint(set, 'bauble', cols[1], w / 2, h / 2, b + 2, t);
+            this.paint(set, THEME.kinds ? KINDS[0] : 'bauble', cols[1], w / 2, h / 2, b + 2, t);
             for (let x = 0; x < w; x++) set(x, h - 1, cols[1], k);
             return;
         }

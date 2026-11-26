@@ -13,14 +13,14 @@
 
 import { num } from './multi-helpers.mjs';
 import { Geom, propsOf, geomsFor, showXml, xmlAttr } from './models.mjs';
-import { playSound } from './audio.mjs';
+import { playSound, busFor } from './audio.mjs';
 
 export const RATE = 11025;
 const MAX_SECS = 12, MAX_BYTES = MAX_SECS * RATE * 2, FPS = 20;
 const MOUTHS = ['rest', 'E', 'AI', 'O', 'U', 'etc', 'MBP', 'FV', 'L', 'WQ'];
 const EMOJI = [['pumpkin', '🎃'], ['tree', '🌲'], ['snow', '⛄'], ['skull', '💀'], ['ghost', '👻'], ['bulb', '💡'], ['gargoyle', '🦇'], ['firework', '🎆'], ['nut', '💂'],
     ['monster', '🧟'], ['kid', '🧒'], ['globe', '🔮'], ['peacock', '🦚'], ['boogie', '👹'], ['chill', '😎'], ['santa', '🎅'], ['reindeer', '🦌'], ['star', '⭐']];
-const DEFAULTS = { fps: 20, brightness: 100, target: '', faces: true, props: '', soundBus: 'immediate', volume: 100, delay: 0.15, gap: 20, queueMax: 6, maxSecs: 10, hidden: '' };
+const DEFAULTS = { fps: 20, brightness: 100, target: '', faces: true, props: '', soundBus: 'immediate', piHost: '', piKey: '', volume: 100, delay: 0.15, gap: 20, queueMax: 6, maxSecs: 10, hidden: '' };
 
 export function cleanSettings(raw) {
     const s = { ...DEFAULTS };
@@ -29,7 +29,9 @@ export function cleanSettings(raw) {
     if (typeof raw.target === 'string') s.target = raw.target.trim();
     if (typeof raw.faces === 'boolean') s.faces = raw.faces;
     for (const k of ['props', 'hidden']) if (typeof raw[k] === 'string') s[k] = raw[k].slice(0, 6000);
-    if (['immediate', 'main', 'local'].includes(raw.soundBus)) s.soundBus = raw.soundBus;
+    if (['immediate', 'main', 'local', 'pi'].includes(raw.soundBus)) s.soundBus = raw.soundBus;
+    if (typeof raw.piHost === 'string' && (raw.piHost.trim() === '' || /^[\w.-]{1,253}(:\d{1,5})?$/.test(raw.piHost.trim()))) s.piHost = raw.piHost.trim();
+    if (typeof raw.piKey === 'string') s.piKey = raw.piKey.trim().slice(0, 64);
     return s;
 }
 
@@ -173,7 +175,7 @@ export class App {
         const it = this.queue.shift(), s = this.s;
         this.busy = true;
         this.cur = { ...it, t0: Infinity, end: Infinity };
-        void playSound(it.a, it.rate, s.volume / 100, s.soundBus, (lead) => {
+        void playSound(it.a, it.rate, s.volume / 100, busFor(s.soundBus, s.piHost, s.piKey), (lead) => {
             this.cur.t0 = Date.now() + lead + s.delay * 1000;
             this.cur.end = this.cur.t0 + it.a.length / it.rate * 1000;
         }).then((how) => { if (!how) console.log('sing: nothing could play the sound'); })
