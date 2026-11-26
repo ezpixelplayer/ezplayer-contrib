@@ -1,0 +1,13 @@
+  .teams { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .teams button { min-height: 58px; border-radius: 14px; border: 3px solid transparent; color: #fff; font: 800 17px/1.2 system-ui, sans-serif; cursor: pointer; text-shadow: 0 1px 2px #0008; }
+  .teams button[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 3px var(--accent); }
+  .rope { position: relative; height: 34px; border-radius: 17px; overflow: hidden; background: var(--raise); }
+  .rope .side { position: absolute; top: 0; bottom: 0; opacity: .75; }
+  .rope .a { left: 0; } .rope .b { right: 0; }
+  .rope .knot { position: absolute; top: 3px; width: 14px; height: 28px; margin-left: -7px; border-radius: 7px; background: #fff; box-shadow: 0 0 10px #fff; transition: left .2s linear; }
+  .names { display: flex; justify-content: space-between; font-weight: 800; font-size: 15px; }
+  .pull { width: 100%; max-width: 420px; min-height: 42vh; border: 0; border-radius: 28px; color: #fff; font: 900 54px/1 system-ui, sans-serif; text-shadow: 0 2px 6px #0009; cursor: pointer; touch-action: manipulation; }
+  .pull:active { transform: scale(.97); filter: brightness(1.25); }
+  .table { display: flex; flex-direction: column; gap: 4px; }
+  .table div { display: flex; justify-content: space-between; padding: 6px 10px; border-radius: 10px; background: var(--raise); font-weight: 700; border-left: 6px solid transparent; }
+  .table div.me { box-shadow: 0 0 0 2px var(--accent) inset; }

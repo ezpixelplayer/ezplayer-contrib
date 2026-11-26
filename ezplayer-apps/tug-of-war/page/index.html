@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0a16">
+<title>Tug of war</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --raise: #261d3a; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; --c1: #ff2a2a; --c2: #2a7bff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 12px 14px 24px; gap: 12px; min-height: 100dvh; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  h1 { margin: 4px 0 0; font-size: 24px; text-align: center; }
+  .panel { width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  label { color: var(--dim); font-size: 14px; }
+  input[type=text] { width: 100%; font: inherit; font-size: 18px; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 12px; padding: 12px; user-select: text; -webkit-user-select: text; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  .seg button, .grid button { min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .btn { min-height: 54px; border-radius: 14px; border: 0; background: var(--accent); color: #1a1200; font: 800 18px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; width: 100%; }
+  .btn.ghost { background: var(--raise); color: var(--text); border: 1px solid var(--line); min-height: 44px; font-size: 15px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #msg { text-align: center; font-weight: 700; font-size: 18px; min-height: 26px; max-width: 420px; }
+  #note { text-align: center; color: #ff9a9a; min-height: 20px; font-size: 15px; max-width: 420px; }
+  #timer { text-align: center; color: var(--dim); font-size: 14px; min-height: 18px; }
+  .players { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+  .players span { flex: 1; text-align: center; padding: 6px; border-radius: 10px; border: 2px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .players span.turn { border-color: var(--accent); }
+  .big { text-align: center; font: 900 34px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .hidden { display: none !important; }
+  .teams { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .teams button { min-height: 58px; border-radius: 14px; border: 3px solid transparent; color: #fff; font: 800 17px/1.2 system-ui, sans-serif; cursor: pointer; text-shadow: 0 1px 2px #0008; }
+  .teams button[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 3px var(--accent); }
+  .rope { position: relative; height: 34px; border-radius: 17px; overflow: hidden; background: var(--raise); }
+  .rope .side { position: absolute; top: 0; bottom: 0; opacity: .75; }
+  .rope .a { left: 0; } .rope .b { right: 0; }
+  .rope .knot { position: absolute; top: 3px; width: 14px; height: 28px; margin-left: -7px; border-radius: 7px; background: #fff; box-shadow: 0 0 10px #fff; transition: left .2s linear; }
+  .names { display: flex; justify-content: space-between; font-weight: 800; font-size: 15px; }
+  .pull { width: 100%; max-width: 420px; min-height: 42vh; border: 0; border-radius: 28px; color: #fff; font: 900 54px/1 system-ui, sans-serif; text-shadow: 0 2px 6px #0009; cursor: pointer; touch-action: manipulation; }
+  .pull:active { transform: scale(.97); filter: brightness(1.25); }
+  .table { display: flex; flex-direction: column; gap: 4px; }
+  .table div { display: flex; justify-content: space-between; padding: 6px 10px; border-radius: 10px; background: var(--raise); font-weight: 700; border-left: 6px solid transparent; }
+  .table div.me { box-shadow: 0 0 0 2px var(--accent) inset; }
+
+</style>
+</head>
+<body>
+<h1>🪢 Tug of war</h1>
+<div class="panel" id="namePanel">
+  <label for="name">Your name</label>
+  <input type="text" id="name" maxlength="16" placeholder="Your name" autocomplete="off">
+</div>
+<div class="panel" id="setup">
+  <label>Pick your team</label>
+  <div class="teams" id="teams"></div>
+  <button class="btn" id="go" disabled>New game</button>
+  <button class="btn hidden" id="join">Join the game</button>
+  <button class="btn ghost hidden" id="start">Start now</button>
+</div>
+<div class="panel" id="field">
+  <div class="rope" id="rope"><div class="side a" id="sideA"></div><div class="side b" id="sideB"></div><div class="knot" id="knot"></div></div>
+  <div class="names"><span id="nameA"></span><span id="nameB"></span></div>
+</div>
+<button class="pull hidden" id="pull" type="button">PULL!</button>
+<div class="panel hidden" id="board">
+  <div class="table" id="table"></div>
+  <button class="btn ghost hidden" id="quit">Leave the game</button>
+</div>
+
+<div id="timer"></div>
+<div id="msg">Connecting...</div>
+<div id="note"></div>
+<script>
+  const el = (id) => document.getElementById(id);
+  let app = null, status = { phase: 'idle', players: [] }, skew = 0, lastNoteText = '', lastNoteAt = 0;
+  try { el('name').value = localStorage.getItem('spName') || ''; } catch (e) {}
+  el('name').addEventListener('input', () => { try { localStorage.setItem('spName', el('name').value); } catch (e) {} });
+  const myName = () => el('name').value.trim();
+  const me = () => (app && (status.players || []).find((p) => p.id === app.clientId)) || null;
+  const meIndex = () => (app ? (status.players || []).findIndex((p) => p.id === app.clientId) : -1);
+  const nowMs = () => Date.now() + skew;
+  const say = (t) => { el('msg').textContent = t; };
+  const send = (o) => (app ? app.send(o).catch((e) => { el('note').textContent = 'Could not send: ' + e.message; lastNoteAt = Date.now(); }) : Promise.resolve());
+  function seg(box, list, cur, set) {
+    box.replaceChildren(...list.map(([v, t]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-pressed', String(v === cur));
+      b.addEventListener('click', () => { set(v); render(); }); return b;
+    }));
+  }
+  const secsLeft = (at) => Math.max(0, Math.ceil((at - nowMs()) / 1000));
+  let draw = () => {}, tickGame = () => '', onStatus = () => {};
+  let myTeam = 0, taps = 0, lastSent = 0, timer = null;
+  const pullBtn = el('pull');
+  function flush() {
+    const s = status, m = me();
+    if (!m || s.phase !== 'pull' || !taps) return;
+    const n = Math.min(taps, s.maxBatch || 8); taps -= n; if (taps > 16) taps = 16;
+    lastSent = Date.now(); send({ type: 'pull', n, game: s.game });
+  }
+  function tap(e) {
+    e.preventDefault();
+    if (status.phase !== 'pull' || !me()) return;
+    taps += 1;
+    if (navigator.vibrate) navigator.vibrate(8);
+  }
+  pullBtn.addEventListener('pointerdown', tap);
+  pullBtn.addEventListener('contextmenu', (e) => e.preventDefault());
+  function pickTeam(t) {
+    myTeam = t;
+    if (me() && status.phase === 'lobby') send({ type: 'team', team: t });
+    render();
+  }
+  el('go').addEventListener('click', () => send({ type: 'new', name: myName(), team: myTeam || 1 }));
+  el('join').addEventListener('click', () => send({ type: 'join', name: myName(), team: myTeam }));
+  el('start').addEventListener('click', () => send({ type: 'start' }));
+  el('quit').addEventListener('click', () => send({ type: 'quit' }));
+  draw = () => {
+    const s = status, m = me(), ps = s.players || [], T = s.teams || [['Red team', 'ff2a2a'], ['Blue team', '2a7bff']];
+    const busy = !['idle', 'over', 'unconfigured'].includes(s.phase);
+    if (m) myTeam = m.team;
+    el('teams').replaceChildren(...T.map(([n, c], i) => {
+      const b = document.createElement('button'); b.type = 'button'; b.style.background = '#' + c;
+      const count = ps.filter((p) => p.team === i + 1 && !p.left).length;
+      b.textContent = n + (s.phase === 'lobby' ? ' (' + count + ')' : ''); b.setAttribute('aria-pressed', String(myTeam === i + 1));
+      b.addEventListener('click', () => pickTeam(i + 1)); return b;
+    }));
+    el('go').disabled = !app || busy || s.phase === 'unconfigured';
+    el('go').textContent = s.phase === 'over' ? 'Play again' : 'New game';
+    el('go').classList.toggle('hidden', s.phase === 'lobby');
+    el('join').classList.toggle('hidden', !(s.phase === 'lobby' && !m && ps.length < (s.maxPlayers || 16)));
+    el('start').classList.toggle('hidden', !(s.phase === 'lobby' && ps[0] && app && ps[0].id === app.clientId));
+    el('setup').classList.toggle('hidden', busy && s.phase !== 'lobby');
+    // the rope: the knot from -1 (team 1's line) to +1 (team 2's line)
+    const x = 50 + (s.pos || 0) * 43;
+    el('sideA').style.width = x + '%'; el('sideA').style.background = '#' + T[0][1];
+    el('sideB').style.width = (100 - x) + '%'; el('sideB').style.background = '#' + T[1][1];
+    el('knot').style.left = x + '%';
+    el('nameA').textContent = T[0][0] + (s.cpu === 1 ? ' 🤖' : ''); el('nameA').style.color = '#' + T[0][1];
+    el('nameB').textContent = (s.cpu === 2 ? '🤖 ' : '') + T[1][0]; el('nameB').style.color = '#' + T[1][1];
+    const pulling = m && ['count', 'pull'].includes(s.phase);
+    el('namePanel').classList.toggle('hidden', !!pulling);
+    pullBtn.classList.toggle('hidden', !pulling);
+    if (pulling) {
+      pullBtn.style.background = '#' + T[(m.team || 1) - 1][1];
+      pullBtn.textContent = s.phase === 'count' ? 'Get ready…' : 'PULL!';
+      if (!timer) timer = setInterval(flush, s.batchMs || 250);
+    } else if (timer) { clearInterval(timer); timer = null; taps = 0; }
+    el('board').classList.toggle('hidden', !busy && s.phase !== 'over');
+    el('quit').classList.toggle('hidden', !(m && busy));
+    el('table').replaceChildren(...[1, 2].flatMap((t) => ps.filter((p) => p.team === t).sort((a, b) => b.taps - a.taps).map((p) => {
+      const d = document.createElement('div'); if (app && p.id === app.clientId) d.className = 'me'; d.style.borderLeftColor = '#' + T[t - 1][1];
+      d.textContent = p.name + (p.left ? ' (left)' : '');
+      const sc = document.createElement('span'); sc.textContent = s.phase === 'lobby' ? '' : p.taps + ' pulls'; d.append(sc); return d;
+    })));
+    let t = s.message || '';
+    if (s.phase === 'pull' && s.until) t += '  ' + secsLeft(s.until) + ' s';
+    if (s.phase === 'over' && m && s.winner) t = s.winner === m.team ? '🏆 Your team won!' : s.winner === s.cpu || s.winner ? '💪 ' + s.message : s.message;
+    if (s.phase === 'lobby' && !m) t = 'Pick a team and join!';
+    say(t);
+  };
+
+  function render() {
+    draw();
+    el('timer').textContent = tickGame() || '';
+    const n = app && status.notices && status.notices[app.clientId];
+    if (n && n !== lastNoteText) { lastNoteText = n; lastNoteAt = Date.now(); el('note').textContent = n; }
+    if (!n) lastNoteText = '';
+    if (Date.now() - lastNoteAt > 5000) el('note').textContent = '';
+  }
+  function init() {
+    app = EZApp.connect();
+    app.onStatus((s, snap) => {
+      if (!s) return;
+      if (snap && typeof snap.at === 'number') skew = snap.at - Date.now();
+      const old = status; status = s; onStatus(old, s);
+      render();
+    });
+    app.ready.then(render).catch((e) => say('Could not reach the player: ' + e.message));
+    setInterval(() => { el('timer').textContent = tickGame() || ''; }, 250);
+    render();
+  }
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => say('Could not load the app SDK.');
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>

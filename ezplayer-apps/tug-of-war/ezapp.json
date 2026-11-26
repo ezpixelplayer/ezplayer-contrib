@@ -1,0 +1,13 @@
+{
+    "id": "tug-of-war",
+    "name": "Tug of war",
+    "version": "1",
+    "description": "Two teams of phones tap as fast as they can and the rope on the lights moves to the side that pulls harder; alone, against the computer",
+    "icon": "🪢",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 6000, "perClientPerSecond": 6 }
+}

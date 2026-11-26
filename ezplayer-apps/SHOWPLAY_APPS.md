@@ -8,28 +8,35 @@ settings page on the home network.
 
 | App | Version | What visitors do | Ways to play |
 |---|---|---|---|
-| 🎁 **catch-the-presents** | 3 | Catch the presents falling down a matrix in a sleigh, alone or against a friend; a golden star is 3, coal takes 2 off | 👆 finger · 📱 tilt · 🧍 body |
-| 🏓 **pong** | 4 | Pong on a matrix, against the computer or a friend | 👆 finger · 📱 tilt · 🧍 body |
-| 👾 **space-invaders** | 4 | Defend the show from space invaders: move the ship, it fires | 👆 finger · 📱 tilt · 🧍 body |
-| 🍬 **slice-the-treats** | 2 | Swipe to slice the Christmas treats thrown up a matrix, not the coal | 👆 finger (swipe) |
-| 🐍 **snake** | 3 | Steer a snake, eat the apples, don't hit the walls | 👆 arrows or swipes |
-| ⭕ **tic-tac-toe** | 3 | Tic-tac-toe on a matrix, against the computer or a friend | 👆 tap |
-| 🔴 **four-in-a-row** | 3 | Four in a Row on a matrix, against the computer or a friend | 👆 tap |
-| 🟢 **simon** | 3 | Repeat the colours the lights show; one more each round | 👆 tap |
-| 🔢 **count-the-colours** | 2 | Party game for up to 8 phones: count how many times a colour flashes | 👆 tap |
-| 🌟 **race-to-the-star** | 2 | Up to 8 phones race climbers up a tree or matrix (tap, sing, shake or run); the winner lights the star | 👆 tap · 🎤 voice · 📱 shake · 🏃 run |
-| 💬 **messages** | 3 | Send a message, an animated picture (73 GIFs), an effect or a drawing to a matrix | — |
-| 📅 **advent-calendar** | 2 | Open one more door every day of December and see its surprise | — |
-| 🎄 **decorate-the-tree** | 12 | Hang decorations (baubles, candy canes, bells, presents…) with colours and effects, several at once; change the star's colour and effect, and the tree's colour | — |
-| 🎁 **fun** | 5 | Photo frame, wheel of fortune, animals, paint by numbers, the bell, snow on request (web address or DMX, with modes and lights), treasure hunt, guess the song | — |
+| 🎁 **catch-the-presents** | 5 | Catch the presents falling down a matrix in a sleigh, alone or against a friend; a golden star is 3, coal takes 2 off | 👆 finger · 📱 tilt · 🧍 body |
+| 🏓 **pong** | 5 | Pong on a matrix, against the computer or a friend | 👆 finger · 📱 tilt · 🧍 body |
+| 👾 **space-invaders** | 5 | Defend the show from space invaders: move the ship, it fires | 👆 finger · 📱 tilt · 🧍 body |
+| 🍬 **slice-the-treats** | 4 | Swipe to slice the Christmas treats thrown up a matrix, not the coal | 👆 finger (swipe) |
+| 🐍 **snake** | 4 | Steer a snake, eat the apples, don't hit the walls | 👆 arrows or swipes |
+| ⭕ **tic-tac-toe** | 4 | Tic-tac-toe on a matrix, against the computer or a friend | 👆 tap |
+| 🔴 **four-in-a-row** | 4 | Four in a Row on a matrix, against the computer or a friend | 👆 tap |
+| 🟢 **simon** | 4 | Repeat the colours the lights show; one more each round | 👆 tap |
+| 🔢 **count-the-colours** | 3 | Party game for up to 8 phones: count how many times a colour flashes | 👆 tap |
+| 🌟 **race-to-the-star** | 3 | Up to 8 phones race climbers up a tree or matrix (tap, sing, shake or run); the winner lights the star | 👆 tap · 🎤 voice · 📱 shake · 🏃 run |
+| 💬 **messages** | 4 | Send a message, an animated picture (73 GIFs), an effect or a drawing to a matrix | — |
+| 📅 **advent-calendar** | 3 | Open one more door every day of December and see its surprise | — |
+| 🎄 **decorate-the-tree** | 13 | Hang decorations (baubles, candy canes, bells, presents…) with colours and effects, several at once; change the star's colour and effect, and the tree's colour | — |
+| 🎁 **fun** | 7 | Photo frame, wheel of fortune, animals, paint by numbers, the bell, snow on request (web address or DMX, with modes and lights), treasure hunt, guess the song | — |
 | ✨ **props** | 3 | Light up real models of the show (wings, arches, canes…) with an effect and colours | — |
 | 🎹 **play-the-lights** | 3 | Each model becomes a key on the phone: take turns playing the show like a keyboard | — |
-| 🎤 **sing** | 3 | Record a song; a singing model sings it on the show's speakers | — |
+| 🎤 **sing** | 4 | Record a song; a singing model sings it on the show's speakers | — |
+| 🪢 **tug-of-war** | 1 | Two teams of phones tap as fast as they can; the rope moves to the side that pulls harder (alone: against the computer) | 👆 tap |
+| 📸 **photo-pixels** | 1 | Take a selfie and see it on a matrix in pixels, in a frame of the season; nothing is saved | 📸 camera |
+| 📝 **guestbook** | 1 | Leave your name and a short note; new notes scroll on a matrix and the book is read every few minutes | — |
 
 **Ways to play**: 👆 finger on the phone; 📱 tilt: tilting the phone (needs the page in https); 🧍 body: the body
 sensor at the lights, see below.
 
 ## Not an app
+
+- **pi-speaker/**: the ShowPlay speaker, a Raspberry Pi on the network that plays the apps' sounds (endings of the games,
+  the bell, the songs, the singing) next to the lights. Pick "A Raspberry Pi on the network" in "Where it plays". Its own page, http://<the Pi's IP>:8765, sets the
+  volume, the sound output and a key, and plays a test sound.
 
 - **body-sensor/**: the body sensor, an ESP32 with an HLK-LD2450 radar (about 20 €) that sees up to 3 people in front
   of the lights, for 🧍 body in catch-the-presents, pong and space-invaders (and in ShowPlay). Program, wiring and
@@ -96,3 +103,26 @@ sensor at the lights, see below.
   by the computer's voice and/or written across the lights (`{winner}`, `{colour}`, `{score}`), and a machine (bubbles,
   fog, lights…) for a few seconds. All off by default; each game has its own, for a show with only one game. Shared code:
   `_common/ending.mjs`.
+- **🔈 A Raspberry Pi as a speaker (with ShowPlay v36):** "Where it plays" has a new choice, **A Raspberry Pi on the
+  network**, with its IP address and key, in the 10 games (four-in-a-row 4, tic-tac-toe 4, simon 4, count-the-colours 3,
+  snake 4, space-invaders 5, pong 5, race-to-the-star 3, catch-the-presents 4, slice-the-treats 3), fun 6 and sing 4.
+  The Pi runs `pi-speaker/` (install with `sh install.sh`). If the Pi does not answer, the sound plays on the computer.
+- **🎨 Theme packs:** the 17 apps dressed for 🎆 New Year, 💍 Wedding, 🕊️ Baptism, 🐣 Easter, 🎃 Halloween and 🦃
+  Thanksgiving, each pack in its own folder next to `ezplayer-apps` (`ezplayer-apps-newyear`, …) with its own app ids
+  (`halloween-catch`, …), so they install next to the Christmas ones. What changes in each app: `THEME_PACKS.md`.
+  The Christmas apps catch-the-presents 5, slice-the-treats 4, decorate-the-tree 13, advent-calendar 3, fun 7 and
+  messages 4 only got ready for them (a `theme.mjs`, empty for Christmas): they look and play as before.
+- **🎨 Theme packs and ShowPlay v38:** every app also exists in 6 theme packs (the folders `ezplayer-apps-newyear`, `-wedding`, `-baptism`,
+  `-easter`, `-halloween` and `-thanksgiving`, next to `ezplayer-apps`), each app with its own id so it can sit next to the Christmas one (see
+  THEME_PACKS.md). ShowPlay v38 has the same themes as a **🎨 Theme of the show** choice on its control page, so the
+  bridge, the visitors' page and the apps can show the same party.
+- **🎨 Five more theme packs (with ShowPlay v39):** `ezplayer-apps-carnival`, `-valentines`, `-birthday`,
+  `-childrensday` and `-july4` (11 packs in all), each with the 17 apps and a copy of body-sensor and pi-speaker.
+  18 new little pictures in `sprites.mjs` (mask, drum, parrot, love letter, party hat, kite, teddy bear, flag, eagle…)
+  and a "Stars and stripes" photo frame in fun.
+- **🪢📸📝 Three new apps:** **tug-of-war** (two teams tap to pull a rope on a matrix; a team's pull is divided by how
+  many players it has, so a small team can win; alone, against the computer; the win/lose ending like the other
+  games), **photo-pixels** (a selfie on the lights in pixels, with a frame and a look: natural, pop art, black and
+  white, old photo; only a few squares leave the phone and nothing is saved) and **guestbook** (names and notes on the
+  lights, the book read every few minutes, kept across restarts, the word filter also on notes already in it, a book
+  number to start a new one). All three are in the 11 theme packs too (20 apps per pack).
