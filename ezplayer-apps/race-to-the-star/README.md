@@ -5,7 +5,8 @@ measured on their phone (tapping, singing, shaking the phone, or running on the 
 to reach the top lights the star in their color. A port of the race game in ShowPlay to the EZPlayer
 app runtime: the player starts `race.mjs`, phones open the app's page, and their efforts reach the game
 as app events. While a race is on the track (and the star, when one is chosen) are painted through
-overlay leases; between races the leases are released so the show has its lights back. Plain Node
+exclusive overlay leases, taken when the first player joins and released after the race so the show
+has its lights back. When another app has the track, the race says who and does not start. Plain Node
 (22+), no dependencies.
 
 ## Install
@@ -107,6 +108,8 @@ Every part works on its own: only the sound, only the words, only the machine, o
 **In this game:** a win is someone reaching the star, or being highest when the time is up. There is no loss, and no words on the lights (the track is not a matrix).
 
 ## Changes
+
+- **Version 4:** the overlay leases are **exclusive** again, with the app token, as PR #21 made them (a later upload had undone it: "Could not light …: overlay: mode must be 'exclusive' or 'layer'"). A model another app is using is refused with that app's name. The machine's lease (DMX through EZPlayer) too.
 
 - **Version 3:** 🔈 sounds can also play on **a Raspberry Pi on the network** running the ShowPlay speaker (see `pi-speaker/`): pick it in "Where it plays" and put in the Pi's IP address (and its key, if you set one). If the Pi does not answer, the sound plays on this computer.
 

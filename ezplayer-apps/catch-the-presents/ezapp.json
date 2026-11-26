@@ -1,7 +1,7 @@
 {
     "id": "catch-the-presents",
     "name": "Catch the presents",
-    "version": "5",
+    "version": "6",
     "description": "Presents fall down a matrix of the show: slide your phone to catch them in your sleigh, alone or against a friend",
     "icon": "🎁",
     "runtime": "node",

@@ -1,7 +1,7 @@
 {
     "id": "race-to-the-star",
     "name": "Race to the Star",
-    "version": "3",
+    "version": "4",
     "description": "Up to eight phones race climbers up a tree or matrix by tapping, singing, shaking or running; the winner lights the star",
     "icon": "🌟",
     "runtime": "node",

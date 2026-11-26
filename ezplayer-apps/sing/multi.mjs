@@ -105,8 +105,9 @@ export async function run({ name, App, cleanSettings }) {
     const leases = new Map();   // model -> { id, token, frameBytes, seq, failedAt, fmt, w, h, n, idleSince }
     async function openLease(g) {
         const body = g.fmt === 'grid' ? { model: g.model, format: 'grid', width: g.w, height: g.h } : { model: g.model, format: 'nodes' };
-        const res = await fetch(`${base}/api/ezp/overlays`, { method: 'POST', headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ ...body, name: `${name}: ${g.model}`, blend: 'replace', ttlMs: 8000 }) });
+        // exclusive, with the app token: a model another app is using is refused with that app's name
+        const res = await fetch(`${base}/api/ezp/overlays`, { method: 'POST', headers: jsonHeaders,
+            body: JSON.stringify({ ...body, name: `${name}: ${g.model}`, mode: 'exclusive', blend: 'replace', ttlMs: 8000 }) });
         const o = await res.json().catch(() => ({}));
         if (!o.ok || !o.lease) throw new Error(o.error ?? `HTTP ${res.status}`);
         return { id: o.lease.id, token: o.lease.token, frameBytes: o.lease.frameBytes, seq: 1, fmt: g.fmt, w: g.w, h: g.h, n: g.n };

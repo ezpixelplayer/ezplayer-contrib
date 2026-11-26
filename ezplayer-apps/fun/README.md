@@ -268,6 +268,8 @@ Every part works on its own: only the sound, only the words, only the machine, o
 
 ## Changes
 
+- **Version 8:** the overlay leases are **exclusive** again, with the app token, as PR #21 made them (a later upload had undone it: "Could not light …: overlay: mode must be 'exclusive' or 'layer'"). A model another app is using is refused with that app's name. The machine's lease (DMX through EZPlayer) too.
+
 - **Version 7:** ready for the theme packs (New Year, wedding, baptism, Easter, Halloween, Thanksgiving; later also Carnival, Valentine's Day, birthday, Children's Day and 4th of July, with a "Stars and stripes" photo frame): a `theme.mjs` next to the app (empty here, so this Christmas app looks and plays exactly as before) and the small pictures of `sprites.mjs`. The packs are made from this app by `_themes/make_pack.py`.
 
 - **Version 6:** 🔈 sounds can also play on **a Raspberry Pi on the network** running the ShowPlay speaker (see `pi-speaker/`): pick it in "Where it plays" and put in the Pi's IP address (and its key, if you set one). If the Pi does not answer, the sound plays on this computer.

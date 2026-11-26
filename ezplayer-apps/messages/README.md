@@ -59,6 +59,8 @@ Picking up to 3 pictures in a row (ShowPlay's page could queue three at once); h
 
 ## Changes
 
+- **Version 5:** the overlay leases are **exclusive** again, with the app token, as PR #21 made them (a later upload had undone it: "Could not light …: overlay: mode must be 'exclusive' or 'layer'"). A model another app is using is refused with that app's name.
+
 - **Version 4:** ready for the theme packs (New Year, wedding, baptism, Easter, Halloween, Thanksgiving): a `theme.mjs` next to the app (empty here, so this Christmas app looks and plays exactly as before) and the small pictures of `sprites.mjs`. The packs are made from this app by `_themes/make_pack.py`.
 
 - **Version 2:** the **Picture** tab: the 73 animated GIFs of the ShowPlay page, filtered by the theme.

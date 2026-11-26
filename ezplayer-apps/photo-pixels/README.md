@@ -41,4 +41,6 @@ photo is on), `main.mjs` (starts the two). The frames are the same as fun's phot
 
 ## Changes
 
+- **Version 2:** the overlay leases are **exclusive**, with the app token, like the other apps (PR #21); without it EZPlayer refused them ("overlay: mode must be 'exclusive' or 'layer'").
+
 - **Version 1:** the first version.

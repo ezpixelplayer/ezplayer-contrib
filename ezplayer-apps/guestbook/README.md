@@ -42,4 +42,6 @@ player; the lease is only open while something is on the lights), `main.mjs`.
 
 ## Changes
 
+- **Version 2:** the overlay leases are **exclusive**, with the app token, like the other apps (PR #21); without it EZPlayer refused them ("overlay: mode must be 'exclusive' or 'layer'").
+
 - **Version 1:** the first version.

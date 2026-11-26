@@ -1,7 +1,7 @@
 {
     "id": "four-in-a-row",
     "name": "Four in a Row",
-    "version": "4",
+    "version": "5",
     "description": "Play Four in a Row on a matrix of the show from your phone, against the computer or a friend's phone",
     "icon": "🔴",
     "runtime": "node",
