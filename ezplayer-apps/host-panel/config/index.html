@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Host panel</title>
+<!-- The source of the host panel's settings page. _src/make_panel.mjs fills in Host panel, 🎛️, ffc83c and DATA and
+     writes config/index.html; never edit config/index.html by hand. -->
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c;
+    --run: #39d353; --wait: #ffc83c; --bad: #ff4d4d; --off: #6f6585; --later: #2bb7ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 980px; margin-inline: auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 22px 0 6px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+  .hint { color: var(--dim); font-size: 13px; margin: 4px 0 0; }
+  button, .btn { font: inherit; font-size: 14px; font-weight: 600; color: #1a1200; background: var(--accent); border: 0; border-radius: 10px; padding: 8px 14px; cursor: pointer; text-decoration: none; display: inline-block; }
+  button.ghost, .btn.ghost { color: var(--text); background: #2a2140; border: 1px solid var(--line); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  select { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  #net { display: none; margin: 16px 0; padding: 14px; border: 1px solid var(--accent); border-radius: 10px; background: var(--panel); }
+  #sum { margin: 10px 0 0; font-weight: 600; }
+  #note { min-height: 20px; color: var(--wait); font-size: 14px; margin: 6px 0 0; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .seg button { border-radius: 999px; }
+  .seg button[aria-pressed=false] { color: var(--text); background: #2a2140; border: 1px solid var(--line); }
+  #plan { display: none; margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  #plan ul { margin: 4px 0 10px; padding-left: 20px; }
+  #plan .on { color: var(--run); } #plan .off { color: var(--bad); }
+  #cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; margin-top: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .card.mine { border-color: var(--accent); }
+  .top { display: flex; align-items: center; gap: 10px; }
+  .icon { font-size: 26px; width: 34px; text-align: center; }
+  .names { flex: 1; min-width: 0; }
+  .title { font-weight: 700; overflow-wrap: anywhere; }
+  .app { color: var(--dim); font-size: 12px; overflow-wrap: anywhere; }
+  .badge { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 9px; color: #120c1c; white-space: nowrap; }
+  .msg { font-size: 14px; overflow-wrap: anywhere; }
+  .meta { color: var(--dim); font-size: 12px; }
+  .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .acts button, .acts .btn { padding: 6px 10px; font-size: 13px; }
+  details { font-size: 12px; color: var(--dim); }
+  pre { margin: 6px 0 0; background: #120d1d; border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-size: 11px; max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<h1>🎛️ Host panel</h1>
+<p class="hint">Every app of the show on one page: what is on, how many people play, and buttons to switch them. Updates every 3 seconds.</p>
+<div id="net">Open this page on the home network (the player's own address, e.g. http://ezplayer.local) to see and switch the apps. Through the internet the player does not offer this.</div>
+<div id="main">
+  <p id="sum">Loading...</p>
+  <p id="note"></p>
+
+  <h2>🎨 Theme of the night</h2>
+  <div class="bar">
+    <select id="theme" aria-label="Theme of the night"></select>
+    <button id="preview">Show what changes</button>
+  </div>
+  <p class="hint">Switches on the apps of this theme and switches off the ShowPlay apps of the other themes. Other apps (this panel, the agenda, apps not from ShowPlay) are never touched.</p>
+  <div id="plan" role="region" aria-live="polite"></div>
+
+  <h2>Apps</h2>
+  <div class="bar seg" id="filter">
+    <button data-f="all" aria-pressed="true">All</button>
+    <button data-f="running" aria-pressed="false">Running</button>
+    <button data-f="stopped" aria-pressed="false">Not running</button>
+  </div>
+  <div id="cards"></div>
+</div>
+<script>
+  const DATA = {"theme":"christmas","themes":[{"key":"christmas","name":"Christmas","emoji":"🎄"},{"key":"newyear","name":"New Year","emoji":"🎆"},{"key":"wedding","name":"Wedding","emoji":"💍"},{"key":"baptism","name":"Baptism","emoji":"🕊️"},{"key":"easter","name":"Easter","emoji":"🐣"},{"key":"halloween","name":"Halloween","emoji":"🎃"},{"key":"thanksgiving","name":"Thanksgiving","emoji":"🦃"},{"key":"carnival","name":"Carnival","emoji":"🎭"},{"key":"valentines","name":"Valentine's Day","emoji":"💘"},{"key":"birthday","name":"Birthday","emoji":"🎂"},{"key":"childrensday","name":"Children's Day","emoji":"🧒"},{"key":"july4","name":"4th of July","emoji":"🇺🇸"}],"prefixes":["newyear","wedding","baptism","easter","halloween","thanksgiving","carnival","valentines","birthday","childrensday","july4"],"showplay":["advent-calendar","baptism-catch","baptism-count-the-colours","baptism-countdown","baptism-four-in-a-row","baptism-fun","baptism-guestbook","baptism-live-countdown","baptism-messages","baptism-photo","baptism-play-the-lights","baptism-pong","baptism-props","baptism-race","baptism-raffle","baptism-rhythm","baptism-simon","baptism-sing","baptism-slice","baptism-snake","baptism-space-invaders","baptism-statue","baptism-tic-tac-toe","baptism-tree","baptism-tug-of-war","birthday-catch","birthday-count-the-colours","birthday-countdown","birthday-four-in-a-row","birthday-fun","birthday-guestbook","birthday-live-countdown","birthday-messages","birthday-photo","birthday-play-the-lights","birthday-pong","birthday-props","birthday-race","birthday-raffle","birthday-rhythm","birthday-simon","birthday-sing","birthday-slice","birthday-snake","birthday-space-invaders","birthday-statue","birthday-tic-tac-toe","birthday-tree","birthday-tug-of-war","carnival-catch","carnival-count-the-colours","carnival-countdown","carnival-four-in-a-row","carnival-fun","carnival-guestbook","carnival-live-countdown","carnival-messages","carnival-photo","carnival-play-the-lights","carnival-pong","carnival-props","carnival-race","carnival-raffle","carnival-rhythm","carnival-simon","carnival-sing","carnival-slice","carnival-snake","carnival-space-invaders","carnival-statue","carnival-tic-tac-toe","carnival-tree","carnival-tug-of-war","catch-the-presents","childrensday-catch","childrensday-count-the-colours","childrensday-countdown","childrensday-four-in-a-row","childrensday-fun","childrensday-guestbook","childrensday-live-countdown","childrensday-messages","childrensday-photo","childrensday-play-the-lights","childrensday-pong","childrensday-props","childrensday-race","childrensday-raffle","childrensday-rhythm","childrensday-simon","childrensday-sing","childrensday-slice","childrensday-snake","childrensday-space-invaders","childrensday-statue","childrensday-tic-tac-toe","childrensday-tree","childrensday-tug-of-war","count-the-colours","decorate-the-tree","easter-catch","easter-count-the-colours","easter-countdown","easter-four-in-a-row","easter-fun","easter-guestbook","easter-live-countdown","easter-messages","easter-photo","easter-play-the-lights","easter-pong","easter-props","easter-race","easter-raffle","easter-rhythm","easter-simon","easter-sing","easter-slice","easter-snake","easter-space-invaders","easter-statue","easter-tic-tac-toe","easter-tree","easter-tug-of-war","four-in-a-row","fun","guestbook","halloween-catch","halloween-count-the-colours","halloween-countdown","halloween-four-in-a-row","halloween-fun","halloween-guestbook","halloween-live-countdown","halloween-messages","halloween-photo","halloween-play-the-lights","halloween-pong","halloween-props","halloween-race","halloween-raffle","halloween-rhythm","halloween-simon","halloween-sing","halloween-slice","halloween-snake","halloween-space-invaders","halloween-statue","halloween-tic-tac-toe","halloween-tree","halloween-tug-of-war","july4-catch","july4-count-the-colours","july4-countdown","july4-four-in-a-row","july4-fun","july4-guestbook","july4-live-countdown","july4-messages","july4-photo","july4-play-the-lights","july4-pong","july4-props","july4-race","july4-raffle","july4-rhythm","july4-simon","july4-sing","july4-slice","july4-snake","july4-space-invaders","july4-statue","july4-tic-tac-toe","july4-tree","july4-tug-of-war","live-countdown","messages","newyear-catch","newyear-count-the-colours","newyear-countdown","newyear-four-in-a-row","newyear-fun","newyear-guestbook","newyear-live-countdown","newyear-messages","newyear-photo","newyear-play-the-lights","newyear-pong","newyear-props","newyear-race","newyear-raffle","newyear-rhythm","newyear-simon","newyear-sing","newyear-slice","newyear-snake","newyear-space-invaders","newyear-statue","newyear-tic-tac-toe","newyear-tree","newyear-tug-of-war","photo-pixels","play-the-lights","pong","props","race-to-the-star","raffle","rhythm","simon","sing","slice-the-treats","snake","space-invaders","statue","thanksgiving-catch","thanksgiving-count-the-colours","thanksgiving-countdown","thanksgiving-four-in-a-row","thanksgiving-fun","thanksgiving-guestbook","thanksgiving-live-countdown","thanksgiving-messages","thanksgiving-photo","thanksgiving-play-the-lights","thanksgiving-pong","thanksgiving-props","thanksgiving-race","thanksgiving-raffle","thanksgiving-rhythm","thanksgiving-simon","thanksgiving-sing","thanksgiving-slice","thanksgiving-snake","thanksgiving-space-invaders","thanksgiving-statue","thanksgiving-tic-tac-toe","thanksgiving-tree","thanksgiving-tug-of-war","tic-tac-toe","tug-of-war","valentines-catch","valentines-count-the-colours","valentines-countdown","valentines-four-in-a-row","valentines-fun","valentines-guestbook","valentines-live-countdown","valentines-messages","valentines-photo","valentines-play-the-lights","valentines-pong","valentines-props","valentines-race","valentines-raffle","valentines-rhythm","valentines-simon","valentines-sing","valentines-slice","valentines-snake","valentines-space-invaders","valentines-statue","valentines-tic-tac-toe","valentines-tree","valentines-tug-of-war","wedding-catch","wedding-count-the-colours","wedding-countdown","wedding-four-in-a-row","wedding-fun","wedding-guestbook","wedding-live-countdown","wedding-messages","wedding-photo","wedding-play-the-lights","wedding-pong","wedding-props","wedding-race","wedding-raffle","wedding-rhythm","wedding-simon","wedding-sing","wedding-slice","wedding-snake","wedding-space-invaders","wedding-statue","wedding-tic-tac-toe","wedding-tree","wedding-tug-of-war"]};
+  const el = (id) => document.getElementById(id);
+  const STATES = {
+    running: ['Running', 'var(--run)'], starting: ['Starting', 'var(--wait)'], stopped: ['Stopped', 'var(--off)'],
+    failed: ['Failed', 'var(--bad)'], missing: ['App missing', 'var(--bad)'], disabled: ['Off', 'var(--off)'],
+    unavailable: ['Not scheduled now', 'var(--later)'],
+  };
+  const SHOWPLAY = new Set(DATA.showplay);
+  let app = null, apps = null, statuses = {}, filter = 'all', busy = new Set(), openLogs = new Set(), plan = null, timer = 0, saidAt = 0;
+  // a note from a button stays 10 s, so the next refresh does not wipe it at once
+  const say = (text) => { el('note').textContent = text; saidAt = text ? Date.now() : 0; };
+
+  // ---- the theme of an app: a pack app's id starts with "<pack>-"; a ShowPlay app with none of the prefixes is Christmas
+  function themeOf(appId) {
+    if (!SHOWPLAY.has(appId)) return null;
+    return DATA.prefixes.find((p) => appId.startsWith(p + '-')) || 'christmas';
+  }
+  // what the theme of the night changes: ShowPlay instances of that theme on, of the other themes off; the rest untouched
+  function planTheme(instances, key) {
+    const on = [], off = [], keep = [];
+    for (const i of instances) {
+      const t = themeOf(i.appId);
+      if (!t) keep.push(i);
+      else if (t === key) { if (!i.enabled) on.push(i); }
+      else if (i.enabled) off.push(i);
+    }
+    return { key, on, off, keep };
+  }
+  const manifest = (appId) => (apps?.apps || []).find((a) => a.id === appId)?.manifest || {};
+  const nameOf = (i) => i.title || manifest(i.appId).name || i.name;
+  const ago = (at) => { const s = Math.max(0, Math.round((Date.now() - at) / 1000)); return s < 60 ? `${s} s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
+  const isRunning = (i) => i.state === 'running' || i.state === 'starting';
+  function mk(tag, props = {}, ...kids) {
+    const n = Object.assign(document.createElement(tag), props);
+    for (const k of kids) if (k != null) n.append(k);
+    return n;
+  }
+
+  async function api(path, opts) {
+    const r = await fetch(`${app.apiBase}${path}`, { cache: 'no-store', ...opts });
+    let body = null;
+    try { body = await r.json(); } catch (e) { /* no JSON */ }
+    if (!r.ok || body?.ok === false) throw new Error(body?.error || `HTTP ${r.status}`);
+    return body;
+  }
+  const command = (cmd) => api('/api/ezp/apps/command', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(cmd) });
+
+  async function refresh() {
+    clearTimeout(timer);
+    try {
+      apps = await api('/api/ezp/apps');
+      const list = apps.instances || [];
+      await Promise.all(list.filter(isRunning).map(async (i) => {
+        try { statuses[i.name] = await api(`/api/ezp/apps/${encodeURIComponent(i.name)}/status`); } catch (e) { /* keep the last one */ }
+      }));
+      if (Date.now() - saidAt > 10000) el('note').textContent = apps.lastError ? `Player: ${apps.lastError}` : '';
+      draw();
+    } catch (e) {
+      el('note').textContent = `Could not reach the player: ${e.message}`;
+    }
+    timer = setTimeout(refresh, 3000);
+  }
+
+  function draw() {
+    const list = (apps?.instances || []).slice().sort((a, b) => nameOf(a).localeCompare(nameOf(b), undefined, { sensitivity: 'base' }));
+    const n = (f) => list.filter(f).length;
+    const run = n(isRunning), later = n((i) => i.state === 'unavailable'), stopped = list.length - run - later;
+    const failed = n((i) => i.state === 'failed' || i.state === 'missing');
+    el('sum').textContent = `${run} running, ${stopped} stopped, ${later} not scheduled now` + (failed ? ` (${failed} with a problem)` : '') + ` · ${list.length} apps`;
+    const shown = list.filter((i) => filter === 'all' || (filter === 'running') === isRunning(i));
+    el('cards').replaceChildren(...shown.map(card));
+    if (!shown.length) el('cards').append(mk('p', { className: 'hint', textContent: list.length ? 'No app here with this filter.' : 'No app installed yet: add some on the Apps tile of the player.' }));
+  }
+
+  function card(i) {
+    const m = manifest(i.appId), [label, colour] = STATES[i.state] || [i.state, 'var(--off)'];
+    const snap = statuses[i.name], st = isRunning(i) && snap && snap.seq > 0 && snap.state && typeof snap.state === 'object' ? snap.state : null;
+    const badge = mk('span', { className: 'badge', textContent: label });
+    badge.style.background = colour;
+    const t = themeOf(i.appId), th = t && DATA.themes.find((x) => x.key === t);
+    const c = mk('div', { className: 'card' + (t === null && /host-panel$/.test(i.appId) ? ' mine' : '') },
+      mk('div', { className: 'top' },
+        mk('div', { className: 'icon', textContent: m.icon || '🧩' }),
+        mk('div', { className: 'names' }, mk('div', { className: 'title', textContent: nameOf(i) }),
+          mk('div', { className: 'app', textContent: `${m.name || i.appId} · ${i.name}` + (th ? ` · ${th.emoji} ${th.name}` : '') })),
+        badge));
+    if (st) {
+      const players = Array.isArray(st.players) ? st.players.length : null;
+      if (players !== null) c.append(mk('div', { className: 'msg', textContent: `👥 ${players} ${players === 1 ? 'player' : 'players'} now` }));
+      if (st.message) c.append(mk('div', { className: 'msg', textContent: String(st.message).slice(0, 200) }));
+      c.append(mk('div', { className: 'meta', textContent: `Updated ${ago(snap.at)}` + (st.phase ? ` · ${st.phase}` : '') }));
+    } else if (i.state === 'unavailable') {
+      c.append(mk('div', { className: 'meta', textContent: 'On, but outside its schedule: it starts by itself when its time comes.' }));
+    } else if (i.state === 'failed' || i.state === 'missing') {
+      c.append(mk('div', { className: 'meta', textContent: i.report?.lastExit ? `Last exit: ${i.report.lastExit}` : i.state === 'missing' ? 'The app is not installed any more.' : 'It stopped and was not started again.' }));
+    }
+    const b = busy.has(i.name);
+    const act = (text, cmd, enabled, ghost = true) => {
+      const x = mk('button', { textContent: text, className: ghost ? 'ghost' : '', disabled: b || !enabled });
+      x.addEventListener('click', () => run(i.name, [cmd]));
+      return x;
+    };
+    const acts = mk('div', { className: 'acts' },
+      act(i.enabled ? 'Switch off' : 'Switch on', { op: 'setInstance', name: i.name, patch: { enabled: !i.enabled } }, true, false),
+      act('Start', { op: 'start', name: i.name }, i.enabled && !isRunning(i) && i.state !== 'missing'),
+      act('Stop', { op: 'stop', name: i.name }, isRunning(i)),
+      act('Restart', { op: 'restart', name: i.name }, i.enabled && i.state !== 'missing'));
+    const base = `${app.apiBase}/apps/${encodeURIComponent(i.name)}/`;
+    if (m.page) acts.append(mk('a', { className: 'btn ghost', href: base, target: '_blank', rel: 'noopener', textContent: "Visitors' page" }));
+    if (m.config) acts.append(mk('a', { className: 'btn ghost', href: base + 'config/', target: '_blank', rel: 'noopener', textContent: 'Settings' }));
+    c.append(acts);
+    const log = i.report?.logTail || [];
+    if (log.length) {
+      const d = mk('details', { open: openLogs.has(i.name) }, mk('summary', { textContent: 'Last lines of its log' }), mk('pre', { textContent: log.slice(-30).join('\n') }));
+      d.addEventListener('toggle', () => { d.open ? openLogs.add(i.name) : openLogs.delete(i.name); });
+      c.append(d);
+    }
+    return c;
+  }
+
+  // one or more commands, one after another; the card's buttons wait meanwhile
+  async function run(name, cmds) {
+    busy.add(name); draw();
+    try { for (const cmd of cmds) await command(cmd); say(''); }
+    catch (e) { say(`Could not do it: ${e.message}`); }
+    busy.delete(name);
+    await refresh();
+  }
+
+  // ---- theme of the night: show the plan, then a Yes inside the page
+  function showPlan() {
+    plan = planTheme(apps?.instances || [], el('theme').value);
+    const th = DATA.themes.find((x) => x.key === plan.key);
+    const box = el('plan');
+    box.replaceChildren();
+    box.style.display = 'block';
+    const li = (i) => mk('li', { textContent: `${manifest(i.appId).icon || ''} ${nameOf(i)} (${i.name})` });
+    if (!plan.on.length && !plan.off.length) {
+      box.append(mk('p', { textContent: `Nothing to change: the ${th.emoji} ${th.name} apps are already the ones on.` }));
+      box.append(mk('button', { className: 'ghost', textContent: 'Close', onclick: hidePlan }));
+      return;
+    }
+    if (plan.on.length) box.append(mk('div', { className: 'on', textContent: `Switch on (${plan.on.length}):` }), mk('ul', {}, ...plan.on.map(li)));
+    if (plan.off.length) box.append(mk('div', { className: 'off', textContent: `Switch off (${plan.off.length}):` }), mk('ul', {}, ...plan.off.map(li)));
+    if (plan.keep.length) box.append(mk('p', { className: 'hint', textContent: `Not touched (${plan.keep.length}, not part of a theme): ${plan.keep.map(nameOf).join(', ')}.` }));
+    const yes = mk('button', { textContent: `Yes, make it ${th.emoji} ${th.name}` });
+    yes.addEventListener('click', applyPlan);
+    box.append(mk('div', { className: 'bar' }, yes, mk('button', { className: 'ghost', textContent: 'Cancel', onclick: hidePlan })));
+  }
+  function hidePlan() { plan = null; el('plan').style.display = 'none'; el('plan').replaceChildren(); }
+  async function applyPlan() {
+    const p = plan;
+    if (!p) return;
+    el('plan').querySelectorAll('button').forEach((x) => { x.disabled = true; });
+    const cmds = [...p.on.map((i) => ({ op: 'setInstance', name: i.name, patch: { enabled: true } })),
+      ...p.off.map((i) => ({ op: 'setInstance', name: i.name, patch: { enabled: false } }))];
+    let done = 0, failed = [];
+    for (const cmd of cmds) {
+      try { await command(cmd); done++; } catch (e) { failed.push(`${cmd.name}: ${e.message}`); }
+      say(`Switching... ${done + failed.length} of ${cmds.length}`);
+    }
+    hidePlan();
+    say(failed.length ? `Done ${done} of ${cmds.length}. Not done: ${failed.join('; ')}` : `Done: ${done} ${done === 1 ? 'app' : 'apps'} switched.`);
+    await refresh();
+  }
+
+  function init() {
+    for (const t of DATA.themes) el('theme').append(new Option(`${t.emoji} ${t.name}`, t.key));
+    el('theme').value = DATA.theme;
+    el('preview').addEventListener('click', showPlan);
+    el('theme').addEventListener('change', () => { if (plan) showPlan(); });
+    el('filter').addEventListener('click', (e) => {
+      const f = e.target.closest('button')?.dataset.f;
+      if (!f) return;
+      filter = f;
+      el('filter').querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.f === f)));
+      draw();
+    });
+  }
+  async function start() {
+    try { app = EZApp.connect(); await app.ready; } catch (e) { el('sum').textContent = ''; el('note').textContent = `Could not reach the player: ${e.message}`; return; }
+    if (app.apiBase === null || app.apiBase === undefined) {
+      // through the cloud: the owner API is only on the home network
+      el('net').style.display = 'block';
+      el('main').style.display = 'none';
+      return;
+    }
+    refresh();
+  }
+  init();
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = start;
+  sdk.onerror = () => { el('sum').textContent = ''; el('note').textContent = 'Could not load the app SDK.'; };
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>

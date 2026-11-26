@@ -1,0 +1,12 @@
+{
+    "id": "host-panel",
+    "name": "Host panel",
+    "version": "1",
+    "description": "One page for whoever runs the show: see every app, how many people play, switch apps on and off, and pick the theme of the night",
+    "icon": "🎛️",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 30, "perClientPerSecond": 1 }
+}

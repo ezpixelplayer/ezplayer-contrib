@@ -1,0 +1,13 @@
+{
+    "id": "statue",
+    "name": "Statues",
+    "version": "1",
+    "description": "Musical statues with the lights: dance while the matrix is green, freeze when it turns red. The body sensor or each player's phone sees who moves",
+    "icon": "🗽",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 2400, "perClientPerSecond": 8 }
+}

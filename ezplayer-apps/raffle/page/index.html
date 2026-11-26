@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0a16">
+<title>Raffle</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --raise: #261d3a; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; --c1: #ff2a2a; --c2: #2a7bff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 12px 14px 24px; gap: 12px; min-height: 100dvh; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  h1 { margin: 4px 0 0; font-size: 24px; text-align: center; }
+  .panel { width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  label { color: var(--dim); font-size: 14px; }
+  input[type=text] { width: 100%; font: inherit; font-size: 18px; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 12px; padding: 12px; user-select: text; -webkit-user-select: text; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  .seg button, .grid button { min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .btn { min-height: 54px; border-radius: 14px; border: 0; background: var(--accent); color: #1a1200; font: 800 18px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; width: 100%; }
+  .btn.ghost { background: var(--raise); color: var(--text); border: 1px solid var(--line); min-height: 44px; font-size: 15px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #msg { text-align: center; font-weight: 700; font-size: 18px; min-height: 26px; max-width: 420px; }
+  #note { text-align: center; color: #ff9a9a; min-height: 20px; font-size: 15px; max-width: 420px; }
+  #timer { text-align: center; color: var(--dim); font-size: 14px; min-height: 18px; }
+  .players { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+  .players span { flex: 1; text-align: center; padding: 6px; border-radius: 10px; border: 2px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .players span.turn { border-color: var(--accent); }
+  .big { text-align: center; font: 900 34px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .hidden { display: none !important; }
+  .greet { text-align: center; color: var(--dim); font-weight: 700; }
+  .count { text-align: center; font-size: 15px; color: var(--dim); }
+  .count b { color: var(--text); font-size: 20px; }
+  .inmsg { text-align: center; font-weight: 800; font-size: 18px; color: #7dff9a; }
+  .slot { position: relative; height: 84px; overflow: hidden; border-radius: 14px; background: #000; border: 2px solid var(--accent); }
+  .slot::before, .slot::after { content: ''; position: absolute; left: 0; right: 0; height: 18px; z-index: 1; pointer-events: none; }
+  .slot::before { top: 0; background: linear-gradient(#000, transparent); }
+  .slot::after { bottom: 0; background: linear-gradient(transparent, #000); }
+  .reel { will-change: transform; }
+  .reel div { height: 84px; display: flex; align-items: center; justify-content: center; font: 900 34px/1 system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 8px; }
+  .slot.stop { animation: glow 0.9s ease-in-out infinite alternate; }
+  @keyframes glow { from { box-shadow: 0 0 0 var(--accent); } to { box-shadow: 0 0 22px var(--accent); } }
+  .of { text-align: center; color: var(--dim); font-size: 14px; }
+  .winners { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .winners div { font: 900 30px/1.15 system-ui, sans-serif; text-align: center; word-break: break-word; }
+  .you { text-align: center; font: 900 30px/1.2 system-ui, sans-serif; color: #7dff9a; animation: pop 0.6s ease-in-out infinite alternate; }
+  @keyframes pop { from { transform: scale(1); } to { transform: scale(1.08); } }
+  .booktitle { font-weight: 800; text-align: center; }
+  .past { display: flex; flex-direction: column; gap: 4px; max-height: 32vh; overflow-y: auto; }
+  .past div { background: var(--raise); border-radius: 10px; padding: 6px 10px; font-size: 15px; display: flex; justify-content: space-between; gap: 8px; }
+  .past span { color: var(--dim); font-size: 13px; }
+
+</style>
+</head>
+<body>
+<h1>🎟️ Raffle</h1>
+<div class="panel" id="namePanel">
+  <label for="name">Your name</label>
+  <input type="text" id="name" maxlength="16" placeholder="Your name" autocomplete="off">
+</div>
+<div class="panel" id="head">
+  <div class="big" id="title"></div>
+  <div class="greet" id="greet"></div>
+  <div class="count" id="count"></div>
+</div>
+<div class="panel hidden" id="joinP">
+  <div class="inmsg hidden" id="inMsg"></div>
+  <button class="btn" id="join" disabled>Join the draw</button>
+  <button class="btn ghost hidden" id="leave">Leave the draw</button>
+</div>
+<div class="panel hidden" id="spinP">
+  <div class="slot" id="slot"><div class="reel" id="reel"><div id="r1"></div><div id="r0"></div></div></div>
+  <div class="of" id="spinOf"></div>
+</div>
+<div class="panel hidden" id="winP">
+  <div class="booktitle" id="winLabel">The winner</div>
+  <div class="winners" id="winners"></div>
+  <div class="you hidden" id="you">🎉 You won!</div>
+</div>
+<div class="panel hidden" id="pastP">
+  <div class="booktitle">Winners so far</div>
+  <div class="past" id="past"></div>
+</div>
+
+<div id="timer"></div>
+<div id="msg">Connecting...</div>
+<div id="note"></div>
+<script>
+  const el = (id) => document.getElementById(id);
+  let app = null, status = { phase: 'idle', players: [] }, skew = 0, lastNoteText = '', lastNoteAt = 0;
+  try { el('name').value = localStorage.getItem('spName') || ''; } catch (e) {}
+  el('name').addEventListener('input', () => { try { localStorage.setItem('spName', el('name').value); } catch (e) {} });
+  const myName = () => el('name').value.trim();
+  const me = () => (app && (status.players || []).find((p) => p.id === app.clientId)) || null;
+  const meIndex = () => (app ? (status.players || []).findIndex((p) => p.id === app.clientId) : -1);
+  const nowMs = () => Date.now() + skew;
+  const say = (t) => { el('msg').textContent = t; };
+  const send = (o) => (app ? app.send(o).catch((e) => { el('note').textContent = 'Could not send: ' + e.message; lastNoteAt = Date.now(); }) : Promise.resolve());
+  function seg(box, list, cur, set) {
+    box.replaceChildren(...list.map(([v, t]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-pressed', String(v === cur));
+      b.addEventListener('click', () => { set(v); render(); }); return b;
+    }));
+  }
+  const secsLeft = (at) => Math.max(0, Math.ceil((at - nowMs()) / 1000));
+  let draw = () => {}, tickGame = () => '', onStatus = () => {};
+  // The visitors' page of the raffle: how many are in, Join with a name (when visitors can join), the draw spinning
+  // live with the lights (the same reel and timing, from the status), the winners big and "You won!" on their phone.
+  let raf = 0, wonFor = '';
+  const mine = (c) => !!(app && c && c === app.clientId);
+  const colOf = (j) => { const c = (status.colors && status.colors.names) || ['ffffff']; return '#' + c[j % c.length]; };
+  function spinFrame() {
+    raf = 0;
+    const s = status, sp = s.spin;
+    if (s.phase !== 'spinning' || !sp) return;
+    const u = Math.min(1, Math.max(0, (nowMs() - sp.t0) / sp.dur)), p = sp.N * (1 - Math.pow(1 - u, 3)), i = Math.floor(p), f = p - i;
+    const nm = (j) => (sp.names[j] !== undefined ? sp.names[j] : '…');
+    el('r0').textContent = nm(i); el('r0').style.color = colOf(i);
+    el('r1').textContent = nm(i + 1); el('r1').style.color = colOf(i + 1);
+    el('reel').style.transform = 'translateY(' + ((f - 1) * 50) + '%)';   // the names come down from the top, like the lights
+    raf = requestAnimationFrame(spinFrame);
+  }
+  draw = () => {
+    const s = status, inIt = !!(app && (s.ins || []).includes(app.clientId));
+    const win = '#' + ((s.colors && s.colors.win) || 'ffd23f');
+    el('title').textContent = '🎟️ ' + (s.title || 'Raffle');
+    el('greet').textContent = s.greeting || '';
+    el('count').innerHTML = '';
+    if (s.count) {
+      const b = document.createElement('b'); b.textContent = s.count;
+      el('count').append(b, ' in the draw');
+      if (s.removeWinners && s.left < s.count) el('count').append(' · ' + s.left + ' still to win');
+    } else el('count').textContent = s.phase === 'unconfigured' ? '' : 'Nobody is in the draw yet.';
+    // joining: only when the host lets visitors in
+    const canJoin = s.visitorsOn && s.phase !== 'unconfigured';
+    el('joinP').classList.toggle('hidden', !canJoin);
+    el('namePanel').classList.toggle('hidden', !canJoin || !s.open);
+    el('inMsg').classList.toggle('hidden', !inIt);
+    el('inMsg').textContent = "✅ You're in the draw!";
+    el('join').classList.toggle('hidden', inIt && !s.open);
+    el('join').disabled = !app || !s.open;
+    el('join').textContent = !s.open ? (inIt ? '' : 'The entries are closed') : inIt ? 'Change my name' : 'Join the draw';
+    el('leave').classList.toggle('hidden', !inIt || s.phase !== 'idle');
+    // the draw, live
+    const spinning = s.phase === 'spinning' && s.spin, shown = s.phase === 'over' && s.shown;
+    el('spinP').classList.toggle('hidden', !spinning && !shown);
+    el('slot').classList.toggle('stop', !!shown);
+    if (spinning) {
+      el('spinOf').textContent = s.spin.of > 1 ? 'Winner ' + (s.spin.k + 1) + ' of ' + s.spin.of + '…' : 'Who will it be?';
+      if (!raf) raf = requestAnimationFrame(spinFrame);
+    } else if (shown) {
+      el('r0').textContent = shown.name; el('r0').style.color = win; el('reel').style.transform = 'translateY(-50%)';
+      el('spinOf').textContent = shown.of > 1 ? 'Winner ' + (shown.k + 1) + ' of ' + shown.of : '';
+    }
+    // the winners of the last draw, and "You won!"
+    const ws = (s.last && s.last.winners) || [];
+    el('winP').classList.toggle('hidden', !ws.length);
+    el('winLabel').textContent = ws.length > 1 ? 'The winners' : 'The winner';
+    el('winners').replaceChildren(...ws.map((w) => { const d = document.createElement('div'); d.textContent = w.name; d.style.color = win; return d; }));
+    const iWon = ws.some((w) => mine(w.c));
+    el('you').classList.toggle('hidden', !iWon);
+    if (iWon && wonFor !== String(s.last.d)) { wonFor = String(s.last.d); try { navigator.vibrate && navigator.vibrate([200, 100, 200, 100, 400]); } catch (e) {} }
+    const past = s.past || [];
+    el('pastP').classList.toggle('hidden', past.length <= ws.length);
+    el('past').replaceChildren(...past.map((p) => {
+      const d = document.createElement('div'), n = document.createElement('b'), t = document.createElement('span');
+      n.textContent = p.name + (mine(p.c) ? ' (you)' : ''); t.textContent = 'draw ' + p.d; d.append(n, t); return d;
+    }));
+    let m = s.message || '';
+    if (shown && mine(shown.c)) m = '🎉 You won! ' + (s.greeting || '');
+    else if (spinning && inIt) m = 'Fingers crossed…';
+    say(m);
+  };
+  el('join').addEventListener('click', () => {
+    const n = myName();
+    if (!n) { el('note').textContent = 'Write your name first.'; return; }
+    send({ type: 'join', name: n }); say('Joining…'); setTimeout(render, 1200);
+  });
+  el('leave').addEventListener('click', () => { send({ type: 'leave' }); say('Leaving…'); });
+
+  function render() {
+    draw();
+    el('timer').textContent = tickGame() || '';
+    const n = app && status.notices && status.notices[app.clientId];
+    if (n && n !== lastNoteText) { lastNoteText = n; lastNoteAt = Date.now(); el('note').textContent = n; }
+    if (!n) lastNoteText = '';
+    if (Date.now() - lastNoteAt > 5000) el('note').textContent = '';
+  }
+  function init() {
+    app = EZApp.connect();
+    app.onStatus((s, snap) => {
+      if (!s) return;
+      if (snap && typeof snap.at === 'number') skew = snap.at - Date.now();
+      const old = status; status = s; onStatus(old, s);
+      render();
+    });
+    app.ready.then(render).catch((e) => say('Could not reach the player: ' + e.message));
+    setInterval(() => { el('timer').textContent = tickGame() || ''; }, 250);
+    render();
+  }
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => say('Could not load the app SDK.');
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>

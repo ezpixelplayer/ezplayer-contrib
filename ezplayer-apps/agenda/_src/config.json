@@ -1,0 +1,13 @@
+{
+ "title": "Agenda",
+ "icon": "🗓️",
+ "min": [
+  1,
+  1
+ ],
+ "fps": 5,
+ "target": "none",
+ "intro": "One page to give every app its times.",
+ "fields": [],
+ "afterBuild": "agenda/_src/config.mjs"
+}

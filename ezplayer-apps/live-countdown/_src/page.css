@@ -1,0 +1,9 @@
+  #cd { align-items: center; text-align: center; padding: 22px 14px; --cc: var(--accent); --cc2: var(--accent); }
+  .cdEmoji { font-size: 42px; line-height: 1; }
+  .cdBig { font: 900 64px/1.05 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: var(--cc); font-variant-numeric: tabular-nums; letter-spacing: 1px; overflow-wrap: anywhere; }
+  .cdBig.long { font-size: 44px; }
+  .cdBig.huge { font-size: 120px; }
+  .cdBig.party { font-size: 36px; animation: cdPulse 0.8s ease-in-out infinite alternate; }
+  .cdLabel { font-weight: 800; font-size: 20px; color: var(--cc2); min-height: 26px; }
+  .cdWhen { color: var(--dim); font-size: 14px; }
+  @keyframes cdPulse { from { transform: scale(0.94); } to { transform: scale(1.06); } }

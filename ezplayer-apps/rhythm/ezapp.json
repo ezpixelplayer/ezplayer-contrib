@@ -1,0 +1,13 @@
+{
+    "id": "rhythm",
+    "name": "Rhythm on the lights",
+    "version": "1",
+    "description": "A rhythm game on a matrix of the show: notes fall to the beat, up to 4 phones tap them in time",
+    "icon": "🥁",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 1500, "perClientPerSecond": 8 }
+}
