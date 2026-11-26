@@ -147,7 +147,6 @@ sensor at the lights, see below.
   raffle `draw` and live-countdown `start`; map them on the Apps card. Only events the player marks as show inputs (source
   `input:…`) reach them, so a phone cannot fake a button. host-panel and agenda use the player's owner API and work on the home
   network only; set **agenda** to "Always" (it applies the dates while it runs).
-- **_tools/**: `build.mjs` builds an app's two pages from its `_src` (the visitors' page and the settings page share their look and
-  SDK code with every other app; `afterBuild` in `_src/config.json` names a script that finishes a settings page with more than
-  the shared fields: the raffle's host buttons, the countdown's Start/Stop, the host panel, the agenda); `make_pack.mjs <app>` makes the
-  11 theme-pack versions from `_tools/packs/<app>.json` and `_tools/packs.json` (each pack's name, emoji, colours and greeting).
+- **Build tools**: the new apps' pages (`page/`, `config/`) are built from their `_src`, and their theme-pack versions made from
+  the Christmas app, with build tools kept outside this repository (`_tools/build.mjs`, `_tools/make_pack.mjs`); the notes on
+  building in those apps' READMEs refer to them. The built pages here are complete: nothing needs building to use the apps.
