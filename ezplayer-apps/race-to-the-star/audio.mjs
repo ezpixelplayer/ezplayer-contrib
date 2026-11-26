@@ -101,6 +101,11 @@ async function lease(bus) {
  *  time until it is heard (so lights can follow it). */
 export async function playSound(samples, rate, volume = 1, bus = 'immediate', onStart = null) {
     const secs = samples.length / rate;
+    if (typeof bus === 'string' && bus.startsWith('pi:')) {   // a Raspberry Pi running the ShowPlay speaker (pi-speaker/)
+        const [host, key = ''] = bus.slice(3).split('|');
+        try { await piPlay(host, key, wavBuffer(rate, samples, volume), secs, onStart); return 'pi'; }
+        catch (e) { console.log(`sound: the Raspberry Pi ${host || '(no address)'} could not play it (${e.message}); playing it on this computer`); bus = 'local'; }
+    }
     if (bus !== 'local') {
         for (let tries = 0; tries < 2; tries++) {
             try {
@@ -122,6 +127,22 @@ export async function playSound(samples, rate, volume = 1, bus = 'immediate', on
     const file = tempWav('play');
     try { writeWav(file, rate, samples, volume); onStart?.(150); return (await playWav(file)) ? 'local' : false; }
     finally { fs.rm(file, () => undefined); }
+}
+
+/** where a sound goes: the setting ('immediate', 'main', 'local' or 'pi') and, for 'pi', the Raspberry Pi's address and key */
+export function busFor(bus, host = '', key = '') {
+    return bus === 'pi' ? `pi:${String(host || '').trim()}|${String(key || '').trim()}` : bus;
+}
+
+/** sends a WAV to the ShowPlay speaker on a Raspberry Pi (port 8765 unless the address has one); resolves once it played */
+async function piPlay(host, key, wav, secs, onStart) {
+    if (!host) throw new Error('no address set');
+    const url = `http://${/:\d+$/.test(host) ? host : host + ':8765'}/play`;
+    onStart?.(300);
+    const res = await fetch(url, { method: 'POST', body: wav, headers: { 'content-type': 'audio/wav', ...(key ? { 'x-showplay-key': key } : {}) },
+        signal: AbortSignal.timeout(secs * 1000 + 75000) });
+    const o = await res.json().catch(() => ({}));
+    if (!res.ok || !o.ok) throw new Error(o.error ?? 'HTTP ' + res.status);
 }
 
 /** closes the leases (when the app stops) */

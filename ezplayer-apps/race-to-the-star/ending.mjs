@@ -14,12 +14,12 @@
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { dmxValues, runMachine, MachineLink, MACHINE_HOWS } from './machine.mjs';
-import { playSound, readWav, tempWav } from './audio.mjs';
+import { playSound, readWav, tempWav, busFor } from './audio.mjs';
 import { Text, plain } from './lights.mjs';
 
 export const END_DEFAULTS = {
     endWin: true, endLose: true,
-    endSound: 'off', endWinWav: '', endLoseWav: '', endVolume: 80, endBus: 'immediate',
+    endSound: 'off', endWinWav: '', endLoseWav: '', endVolume: 80, endBus: 'immediate', endPi: '', endPiKey: '',
     endVoice: false, endVoiceLang: 'en', endBanner: false,
     endWinText: '{winner} wins!', endLoseText: 'Game over!', endRecordText: 'New record: {score}!',
     endMachine: false, endHow: 'url', endOnUrl: '', endOffUrl: '', endHost: '', endUniverse: 1, endModel: '',
@@ -32,7 +32,9 @@ export function cleanEnd(raw, s, texts = {}) {
     if (!raw || typeof raw !== 'object') return s;
     for (const k of ['endWin', 'endLose', 'endVoice', 'endBanner', 'endMachine', 'endLoseUrl']) if (typeof raw[k] === 'boolean') s[k] = raw[k];
     if (['off', 'built', 'files'].includes(raw.endSound)) s.endSound = raw.endSound;
-    if (['immediate', 'main', 'local'].includes(raw.endBus)) s.endBus = raw.endBus;
+    if (['immediate', 'main', 'local', 'pi'].includes(raw.endBus)) s.endBus = raw.endBus;
+    if (typeof raw.endPi === 'string' && (raw.endPi.trim() === '' || /^[\w.-]{1,253}(:\d{1,5})?$/.test(raw.endPi.trim()))) s.endPi = raw.endPi.trim();
+    if (typeof raw.endPiKey === 'string') s.endPiKey = raw.endPiKey.trim().slice(0, 64);
     if (MACHINE_HOWS.includes(raw.endHow)) s.endHow = raw.endHow;
     const num = (k, lo, hi) => { if (raw[k] !== '' && raw[k] !== null && Number.isFinite(+raw[k])) s[k] = Math.max(lo, Math.min(hi, Math.round(+raw[k]))); };
     num('endVolume', 5, 100); num('endUniverse', 0, 63999); num('endWinSecs', 1, 60); num('endLoseSecs', 1, 60); num('endGap', 0, 600);
@@ -143,15 +145,15 @@ export class Ending {
         if (this.soundBusy) return;
         this.soundBusy = true;
         try {
-            const vol = s.endVolume / 100, lose = kind === 'lose';
-            if (s.endSound === 'built') await playSound(builtInSound(lose ? 'lose' : 'win'), RATE, vol, s.endBus);
+            const vol = s.endVolume / 100, lose = kind === 'lose', bus = busFor(s.endBus, s.endPi, s.endPiKey);
+            if (s.endSound === 'built') await playSound(builtInSound(lose ? 'lose' : 'win'), RATE, vol, bus);
             else if (s.endSound === 'files') {
                 const f = lose ? s.endLoseWav : s.endWinWav;
-                if (f) { try { const w = readWav(f); await playSound(w.mono(0, Math.min(15, w.seconds)), w.rate, vol, s.endBus); } catch (e) { this.log(`the sound ${f} could not be played: ${e.message}`); } }
+                if (f) { try { const w = readWav(f); await playSound(w.mono(0, Math.min(15, w.seconds)), w.rate, vol, bus); } catch (e) { this.log(`the sound ${f} could not be played: ${e.message}`); } }
             }
             if (s.endVoice && words) {
                 const v = await speak(words, s.endVoiceLang);
-                if (v) await playSound(v.samples, v.rate, vol, s.endBus);
+                if (v) await playSound(v.samples, v.rate, vol, bus);
                 else if (!this.warnedVoice) { this.warnedVoice = true; this.log('this computer has no voice to say the words (on Linux install espeak-ng)'); }
             }
         } catch (e) { this.log('sound:', e.message); }
@@ -196,7 +198,9 @@ export function endFields(texts = {}, record = false) {
         { id: 'endLose', type: 'check', text: '😢 When someone loses (or the computer wins)', default: true },
         { id: 'endSound', type: 'select', label: '🔊 Sound', options: [['off', 'Off'], ['built', 'Built in: a fanfare for a win, a "wah wah" for a loss'], ['files', 'My own WAV files']], default: 'off' },
         { id: 'endVolume', type: 'number', label: 'Volume (5 to 100)', min: 5, max: 100, default: 80 },
-        { id: 'endBus', type: 'select', label: 'Where it plays', options: [['immediate', "The show's speakers (EZPlayer)"], ['main', "Mixed with the show's music (EZPlayer)"], ['local', "This computer's speaker"]], default: 'immediate', end: true },
+        { id: 'endBus', type: 'select', label: 'Where it plays', options: [['immediate', "The show's speakers (EZPlayer)"], ['main', "Mixed with the show's music (EZPlayer)"], ['local', "This computer's speaker"], ['pi', 'A Raspberry Pi on the network (ShowPlay speaker)']], default: 'immediate', end: true },
+        { id: 'endPi', type: 'text', label: 'Raspberry Pi: its IP address (add :port if not 8765)', default: '', placeholder: '192.168.1.70' },
+        { id: 'endPiKey', type: 'text', label: 'Raspberry Pi: its key (only if you set one)', default: '', end: true },
         { id: 'endWinWav', type: 'text', label: 'My own sound for a win (a WAV file on this computer)', default: '', placeholder: 'C:\\Sounds\\win.wav' },
         { id: 'endLoseWav', type: 'text', label: 'My own sound for a loss', default: '', placeholder: 'C:\\Sounds\\lose.wav', end: true },
         { id: 'endVoice', type: 'check', text: "🗣️ Say the words out loud (the computer's own voice, after the sound)", default: false },

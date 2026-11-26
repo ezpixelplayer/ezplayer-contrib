@@ -62,6 +62,8 @@ Approval of recordings by the crew, and the cube side as a singer (any matrix ca
 
 ## Changes
 
+- **Version 4:** 🔈 sounds can also play on **a Raspberry Pi on the network** running the ShowPlay speaker (see `pi-speaker/`): pick it in "Where it plays" and put in the Pi's IP address (and its key, if you set one). If the Pi does not answer, the sound plays on this computer.
+
 - **Version 2:** a group made of submodels lights only those submodels (before, it lit the whole models they belong to).
 
 - **Version 3:** on the settings page, tapping a group or model on an empty line makes a whole prop line, with an icon and a name guessed from it; tapping more adds them to that prop, and **➕ New prop** starts the next one.
