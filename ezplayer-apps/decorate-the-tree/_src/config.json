@@ -21,5 +21,9 @@
   {"id": "restart", "type": "check", "text": "When the tree is full: a party on the lights, then it starts again empty", "default": true},
   {"id": "bg", "type": "select", "label": "The tree between the decorations", "options": [["green", "Lit in the tree's colour (dim)"], ["off", "Off"]], "default": "green"},
   {"id": "treeColor", "type": "color", "label": "The tree's colour", "default": "1e9e3c"},
-  {"id": "treePick", "type": "check", "text": "Visitors may change the tree's colour (tap the tree on the phone; they wait like for the star)", "default": true}
+  {"id": "treePick", "type": "check", "text": "Visitors may change the tree's colour (tap the tree on the phone; they wait like for the star)", "default": true},
+  {"section": "A round mega tree (360°)"},
+  {"id": "view", "type": "select", "label": "What the phones show of a round tree", "options": [["front", "Only the front (180°): the half the visitors see"],["all", "All the way round (360°): visitors turn the tree with ◀ ▶"]], "default": "front", "end": true},
+  {"id": "frontDeg", "type": "front", "label": "The front of the tree (where the visitors stand)", "default": 0},
+  {"id": "lookGuide", "type": "check", "text": "360°: while a visitor turns the tree on the phone, a thin gold stripe shows for 2 s where the middle of their drawing is", "default": false}
  ]}
