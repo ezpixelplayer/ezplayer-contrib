@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0a16">
+<title>Guestbook</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --raise: #261d3a; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; --c1: #ff2a2a; --c2: #2a7bff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 12px 14px 24px; gap: 12px; min-height: 100dvh; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  h1 { margin: 4px 0 0; font-size: 24px; text-align: center; }
+  .panel { width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  label { color: var(--dim); font-size: 14px; }
+  input[type=text] { width: 100%; font: inherit; font-size: 18px; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 12px; padding: 12px; user-select: text; -webkit-user-select: text; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  .seg button, .grid button { min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .btn { min-height: 54px; border-radius: 14px; border: 0; background: var(--accent); color: #1a1200; font: 800 18px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; width: 100%; }
+  .btn.ghost { background: var(--raise); color: var(--text); border: 1px solid var(--line); min-height: 44px; font-size: 15px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #msg { text-align: center; font-weight: 700; font-size: 18px; min-height: 26px; max-width: 420px; }
+  #note { text-align: center; color: #ff9a9a; min-height: 20px; font-size: 15px; max-width: 420px; }
+  #timer { text-align: center; color: var(--dim); font-size: 14px; min-height: 18px; }
+  .players { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+  .players span { flex: 1; text-align: center; padding: 6px; border-radius: 10px; border: 2px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .players span.turn { border-color: var(--accent); }
+  .big { text-align: center; font: 900 34px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .hidden { display: none !important; }
+  .tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; width: 100%; max-width: 420px; }
+  .tabs button { min-height: 46px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel); color: var(--text); font: 700 15px/1 system-ui, sans-serif; cursor: pointer; }
+  .tabs button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button { border-radius: 999px; border: 1px solid var(--line); background: var(--raise); color: var(--text); padding: 8px 12px; font: 600 14px/1.2 system-ui, sans-serif; cursor: pointer; }
+  .sw { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sw button { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+  .sw button[aria-pressed="true"] { border-color: #fff; }
+  .fxs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .fxs button { min-height: 56px; border-radius: 14px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 15px/1.2 system-ui, sans-serif; cursor: pointer; }
+  .fxs button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  canvas { width: 100%; border-radius: 10px; background: #000; touch-action: none; image-rendering: pixelated; }
+  .row2 { display: flex; gap: 8px; }
+  .row2 .btn { flex: 1; }
+  .gifs { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+  .gifs button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border-radius: 14px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 12px/1.2 system-ui, sans-serif; cursor: pointer; }
+  .gifs button img { width: 64px; height: 64px; image-rendering: pixelated; background: #000; border-radius: 8px; }
+  .gifs button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .booktitle { font-weight: 800; text-align: center; }
+  .book { display: flex; flex-direction: column; gap: 6px; max-height: 40vh; overflow-y: auto; }
+  .book div { background: var(--raise); border-radius: 10px; padding: 8px 10px; font-size: 15px; }
+  .book b { margin-right: 6px; }
+  .book .empty { color: var(--dim); text-align: center; background: none; }
+
+</style>
+</head>
+<body>
+<h1>📝 Guestbook</h1>
+<div class="panel" id="namePanel">
+  <label for="name">Your name</label>
+  <input type="text" id="name" maxlength="16" placeholder="Your name" autocomplete="off">
+</div>
+<div class="panel" id="write">
+  <label for="text" id="textLabel">Your note</label>
+  <input type="text" id="text" maxlength="40" autocomplete="off" placeholder="We loved the lights!">
+  <div class="chips" id="presets"></div>
+  <label>Colour</label>
+  <div class="sw" id="colours"></div>
+</div>
+<button class="btn" id="send" style="max-width:420px" disabled>Sign the book!</button>
+<div class="panel" id="bookPanel">
+  <div class="booktitle" id="bookTitle">📝 The guestbook</div>
+  <div class="book" id="book"></div>
+</div>
+
+<div id="timer"></div>
+<div id="msg">Connecting...</div>
+<div id="note"></div>
+<script>
+  const el = (id) => document.getElementById(id);
+  let app = null, status = { phase: 'idle', players: [] }, skew = 0, lastNoteText = '', lastNoteAt = 0;
+  try { el('name').value = localStorage.getItem('spName') || ''; } catch (e) {}
+  el('name').addEventListener('input', () => { try { localStorage.setItem('spName', el('name').value); } catch (e) {} });
+  const myName = () => el('name').value.trim();
+  const me = () => (app && (status.players || []).find((p) => p.id === app.clientId)) || null;
+  const meIndex = () => (app ? (status.players || []).findIndex((p) => p.id === app.clientId) : -1);
+  const nowMs = () => Date.now() + skew;
+  const say = (t) => { el('msg').textContent = t; };
+  const send = (o) => (app ? app.send(o).catch((e) => { el('note').textContent = 'Could not send: ' + e.message; lastNoteAt = Date.now(); }) : Promise.resolve());
+  function seg(box, list, cur, set) {
+    box.replaceChildren(...list.map(([v, t]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-pressed', String(v === cur));
+      b.addEventListener('click', () => { set(v); render(); }); return b;
+    }));
+  }
+  const secsLeft = (at) => Math.max(0, Math.ceil((at - nowMs()) / 1000));
+  let draw = () => {}, tickGame = () => '', onStatus = () => {};
+  let colour = 1;
+  function swatches(box, cur, set) {
+    box.replaceChildren(...(status.colors || []).slice(1).map((c, k) => {
+      const i = k + 1, b = document.createElement('button'); b.type = 'button'; b.style.background = '#' + c; b.setAttribute('aria-label', 'Colour ' + i);
+      b.setAttribute('aria-pressed', String(i === cur)); b.addEventListener('click', () => { set(i); render(); }); return b;
+    }));
+  }
+  draw = () => {
+    const s = status;
+    el('text').classList.toggle('hidden', s.free === false); el('textLabel').textContent = s.free === false ? 'Pick a note' : 'Your note';
+    el('presets').replaceChildren(...(s.presets || []).map((p) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = p; b.addEventListener('click', () => { el('text').value = p; }); return b; }));
+    swatches(el('colours'), colour, (v) => { colour = v; });
+    el('bookTitle').textContent = '📝 ' + (s.title || 'The guestbook') + (s.count ? ' (' + s.count + ')' : '');
+    const list = s.latest || [];
+    el('book').replaceChildren(...(list.length ? list.map((x) => {
+      const d = document.createElement('div'), b = document.createElement('b'); b.style.color = '#' + x.c; b.textContent = x.n; d.append(b, x.t); return d;
+    }) : [Object.assign(document.createElement('div'), { className: 'empty', textContent: 'Nobody has written yet. Be the first!' })]));
+    el('send').disabled = !app || s.phase === 'unconfigured';
+    const mine = (s.queue || []).findIndex((q) => app && q.id === app.clientId);
+    let t = s.message || '';
+    if (s.now && app && s.now.id === app.clientId) t = '✨ Your note is on the lights now!';
+    else if (mine >= 0) t = mine === 0 ? 'Your note is next!' : 'Your note is number ' + (mine + 1) + ' in line.';
+    say(t);
+  };
+  el('send').addEventListener('click', () => {
+    const n = myName(), t = el('text').value.trim();
+    if (!n) { el('note').textContent = 'Write your name first.'; return; }
+    if (!t) { el('note').textContent = 'Write or pick a note first.'; return; }
+    send({ type: 'sign', name: n, text: t, color: colour });
+    el('text').value = ''; el('send').disabled = true; say('Sending…'); setTimeout(render, 1200);
+  });
+
+  function render() {
+    draw();
+    el('timer').textContent = tickGame() || '';
+    const n = app && status.notices && status.notices[app.clientId];
+    if (n && n !== lastNoteText) { lastNoteText = n; lastNoteAt = Date.now(); el('note').textContent = n; }
+    if (!n) lastNoteText = '';
+    if (Date.now() - lastNoteAt > 5000) el('note').textContent = '';
+  }
+  function init() {
+    app = EZApp.connect();
+    app.onStatus((s, snap) => {
+      if (!s) return;
+      if (snap && typeof snap.at === 'number') skew = snap.at - Date.now();
+      const old = status; status = s; onStatus(old, s);
+      render();
+    });
+    app.ready.then(render).catch((e) => say('Could not reach the player: ' + e.message));
+    setInterval(() => { el('timer').textContent = tickGame() || ''; }, 250);
+    render();
+  }
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => say('Could not load the app SDK.');
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>

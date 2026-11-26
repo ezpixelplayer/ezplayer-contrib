@@ -69,7 +69,8 @@ A section of the settings, **🎉 When someone wins or loses**, all off by defau
 
 - **🔊 Sound:** built in (a short fanfare for a win, a sad "wah wah wah waaah" for a loss, made by the app, no files
   needed) or your own WAV files (one for a win, one for a loss, on the player computer). Volume, and where it plays:
-  the show's speakers through EZPlayer (at once, or mixed with the show's music), or the computer's own speaker.
+  the show's speakers through EZPlayer (at once, or mixed with the show's music), the computer's own speaker, or a
+  Raspberry Pi on the network running the ShowPlay speaker (`pi-speaker/`: its IP address and key).
 - **🗣️ Say the words out loud:** after the sound, the computer's own voice says the words (Windows and macOS have
   voices; on Linux or a Raspberry Pi install `espeak-ng`). **Voice language** picks a voice of that language when the
   computer has one (`en` by default; `pt` for Portuguese, for example Windows' "Helia" voice). No voice: only the sound.
@@ -87,6 +88,8 @@ Every part works on its own: only the sound, only the words, only the machine, o
 **In this game:** a win is a person winning (against the computer or a friend); a loss is the computer winning. A game nobody played does nothing.
 
 ## Changes
+
+- **Version 5:** 🔈 sounds can also play on **a Raspberry Pi on the network** running the ShowPlay speaker (see `pi-speaker/`): pick it in "Where it plays" and put in the Pi's IP address (and its key, if you set one). If the Pi does not answer, the sound plays on this computer.
 
 - **Version 4:** 🎉 when someone wins or loses: a sound (built in or your own WAV), the words said out loud and/or written across the lights, and a machine (bubbles, fog, lights…) for a few seconds; all off by default.
 

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShowPlay speaker</title>
+<style>
+  :root { --bg: #14111f; --panel: #1f1a30; --line: #362d52; --text: #ece8f6; --dim: #a59cc0; --gold: #ffc828; --ok: #39d353; --bad: #ff5c5c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  main { max-width: 640px; margin: 0 auto; padding: 18px 16px 40px; }
+  h1 { font-size: 24px; margin: 4px 0 2px; display: flex; align-items: center; gap: 10px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--dim); flex: none; }
+  .dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); } .dot.busy { background: var(--gold); box-shadow: 0 0 8px var(--gold); } .dot.off { background: var(--bad); }
+  .sub { color: var(--dim); margin: 0 0 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 14px 0; }
+  .card h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--gold); margin: 0 0 10px; }
+  label { display: block; color: var(--dim); font-size: 14px; margin: 10px 0 4px; }
+  input[type=text], input[type=password], select { width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  input[type=range] { width: 100%; accent-color: var(--gold); }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .big { font-size: 22px; font-weight: 700; letter-spacing: .02em; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 11px 16px; cursor: pointer; background: var(--line); color: var(--text); }
+  button.primary { background: var(--gold); color: #1d1600; }
+  button:disabled { opacity: .5; cursor: default; }
+  .msg { color: var(--dim); min-height: 1.4em; margin-top: 8px; }
+  .msg.bad { color: var(--bad); } .msg.good { color: var(--ok); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td { padding: 6px 4px; border-top: 1px solid var(--line); }
+  td.t { color: var(--dim); white-space: nowrap; width: 1%; }
+  .err { color: var(--bad); }
+  .hint { color: var(--dim); font-size: 14px; }
+  code { background: var(--bg); padding: 1px 6px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1><span class="dot" id="dot"></span><span id="name">ShowPlay speaker</span></h1>
+  <p class="sub" id="status">Connecting…</p>
+
+  <div class="card">
+    <h2>🔗 Address for the apps</h2>
+    <div class="row"><span class="big" id="addr">…</span><button id="copy" type="button">Copy</button></div>
+    <p class="hint">In the ShowPlay apps and on the bridge's /fun page, set <b>Where it plays</b> to <b>A Raspberry Pi on the network</b> and put in this address<span id="keyHint"></span>.</p>
+  </div>
+
+  <div class="card">
+    <h2>🔊 Sound</h2>
+    <label for="vol">Volume: <b id="volTxt">100%</b></label>
+    <input type="range" id="vol" min="5" max="100" step="5">
+    <label for="dev">Sound output</label>
+    <select id="dev"></select>
+    <div class="row" style="margin-top:14px"><button class="primary" id="test" type="button">▶ Try a sound</button><button id="saveSound" type="button">Save</button></div>
+    <div class="msg" id="soundMsg"></div>
+  </div>
+
+  <div class="card">
+    <h2>🎵 Last sounds</h2>
+    <table><tbody id="recent"><tr><td class="hint">Nothing played yet.</td></tr></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>⚙️ Settings</h2>
+    <label for="nm">Its name (shown on this page)</label>
+    <input type="text" id="nm" maxlength="40" placeholder="ShowPlay speaker">
+    <label for="newKey">Key: the apps must give it to play sounds, and this page asks for it to change anything</label>
+    <input type="password" id="newKey" maxlength="64" placeholder="type a new key to set or change it" autocomplete="new-password">
+    <div class="row" style="margin-top:14px"><button id="saveSet" type="button">Save</button><button id="noKey" type="button" hidden>Remove the key</button></div>
+    <div class="msg" id="setMsg"></div>
+  </div>
+
+  <div class="card" id="unlock" hidden>
+    <h2>🔑 This speaker has a key</h2>
+    <p class="hint">Type it once to change the settings or try a sound from this browser.</p>
+    <input type="password" id="myKey" maxlength="64" autocomplete="current-password">
+    <div class="row" style="margin-top:10px"><button id="useKey" type="button">Use it</button></div>
+  </div>
+
+  <p class="hint">Not heard? Check the sound output above, the Pi's own volume (<code>alsamixer</code>) and the amplifier. The guide is in the <code>pi-speaker</code> folder.</p>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let S = null, dirty = false;
+  const myKey = () => { try { return localStorage.getItem('spkKey') || ''; } catch (e) { return ''; } };
+  const say = (id, t, cls = '') => { const m = $(id); m.textContent = t; m.className = 'msg ' + cls; };
+  async function post(path, body) {
+    const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', 'x-showplay-key': myKey() }, body: JSON.stringify(body || {}) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) { if (r.status === 403) $('unlock').hidden = false; throw new Error(j.error || 'HTTP ' + r.status); }
+    return j;
+  }
+  function draw() {
+    $('dot').className = 'dot ' + (S.busy ? 'busy' : 'on');
+    $('name').textContent = S.name; document.title = S.name;
+    const up = S.up < 3600 ? Math.floor(S.up / 60) + ' min' : Math.floor(S.up / 3600) + ' h';
+    $('status').textContent = (S.busy ? 'Playing a sound now · ' : 'Ready · ') + 'running for ' + up + ' · plays with ' + S.player + ' · version ' + S.version;
+    $('addr').textContent = S.ip + (S.port === 8765 ? '' : ':' + S.port);
+    $('keyHint').textContent = S.key ? ', and the key' : '';
+    if (!dirty) {
+      $('vol').value = S.volume; $('volTxt').textContent = S.volume + '%';
+      $('dev').replaceChildren(...S.devices.map(([v, t]) => new Option(t, v, false, v === S.device)));
+      if (document.activeElement !== $('nm')) $('nm').value = S.name;
+    }
+    $('recent').replaceChildren(...(S.recent.length ? S.recent : [null]).map((r) => {
+      const tr = document.createElement('tr');
+      if (!r) { tr.innerHTML = '<td class="hint">Nothing played yet.</td>'; return tr; }
+      const a = document.createElement('td'); a.className = 't'; a.textContent = r.at;
+      const b = document.createElement('td'); b.textContent = r.ok ? `${r.secs} s from ${r.from}` : `from ${r.from}: `;
+      if (!r.ok) { const e = document.createElement('span'); e.className = 'err'; e.textContent = r.error; b.append(e); }
+      tr.append(a, b); return tr;
+    }));
+    $('unlock').hidden = !S.key || !!myKey();
+    $('noKey').hidden = !S.key;
+  }
+  async function refresh() {
+    try { S = await (await fetch('/api/state')).json(); draw(); }
+    catch (e) { $('dot').className = 'dot off'; $('status').textContent = 'The speaker does not answer (is the Pi on?)'; }
+  }
+  $('vol').oninput = () => { dirty = true; $('volTxt').textContent = $('vol').value + '%'; };
+  $('dev').onchange = () => { dirty = true; };
+  $('saveSound').onclick = async () => {
+    try { await post('/api/settings', { volume: +$('vol').value, device: $('dev').value }); dirty = false; say('soundMsg', 'Saved.', 'good'); refresh(); }
+    catch (e) { say('soundMsg', e.message, 'bad'); }
+  };
+  $('test').onclick = async () => {
+    $('test').disabled = true; say('soundMsg', 'Playing…');
+    try {
+      if (dirty) { await post('/api/settings', { volume: +$('vol').value, device: $('dev').value }); dirty = false; }
+      await post('/api/test'); say('soundMsg', 'Played. Did you hear it?', 'good');
+    } catch (e) { say('soundMsg', 'It could not play: ' + e.message, 'bad'); }
+    $('test').disabled = false; refresh();
+  };
+  $('saveSet').onclick = async () => {
+    const k = $('newKey').value.trim(), body = { name: $('nm').value };
+    if (k) body.key = k;
+    try {
+      await post('/api/settings', body);
+      if (k) { try { localStorage.setItem('spkKey', k); } catch (e) { /* this browser keeps nothing */ } }
+      $('newKey').value = ''; say('setMsg', k ? 'Saved. Put the same key in the apps.' : 'Saved.', 'good'); refresh();
+    } catch (e) { say('setMsg', e.message, 'bad'); }
+  };
+  $('noKey').onclick = async () => {
+    try { await post('/api/settings', { key: '' }); say('setMsg', 'The key is removed: any app on the network can play sounds.', 'good'); refresh(); }
+    catch (e) { say('setMsg', e.message, 'bad'); }
+  };
+  $('useKey').onclick = () => { try { localStorage.setItem('spkKey', $('myKey').value.trim()); } catch (e) { /* nothing kept */ } $('unlock').hidden = true; };
+  $('copy').onclick = async () => { try { await navigator.clipboard.writeText($('addr').textContent); $('copy').textContent = 'Copied'; } catch (e) { $('copy').textContent = 'Select it'; } setTimeout(() => { $('copy').textContent = 'Copy'; }, 2000); };
+  refresh(); setInterval(refresh, 3000);
+</script>
+</body>
+</html>

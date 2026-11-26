@@ -1,0 +1,13 @@
+{
+    "id": "guestbook",
+    "name": "Guestbook",
+    "version": "1",
+    "description": "Visitors leave their name and a short note from their phone; new notes scroll across a matrix of the show and the book is read every few minutes",
+    "icon": "📝",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 120, "perClientPerSecond": 1 }
+}

@@ -1,0 +1,13 @@
+{
+    "id": "photo-pixels",
+    "name": "Photo in pixels",
+    "version": "1",
+    "description": "Visitors take a selfie on their phone and see it on a matrix of the show in pixels, in a frame of the season; nothing is saved",
+    "icon": "📸",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 120, "perClientPerSecond": 1 }
+}

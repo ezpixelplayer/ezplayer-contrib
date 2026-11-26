@@ -1,0 +1,11 @@
+{"title": "Photo in pixels", "icon": "📸", "min": [8, 8], "fps": 25,
+ "intro": "Visitors take a selfie (or pick a photo) on their phone and see it on the matrix in pixels, in a frame of the season, after a \"3, 2, 1, flash!\". The phone shrinks the photo to a few squares and sends only those; nothing is saved: a photo is forgotten as soon as it has been on the lights. Pick the matrix, then Save.",
+ "fields": [
+  {"id": "frames", "type": "checks", "label": "Frames", "options": [["snow", "Snowflakes"], ["hearts", "Hearts"], ["stars", "Stars"], ["santa", "Santa"], ["rainbow", "Rainbow"]], "default": ["snow", "hearts", "stars", "santa", "rainbow"]},
+  {"id": "noFrame", "type": "check", "text": "Visitors may also pick no frame", "default": true, "end": true},
+  {"id": "styles", "type": "checks", "label": "Looks", "options": [["natural", "Natural colours"], ["pop", "Pop art (few, bright colours)"], ["bw", "Black and white"], ["warm", "Old photo (warm)"]], "default": ["natural", "pop", "bw", "warm"], "end": true},
+  {"id": "countdown", "type": "check", "text": "\"3, 2, 1\" and a flash before each photo", "default": true},
+  {"id": "showSecs", "type": "number", "label": "Seconds a photo stays on the lights", "min": 4, "max": 120, "default": 12},
+  {"id": "waitSecs", "type": "number", "label": "Each phone waits before another photo (seconds)", "min": 0, "max": 3600, "default": 60},
+  {"id": "queueMax", "type": "number", "label": "Most photos waiting", "min": 1, "max": 30, "default": 6, "end": true, "hint": "A matrix of 32 x 32 or bigger shows faces best. Photos of people are shown in public: put up a sign, and switch the app off when you are not there."}
+ ]}
