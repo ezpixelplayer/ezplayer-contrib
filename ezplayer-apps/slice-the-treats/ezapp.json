@@ -1,7 +1,7 @@
 {
     "id": "slice-the-treats",
     "name": "Slice the treats",
-    "version": "5",
+    "version": "6",
     "description": "Christmas treats are thrown up a matrix of the show: swipe on your phone to slice them, but not the coal!",
     "icon": "🍬",
     "runtime": "node",

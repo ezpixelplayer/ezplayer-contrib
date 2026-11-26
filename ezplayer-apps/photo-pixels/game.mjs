@@ -132,7 +132,7 @@ export class Game {
         if (this.queue.some((q) => q.client === client) || this.cur?.client === client) return 'Your photo is already in line.';
         if (this.queue.length >= this.s.queueMax) return 'Too many photos waiting. Try again in a moment!';
         const [pw, ph] = this.photoSize();
-        if (d.w !== pw || d.h !== ph || typeof d.px !== 'string') return 'The photo did not arrive right. Try again.';
+        if (d.w !== pw || d.h !== ph || typeof d.px !== 'string' || d.px.length > Math.ceil(pw * ph * 3 / 3) * 4) return 'The photo did not arrive right. Try again.';   // at most the base64 of pw * ph * 3 bytes
         const rgb = Buffer.from(d.px, 'base64');
         if (rgb.length !== pw * ph * 3) return 'The photo did not arrive right. Try again.';
         let frame = '';

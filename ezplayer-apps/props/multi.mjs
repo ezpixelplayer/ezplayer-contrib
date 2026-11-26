@@ -23,6 +23,8 @@ import { groupsOf, showXml } from './models.mjs';
 const IDLE_MS = 100;
 const NOTICE_MS = 6000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// no request to the player may hang the app: a stalled player would freeze the lights and the phones
+const within = (ms) => AbortSignal.timeout(ms);
 
 export async function run({ name, App, cleanSettings }) {
     const base = (process.env.EZP_API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
@@ -35,7 +37,7 @@ export async function run({ name, App, cleanSettings }) {
     const authHeaders = { 'x-ezp-app-token': token };
     const jsonHeaders = { ...authHeaders, 'content-type': 'application/json' };
     const appUrl = (p) => `${base}/api/ezp/apps/${encodeURIComponent(instance)}${p}`;
-    const publishStatus = (status) => fetch(appUrl('/status'), { method: 'PUT', headers: jsonHeaders, body: JSON.stringify(status) }).catch(() => undefined);
+    const publishStatus = (status) => fetch(appUrl('/status'), { method: 'PUT', headers: jsonHeaders, body: JSON.stringify(status), signal: within(3000) }).catch(() => undefined);
 
     let quit = false;
     const poll = new AbortController();
@@ -57,10 +59,10 @@ export async function run({ name, App, cleanSettings }) {
             const g = groupsOf(xml), j = JSON.stringify(g);
             if (j !== groupsJson) {
                 groupsJson = j; groups = g;
-                await fetch(appUrl('/data/private/groups'), { method: 'PUT', headers: jsonHeaders, body: j }).catch(() => undefined);
+                await fetch(appUrl('/data/private/groups'), { method: 'PUT', headers: jsonHeaders, body: j, signal: within(5000) }).catch(() => undefined);
             }
         }
-        const res = await fetch(appUrl('/data/private/settings'), { headers: authHeaders });
+        const res = await fetch(appUrl('/data/private/settings'), { headers: authHeaders, signal: within(5000) });
         if (res.status === 404) { configError = 'Not set up yet: open the app settings.'; return; }
         if (!res.ok) throw new Error(`settings: HTTP ${res.status}`);
         const s = cleanSettings(await res.json().catch(() => null)), j = JSON.stringify(s);
@@ -69,7 +71,7 @@ export async function run({ name, App, cleanSettings }) {
         settingsJson = j; preparedAt = now;
         app.s = s;
         try { await app.prepare({ base, groups }); configError = app.ready ? '' : app.notReady ?? 'Not set up yet: open the app settings.'; }
-        catch (e) { configError = `Could not read the show: ${e.message}`; }
+        catch (e) { configError = `Could not read the show: ${e.message}`; settingsJson = ''; app.ready = false; }   // tried again in 5 s, not only when the settings change
         if (app.problems?.length) console.log('problems:', app.problems.join('; '));
     }
 
@@ -107,12 +109,12 @@ export async function run({ name, App, cleanSettings }) {
         const body = g.fmt === 'grid' ? { model: g.model, format: 'grid', width: g.w, height: g.h } : { model: g.model, format: 'nodes' };
         // exclusive, with the app token: a model another app is using is refused with that app's name
         const res = await fetch(`${base}/api/ezp/overlays`, { method: 'POST', headers: jsonHeaders,
-            body: JSON.stringify({ ...body, name: `${name}: ${g.model}`, mode: 'exclusive', blend: 'replace', ttlMs: 8000 }) });
+            body: JSON.stringify({ ...body, name: `${name}: ${g.model}`, mode: 'exclusive', blend: 'replace', ttlMs: 8000 }), signal: within(5000) });
         const o = await res.json().catch(() => ({}));
         if (!o.ok || !o.lease) throw new Error(o.error ?? `HTTP ${res.status}`);
-        return { id: o.lease.id, token: o.lease.token, frameBytes: o.lease.frameBytes, seq: 1, fmt: g.fmt, w: g.w, h: g.h, n: g.n };
+        return { id: o.lease.id, token: o.lease.token, frameBytes: o.lease.frameBytes, seq: 1, fmt: g.fmt, w: g.w, h: g.h, n: g.n, fails: 0 };
     }
-    const closeLease = (l) => fetch(`${base}/api/ezp/overlays/${l.id}?token=${l.token}`, { method: 'DELETE' }).catch(() => undefined);
+    const closeLease = (l) => fetch(`${base}/api/ezp/overlays/${l.id}?token=${l.token}`, { method: 'DELETE', signal: within(3000) }).catch(() => undefined);
     const failed = new Map();   // model -> time a lease last failed to open
     async function send(list, k) {
         const now = Date.now(), seen = new Set();
@@ -129,8 +131,12 @@ export async function run({ name, App, cleanSettings }) {
             const out = new Uint8Array(l.frameBytes);
             out.set(bytes.subarray(0, Math.min(bytes.length, out.length)));
             if (k < 1) for (let i = 0; i < out.length; i++) out[i] = out[i] * k;
-            const r = await fetch(`${base}/api/ezp/overlays/${l.id}/frame?token=${l.token}&seq=${l.seq++}`, { method: 'PUT', headers: { 'content-type': 'application/octet-stream' }, body: out }).catch(() => null);
-            if (r && r.status >= 400 && r.status < 500) { leases.delete(g.model); console.log(`Lease on ${g.model} lost (HTTP ${r.status}); opening it again`); }
+            const r = await fetch(`${base}/api/ezp/overlays/${l.id}/frame?token=${l.token}&seq=${l.seq++}`, { method: 'PUT', headers: { 'content-type': 'application/octet-stream' }, body: out, signal: within(3000) }).catch(() => null);
+            if (r && r.ok) l.fails = 0;
+            else if ((r && r.status >= 400 && r.status < 500) || ++l.fails >= 3) {   // refused, or no answer three times: the lease is opened again
+                leases.delete(g.model); console.log(`Lease on ${g.model} lost (${r ? 'HTTP ' + r.status : 'no answer'}); opening it again`);
+                if (r) failed.set(g.model, now); else void closeLease(l);
+            }
         }));
         for (const [m, l] of leases) {   // a model nobody lights any more goes back to the show (after a moment, so a key let go fades out cleanly)
             if (seen.has(m)) continue;
@@ -140,21 +146,32 @@ export async function run({ name, App, cleanSettings }) {
     }
 
     // ---- state kept across restarts
-    let savedJson = '', savedAt = 0;
-    if (app.saveState) {
-        try { const res = await fetch(appUrl('/data/private/state'), { headers: authHeaders }); if (res.ok) { const st = await res.json(); app.restore?.(st); savedJson = JSON.stringify(st); } }
-        catch (e) { console.log(`state: ${e.message}`); }
-    }
+    // Nothing is saved until the saved state has been read (or there is none yet, 404) and the app is set up (the tree
+    // puts the saved decorations on its spots only then): otherwise empty decorations would be written over the saved ones.
+    let savedJson = '', savedAt = 0, stateReady = false, stateTriedAt = -Infinity;
+    const loadState = async (now) => {
+        stateTriedAt = now;
+        try {
+            const res = await fetch(appUrl('/data/private/state'), { headers: authHeaders, signal: within(5000) });
+            if (res.ok) { const st = await res.json(); app.restore?.(st); savedJson = JSON.stringify(st); stateReady = true; }
+            else if (res.status === 404) stateReady = true;
+            else console.log(`state: HTTP ${res.status}`);
+        } catch (e) { console.log(`state: ${e.message}`); }
+    };
+    if (app.saveState) await loadState(Date.now());
     const saveState = async (now, force = false) => {
+        if (!stateReady) { if (now - stateTriedAt > 10_000) await loadState(now); return; }
+        if (!app.ready) return;
         const j = JSON.stringify(app.saveState());
         if (j === savedJson || (!force && now - savedAt < 2000)) return;
         savedAt = now;
-        const res = await fetch(appUrl('/data/private/state'), { method: 'PUT', headers: jsonHeaders, body: j }).catch(() => null);
+        const res = await fetch(appUrl('/data/private/state'), { method: 'PUT', headers: jsonHeaders, body: j, signal: within(5000) }).catch(() => null);
         if (res?.ok) savedJson = j;
     };
 
     let lastJson = '', lastAt = 0, lastPhase = '';
     while (!quit) {
+      try {   // an error in one frame must not stop the app (the models would stay as they were)
         const now = Date.now();
         if (now - lastCheck > 5000) {
             try { await checkSettings(now); }
@@ -174,8 +191,15 @@ export async function run({ name, App, cleanSettings }) {
             await publishStatus(status);
         }
         await sleep(leases.size || list.length ? Math.max(5, 1000 / (app.s.fps || 20) - (Date.now() - now)) : IDLE_MS);
+      } catch (e) {
+        console.log(`error: ${e?.stack ?? e}`);
+        for (const [m, l] of leases) { leases.delete(m); await closeLease(l); }   // the models go back to the show
+        settingsJson = '';   // and the app is set up again
+        await sleep(1000);
+      }
     }
     if (app.saveState) await saveState(Date.now(), true);
     for (const l of leases.values()) await closeLease(l);
+    await app.close?.();   // anything else the app holds (the song's audio lease)
     await publishStatus({ phase: 'idle', message: 'App stopped', notices: {} });
 }

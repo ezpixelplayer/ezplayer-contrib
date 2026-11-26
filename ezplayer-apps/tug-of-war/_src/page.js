@@ -2,7 +2,7 @@
   const pullBtn = el('pull');
   function flush() {
     const s = status, m = me();
-    if (!m || s.phase !== 'pull' || !taps) return;
+    if (!m || m.left || s.phase !== 'pull' || !taps) return;
     const n = Math.min(taps, s.maxBatch || 8); taps -= n; if (taps > 16) taps = 16;
     lastSent = Date.now(); send({ type: 'pull', n, game: s.game });
   }
@@ -46,7 +46,7 @@
     el('knot').style.left = x + '%';
     el('nameA').textContent = T[0][0] + (s.cpu === 1 ? ' 🤖' : ''); el('nameA').style.color = '#' + T[0][1];
     el('nameB').textContent = (s.cpu === 2 ? '🤖 ' : '') + T[1][0]; el('nameB').style.color = '#' + T[1][1];
-    const pulling = m && ['count', 'pull'].includes(s.phase);
+    const pulling = m && !m.left && ['count', 'pull'].includes(s.phase);     // a player who left is not pulling
     el('namePanel').classList.toggle('hidden', !!pulling);
     pullBtn.classList.toggle('hidden', !pulling);
     if (pulling) {
@@ -55,7 +55,7 @@
       if (!timer) timer = setInterval(flush, s.batchMs || 250);
     } else if (timer) { clearInterval(timer); timer = null; taps = 0; }
     el('board').classList.toggle('hidden', !busy && s.phase !== 'over');
-    el('quit').classList.toggle('hidden', !(m && busy));
+    el('quit').classList.toggle('hidden', !(m && !m.left && busy));
     el('table').replaceChildren(...[1, 2].flatMap((t) => ps.filter((p) => p.team === t).sort((a, b) => b.taps - a.taps).map((p) => {
       const d = document.createElement('div'); if (app && p.id === app.clientId) d.className = 'me'; d.style.borderLeftColor = '#' + T[t - 1][1];
       d.textContent = p.name + (p.left ? ' (left)' : '');

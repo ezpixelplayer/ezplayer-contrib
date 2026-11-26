@@ -61,6 +61,8 @@ Approval of requests by the crew (ShowPlay's control page). DMX lights cannot be
 
 ## Changes
 
+- **Version 5:** bug fixes: no request to EZPlayer can freeze the props any more (each has a time limit, and the lease is opened again when frames are refused), and an error in one frame starts the game again instead of stopping the app; no crash when a missing model is back in the show. The overlay leases stay exclusive (PR #21).
+
 - **Version 4:** the overlay leases are **exclusive** again, with the app token, as PR #21 made them (a later upload had undone it: "Could not light …: overlay: mode must be 'exclusive' or 'layer'"). A model another app is using is refused with that app's name.
 
 - **Version 2:** a group made of submodels lights only those submodels (before, it lit the whole models they belong to).

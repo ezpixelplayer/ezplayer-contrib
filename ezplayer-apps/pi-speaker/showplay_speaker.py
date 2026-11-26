@@ -38,6 +38,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 VERSION = 2
 MAX_BYTES = 40 * 1024 * 1024
 PLAY_LOCK = threading.Lock()
+UPLOADS = threading.BoundedSemaphore(3)   # sounds read into memory at once (a few big uploads must not fill a Pi's memory)
 ARGS = None
 CONF_FILE = os.path.expanduser("~/.showplay-speaker.json")
 RECENT = []            # the last sounds: {at, from, secs, ok, error}
@@ -153,7 +154,11 @@ def scaled(data, volume):
         if sys.byteorder == "big":
             a.byteswap()
         f = volume / 100
-        a = array.array("h", (int(x * f) for x in a))
+        try:
+            import audioop   # fast, while this Python still has it (up to 3.12)
+            a = array.array("h", audioop.mul(a.tobytes(), 2, f))
+        except ImportError:
+            a = array.array("h", (int(x * f) for x in a))
         if sys.byteorder == "big":
             a.byteswap()
         out = io.BytesIO()
@@ -196,8 +201,14 @@ def play(data):
 PAGE = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'speaker_page.html'), encoding='utf-8').read() if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'speaker_page.html')) else '<h1>ShowPlay speaker</h1><p>speaker_page.html is missing next to showplay_speaker.py.</p>'
 
 
+def same_key(given, key):
+    """compares keys as bytes (a str with letters like é would make compare_digest fail)"""
+    return hmac.compare_digest(given.encode("utf-8", "replace"), key.encode("utf-8", "replace"))
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "ShowPlaySpeaker/%d" % VERSION
+    timeout = 30   # a sender that stops halfway does not hold a thread for ever
 
     def log_message(self, *a):
         pass
@@ -207,12 +218,16 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
     def key_ok(self):
-        return not ARGS.key or hmac.compare_digest(self.headers.get("X-ShowPlay-Key", ""), ARGS.key)
+        return not ARGS.key or same_key(self.headers.get("X-ShowPlay-Key", ""), ARGS.key)
+
+    def typed(self, kind):
+        """a request with this Content-Type only: a web page elsewhere cannot send it without asking first (CORS),
+        and this server never says yes, so another site cannot change the settings or play sounds"""
+        return self.headers.get("Content-Type", "").split(";")[0].strip().lower() == kind
 
     def body_json(self):
         try:
@@ -243,6 +258,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = self.path.split("?")[0]
         if path in ("/api/settings", "/api/test"):
+            if not self.typed("application/json"):
+                return self.answer(415, {"ok": False, "error": "send JSON (Content-Type: application/json)"})
             if not self.key_ok():
                 return self.answer(403, {"ok": False, "error": "wrong key"})
             if path == "/api/test":
@@ -263,6 +280,8 @@ class Handler(BaseHTTPRequestHandler):
             if isinstance(b.get("device"), str) and len(b["device"]) <= 40 and all(ch.isalnum() or ch in ":,._-" for ch in b["device"]):
                 ARGS.device = b["device"]
             if isinstance(b.get("key"), str) and len(b["key"]) <= 64:
+                if not all(32 < ord(ch) < 127 for ch in b["key"].strip()):
+                    return self.answer(400, {"ok": False, "error": "the key may only have letters without accents, numbers and symbols (no spaces)"})
                 ARGS.key = b["key"].strip()
             if isinstance(b.get("name"), str):
                 ARGS.name = b["name"].strip()[:40] or "ShowPlay speaker"
@@ -274,7 +293,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.answer(200, {"ok": True})
         if path != "/play":
             return self.answer(404, {"ok": False, "error": "not found"})
-        if ARGS.key and not hmac.compare_digest(self.headers.get("X-ShowPlay-Key", ""), ARGS.key):
+        if not self.typed("audio/wav"):
+            return self.answer(415, {"ok": False, "error": "send a WAV (Content-Type: audio/wav)"})
+        if not self.key_ok():
             return self.answer(403, {"ok": False, "error": "wrong key"})
         try:
             n = int(self.headers.get("Content-Length", "0"))
@@ -282,20 +303,27 @@ class Handler(BaseHTTPRequestHandler):
             n = 0
         if n <= 44 or n > MAX_BYTES:
             return self.answer(413 if n > MAX_BYTES else 400, {"ok": False, "error": "a WAV file of up to 40 MB is needed"})
-        data = self.rfile.read(n)
-        if not PLAY_LOCK.acquire(timeout=60):
+        if not UPLOADS.acquire(timeout=5):   # held until it has played: only a few sounds are in memory at once
             return self.answer(503, {"ok": False, "error": "busy playing other sounds"})
         try:
-            secs = play(data)
-            log("played %.1f s from %s" % (secs, self.client_address[0]))
-            note(self.client_address[0], secs)
-            self.answer(200, {"ok": True, "secs": round(secs, 2)})
-        except Exception as e:
-            log("could not play a sound from %s: %s" % (self.client_address[0], e))
-            note(self.client_address[0], 0, str(e))
-            self.answer(500, {"ok": False, "error": str(e)})
+            data = self.rfile.read(n)
+            if len(data) < n:
+                return self.answer(400, {"ok": False, "error": "the sound did not arrive whole"})
+            if not PLAY_LOCK.acquire(timeout=60):
+                return self.answer(503, {"ok": False, "error": "busy playing other sounds"})
+            try:
+                secs = play(data)
+                log("played %.1f s from %s" % (secs, self.client_address[0]))
+                note(self.client_address[0], secs)
+                self.answer(200, {"ok": True, "secs": round(secs, 2)})
+            except Exception as e:
+                log("could not play a sound from %s: %s" % (self.client_address[0], e))
+                note(self.client_address[0], 0, str(e))
+                self.answer(500, {"ok": False, "error": str(e)})
+            finally:
+                PLAY_LOCK.release()
         finally:
-            PLAY_LOCK.release()
+            UPLOADS.release()
 
 
 def main():

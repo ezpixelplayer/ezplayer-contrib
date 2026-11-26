@@ -44,7 +44,8 @@ function cleanGame(raw) {
 
 const ctlOf = (d) => (d && (d.control === 'tilt' || d.control === 'body') ? d.control : 'finger');
 const NO_SENSOR = 'The body sensor is not answering: play with the finger or tilt.';
-const day = (now) => new Date(now).toISOString().slice(0, 10);
+// the local date (not UTC, which turns the day in the evening in the Americas)
+const day = (now) => { const d = new Date(now); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 export const END_TEXTS = {"endWinText": "{winner} wins!", "endLoseText": "Game over! {score} points", "endRecordText": "New record: {score}!"};
 export function cleanSettings(raw) { return cleanEnd(raw, cleanGame(raw), END_TEXTS); }
@@ -104,8 +105,8 @@ export class Game {
         } else if (d.type === 'quit') {
             if (this.phase === 'waiting') this.reset();
             else if (this.phase === 'playing') {
-                if (this.players.length > 1) this.finish(2 - me, `${this.players[me].name} left the game.`, now);
-                else this.finish(0, 'You left the game.', now);
+                // not counted: no winner, no ending, no best score (the one who stays is not declared the winner)
+                this.finish(0, this.players.length > 1 ? `${this.players[me].name} left the game.` : 'You left the game.', now);
             }
         }
         return '';

@@ -1,7 +1,7 @@
 {
     "id": "tug-of-war",
     "name": "Tug of war",
-    "version": "2",
+    "version": "3",
     "description": "Two teams of phones tap as fast as they can and the rope on the lights moves to the side that pulls harder; alone, against the computer",
     "icon": "🪢",
     "runtime": "node",

@@ -1,7 +1,7 @@
 {
     "id": "guestbook",
     "name": "Guestbook",
-    "version": "2",
+    "version": "3",
     "description": "Visitors leave their name and a short note from their phone; new notes scroll across a matrix of the show and the book is read every few minutes",
     "icon": "📝",
     "runtime": "node",

@@ -90,7 +90,8 @@ export class Game {
         this.wave += 1;
         const cols = Math.max(3, Math.min(8, Math.floor((this.W - 4) / 2)));
         const x0 = Math.floor((this.W - (cols * 2 - 1)) / 2);
-        const top = 2 + Math.min(3, this.wave - 1);
+        // lower each wave, but the bottom row stays 4 rows above the shields (H - 4): on a short field always at the top
+        const top = Math.min(2 + Math.min(3, this.wave - 1), Math.max(2, this.H - 12));
         this.aliens = [];
         for (let r = 0; r < ROWS.length; r++) for (let c = 0; c < cols; c++) this.aliens.push([x0 + c * 2, top + r * 2, r]);
         this.n0 = this.aliens.length;
@@ -123,7 +124,8 @@ export class Game {
     outcome() {
         if (this.reason === 'You stopped the game.' || this.reason === 'Nobody was playing.') return null;
         const vars = { winner: this.players[0]?.name ?? 'Player', colour: '', score: this.score };
-        if (this.score > 0 && this.score > (this.bestBefore ?? 0)) return { kind: 'record', vars };
+        // a record only beats an earlier score (the best starts at 0 when the player starts: the first game is no record)
+        if (this.bestBefore > 0 && this.score > this.bestBefore) return { kind: 'record', vars };
         return { kind: this.reason === 'Time is up!' ? 'win' : 'lose', vars };
     }
 
@@ -147,6 +149,7 @@ export class Game {
             if ((this.adx > 0 && Math.max(...xs) + 1 >= W) || (this.adx < 0 && Math.min(...xs) - 1 < 0)) { for (const a of this.aliens) a[1] += 1; this.adx = -this.adx; }
             else for (const a of this.aliens) a[0] += this.adx;
             this.nextStep = now + this.stepTime();
+            for (const a of this.aliens) this.shields.delete(a[0] + ',' + a[1]);   // the invaders crush the shields they reach
             if (Math.max(...this.aliens.map((a) => a[1])) >= H - 2) { this.finish('Invaded!', now); return; }
         }
         if (now >= this.nextBomb && this.aliens.length) {                       // a bomb from the lowest invader of a column

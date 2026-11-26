@@ -13,7 +13,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { num } from './player.mjs';
+import { num, cleanName } from './player.mjs';
 import { cleanEnd } from './ending.mjs';
 import { THEME } from './theme.mjs';
 import { SPRITES as SPRITES8, spriteCell } from './sprites.mjs';
@@ -44,6 +44,7 @@ export const KEYS = ['photo', 'wheel', 'animal', 'paint', 'bell', 'snow', 'hunt'
 export const FRAMES = THEME.frames ?? [['snow', 'Snowflakes'], ['hearts', 'Hearts'], ['stars', 'Stars'], ['santa', 'Santa'], ['rainbow', 'Rainbow']];
 export const ANIMALS = THEME.animals ?? [['penguin', 'Penguin', '🐧'], ['reindeer', 'Reindeer', '🦌'], ['snowman', 'Snowman', '⛄'], ['bear', 'Polar bear', '🐻‍❄️'], ['robin', 'Robin', '🐦']];
 const WHEEL_COLS = ['ff2a2a', 'ffd23f', '39d353', '2bb7ff', '9b5cff', 'ff7a1a', 'ff4fd8', 'ffffff', 'ff2a2a', '39d353', '2bb7ff', 'ffd23f'];
+const BUSY = 'The lights are busy. Try again in a moment.';
 const COLOUR_NAMES = { ff2a2a: 'Red', '39d353': 'Green', '2bb7ff': 'Blue', ffd23f: 'Gold', ffffff: 'White', '9b5cff': 'Purple', ff7a1a: 'Orange', ff4fd8: 'Pink' };
 const DEFAULTS = {
     target: '', fps: 25, brightness: 100,
@@ -118,15 +119,27 @@ export function cluesOf(s) {
         .map((c) => ({ ...c, k: /^-?\d{1,6}$/.test(c.a) ? 'number' : 'word' })).slice(0, 10);
 }
 
+let songCache = new Map();   // file -> { at, size, song }: a WAV is read again only when it changes
 export function songsOf(folder) {
     if (!folder) return [];
     let names = [];
     try { names = fs.readdirSync(folder).filter((n) => n.toLowerCase().endsWith('.wav')).sort(); } catch (e) { return []; }
-    const out = [];
+    const out = [], seen = new Map();
     for (const n of names) {
-        try { const w = readWav(path.join(folder, n)); if (w.seconds >= 4) out.push({ title: n.slice(0, -4).replace(/_/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40), file: path.join(folder, n), secs: w.seconds }); }
-        catch (e) { /* not a WAV this can read */ }
+        const file = path.join(folder, n);
+        try {
+            const st = fs.statSync(file), old = songCache.get(file);
+            let song = old && old.at === st.mtimeMs && old.size === st.size ? old.song : undefined;
+            if (song === undefined) {
+                song = null;
+                try { const w = readWav(file); if (w.seconds >= 4) song = { title: n.slice(0, -4).replace(/_/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40), file, secs: w.seconds }; }
+                catch (e) { /* not a WAV this can read */ }
+            }
+            seen.set(file, { at: st.mtimeMs, size: st.size, song });
+            if (song) out.push(song);
+        } catch (e) { /* gone meanwhile */ }
     }
+    songCache = seen;
     return out;
 }
 
@@ -309,7 +322,7 @@ export class Game {
     constructor(s) {
         this.s = s; this.w = 32; this.h = 16;
         this.phase = 'idle'; this.queue = []; this.cur = null; this.players = [];
-        this.by = new Map(); this.results = new Map();
+        this.by = new Map(); this.results = new Map(); this.solved = new Map();
         this.snowBusy = false; this.snowNext = 0; this.snowRuns = []; this.audioBusy = false;
         this.songs = []; this.songsAt = 0;
         this.quiz = { st: 'idle', id: 0, players: [], scores: new Map(), answers: new Map(), n: 0, of: 0, opts: [], right: -1, until: 0 };
@@ -328,10 +341,12 @@ export class Game {
         const left = Math.ceil(((this.by.get(client + key) ?? -Infinity) + every * 1000 - now) / 1000);
         if (left > 0) return left;
         this.by.set(client + key, now);
+        if (this.by.size > 2000) for (const [k, v] of this.by) if (now - v > 3600000) this.by.delete(k);
         return 0;
     }
 
-    enqueue(item) { if (this.queue.length < 12) this.queue.push(item); }
+    /** false when too many are waiting */
+    enqueue(item) { if (this.queue.length >= 12) return false; this.queue.push(item); return true; }
 
     handle(client, d, now) {
         const s = this.s, k = d.type;
@@ -340,22 +355,22 @@ export class Game {
         if (k === 'photo') {
             if (!s.photoFrames.includes(d.frame)) return '';
             const w = this.wait(client, k, s.photoEvery, now); if (w) return `You can do this again in ${w} s.`;
-            this.enqueue({ kind: k, client, label: 'a photo frame', frame: d.frame, secs: 3.8 + s.photoHold });
+            if (!this.enqueue({ kind: k, client, label: 'a photo frame', frame: d.frame, secs: 3.8 + s.photoHold })) { this.by.delete(client + k); return BUSY; }
         } else if (k === 'wheel') {
             const w = this.wait(client, k, s.wheelEvery, now); if (w) return `You can spin again in ${w} s.`;
             const sl = slicesOf(s), pick = Math.floor(Math.random() * sl.length);
-            this.enqueue({ kind: k, client, label: 'the wheel of fortune', slices: sl, pick, secs: 6.5 + (sl[pick].k === 'again' ? 3 : s.wheelResult) });
+            if (!this.enqueue({ kind: k, client, label: 'the wheel of fortune', slices: sl, pick, secs: 6.5 + (sl[pick].k === 'again' ? 3 : s.wheelResult) })) { this.by.delete(client + k); return BUSY; }
         } else if (k === 'animal') {
             if (!s.animals.includes(d.animal)) return '';
             const w = this.wait(client, k, s.animalEvery, now); if (w) return `You can send another in ${w} s.`;
-            this.enqueue({ kind: k, client, label: ANIMALS.find((a) => a[0] === d.animal)[1], animal: d.animal, secs: 2 * s.animalCross + 2 });
+            if (!this.enqueue({ kind: k, client, label: ANIMALS.find((a) => a[0] === d.animal)[1], animal: d.animal, secs: 2 * s.animalCross + 2 })) { this.by.delete(client + k); return BUSY; }
         } else if (k === 'paint') {
             const px = String(d.px ?? ''), rg = String(d.r ?? '');
             if (!Number.isInteger(d.w) || !Number.isInteger(d.h) || d.w < 4 || d.h < 4 || d.w > 64 || d.h > 64 || px.length !== d.w * d.h || rg.length !== px.length
                 || !/^[0-8]+$/.test(px) || !/^[0-9a-z]+$/.test(rg)) return 'The painting did not arrive right. Try again.';
             const w = this.wait(client, k, s.paintEvery, now); if (w) return `You can send another in ${w} s.`;
             const nreg = new Set(rg.replace(/0/g, '')).size;
-            this.enqueue({ kind: k, client, label: 'a painting', dw: d.w, dh: d.h, px, rg, secs: Math.min(12, nreg * 0.45) + s.paintHold });
+            if (!this.enqueue({ kind: k, client, label: 'a painting', dw: d.w, dh: d.h, px, rg, secs: Math.min(12, nreg * 0.45) + s.paintHold })) { this.by.delete(client + k); return BUSY; }
         } else if (k === 'bell') {
             const w = this.wait(client, k, s.bellEvery, now); if (w) return `You can ring again in ${w} s.`;
             void this.ring();
@@ -475,13 +490,21 @@ export class Game {
     hunt(client, d, now) {
         const cl = cluesOf(this.s), i = d.i;
         if (!Number.isInteger(i) || i < 0 || i >= cl.length) return '';
+        // the clues this phone solved (a new set of clues starts again); in order, all the ones before come first
+        const id = cl.map((c) => c.q + '|' + c.a).join('\n');
+        let me = this.solved.get(client);
+        if (!me || me.id !== id) { me = { id, done: new Set(), at: now }; this.solved.set(client, me); }
+        me.at = now;
+        if (this.solved.size > 2000) for (const [k, v] of this.solved) if (now - v.at > 6 * 3600000) this.solved.delete(k);
+        if (this.s.huntOrder) { const first = cl.findIndex((c, j) => !me.done.has(j)); if (first >= 0 && i > first) return `Solve clue ${first + 1} first.`; }
         const w = this.wait(client, 'hunt', 3, now); if (w) return `Wait ${w} s before answering again.`;
         const c = cl[i], a = String(d.a ?? '').slice(0, 30);
         const norm = (x) => plain(x).toLowerCase().replace(/[^a-z0-9]/g, '');
         const ok = c.k === 'number' ? /^\s*-?\d{1,6}\s*$/.test(a) && +a === +c.a : norm(a) !== '' && norm(a) === norm(c.a);
-        const last = i === cl.length - 1;
+        const last = ok && cl.every((x, j) => j === i || me.done.has(j));   // the treasure: every clue solved
+        if (ok && !this.enqueue(last ? { kind: 'fx', client, label: 'treasure found!', fx: 'fireworks', secs: 10 } : { kind: 'fx', client, label: `clue ${i + 1} solved`, fx: 'bursts', secs: 5 })) { this.by.delete(client + 'hunt'); return BUSY; }
+        if (ok) me.done.add(i);
         if (ok && last) this.ending?.fire(this.s, 'win', { winner: 'The treasure hunter', colour: '', score: '' });
-        if (ok) this.enqueue(last ? { kind: 'fx', client, label: 'treasure found!', fx: 'fireworks', secs: 10 } : { kind: 'fx', client, label: `clue ${i + 1} solved`, fx: 'bursts', secs: 5 });
         this.results.set(client, { k: 'hunt', ok, i, last, at: now });
         return '';
     }
@@ -489,9 +512,10 @@ export class Game {
     // --- guess the song
     songMsg(client, d, now) {
         const q = this.quiz;
+        const nameOf = (n) => { const v = plain(cleanName(d.name, '')).trim(); return v && !isBad(v) ? v : 'Player ' + n; };   // said aloud and shown on the lights
         if (d.a === 'new') {
             if (q.st !== 'idle' && q.st !== 'over') return 'A round is already on.';
-            Object.assign(q, { st: 'lobby', id: q.id + 1, players: [{ id: client, name: String(d.name ?? '').slice(0, 16) || 'Player 1' }], scores: new Map([[client, 0]]), answers: new Map(), n: 0, of: 0, opts: [], right: -1, until: now + 15000 });
+            Object.assign(q, { st: 'lobby', id: q.id + 1, players: [{ id: client, name: nameOf(1) }], scores: new Map([[client, 0]]), answers: new Map(), n: 0, of: 0, opts: [], right: -1, until: now + 15000 });
             void this.runQuiz();
             return '';
         }
@@ -499,7 +523,7 @@ export class Game {
             if (q.st !== 'lobby' || d.id !== q.id) return 'You cannot join this round now.';
             if (q.players.some((p) => p.id === client)) return '';
             if (q.players.length >= 8) return 'The round is full (8 players).';
-            q.players.push({ id: client, name: String(d.name ?? '').slice(0, 16) || 'Player ' + (q.players.length + 1) });
+            q.players.push({ id: client, name: nameOf(q.players.length + 1) });
             q.scores.set(client, 0);
             return '';
         }

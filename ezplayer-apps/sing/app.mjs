@@ -13,7 +13,7 @@
 
 import { num } from './multi-helpers.mjs';
 import { Geom, propsOf, geomsFor, showXml, xmlAttr } from './models.mjs';
-import { playSound, busFor } from './audio.mjs';
+import { playSound, busFor, closeAudio } from './audio.mjs';
 
 export const RATE = 11025;
 const MAX_SECS = 12, MAX_BYTES = MAX_SECS * RATE * 2, FPS = 20;
@@ -219,6 +219,8 @@ export class App {
     }
 
     message() { return this.cur ? `🎶 Now singing: ${this.cur.who}` : 'Record a song and pick who sings it!'; }
+    /** when the app stops: the audio lease is given back at once (not after its 10 minutes) */
+    close() { return closeAudio(); }
 
     status() {
         return {

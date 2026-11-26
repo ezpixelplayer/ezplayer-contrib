@@ -45,28 +45,45 @@ const HIDE = ['merda', 'merdoso', 'merdosa', 'caralho', 'fodase', 'fodasse', 'fo
 const WORD = ['foda', 'fode', 'fodam', 'fodes', 'fdx', 'fdp', 'pqp', 'vsf', 'krl', 'crl', 'puta', 'putas', 'putaria', 'cona',
     'conas', 'pila', 'pilas', 'pissa', 'corno', 'cu', 'cus', 'porra', 'cacete', 'viado', 'maricas', 'vadia', 'merdas',
     'caralhos', 'cagalhao', 'mongoloide', 'putinha', 'putona', 'fck', 'fuk', 'wtf', 'stfu', 'ass', 'arse', 'dick', 'dicks', 'cock', 'twat',
-    'slut', 'piss', 'boobs', 'tits', 'penis', 'porn', 'sex', 'sexy', 'nude', 'nudes', 'fag', 'retard', 'nazi', 'heil', 'kkk'];
+    'slut', 'piss', 'boobs', 'tits', 'penis', 'porn', 'sex', 'sexy', 'nude', 'nudes', 'fag', 'retard', 'nazi', 'heil'];
 let BAD_EXTRA = [];
 export const plain = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7e]/g, '');
-const squeeze = (w) => w.replace(/(.)\1+/g, '$1');
-const HIDE_SQ = HIDE.map(squeeze), WORD_ALL = new Set([...WORD, ...HIDE]), WORD_SQ = new Set([...WORD_ALL].map(squeeze));
+// A blocked word matches a written word that only stretches its letters (fuck: fuuuck, ffuck), never one with fewer
+// letters (ass does not match "as", boobs does not match "bobs", nigger does not match "nigeria").
+const stretch = (w) => w.replace(/([a-z])\1*/g, (run, c) => `${c}{${run.length},}`);
+const WORD_ALL = [...new Set([...WORD, ...HIDE])];
+const RE_WORD = new RegExp(`^(?:${WORD_ALL.map(stretch).join('|')})$`);
+const RE_HIDE = new RegExp(HIDE.map(stretch).join('|'));
+let RE_EXTRA_W = null, RE_EXTRA_H = null;
 /** the show's own blocked words (a comma or line separated list from the settings) */
 export function setBadExtra(list) {
     BAD_EXTRA = String(list || '').split(/[\n,;]+/).map((w) => plain(w).toLowerCase().replace(/[^a-z]/g, '')).filter((w) => w.length >= 2).slice(0, 200);
+    RE_EXTRA_W = BAD_EXTRA.length ? new RegExp(`^(?:${BAD_EXTRA.map(stretch).join('|')})$`) : null;
+    const long = BAD_EXTRA.filter((b) => b.length >= 5);
+    RE_EXTRA_H = long.length ? new RegExp(long.map(stretch).join('|')) : null;
 }
+const badWord = (w) => RE_WORD.test(w) || RE_HIDE.test(w) || !!(RE_EXTRA_W && RE_EXTRA_W.test(w)) || !!(RE_EXTRA_H && RE_EXTRA_H.test(w));
 export function isBad(s) {
-    const n = plain(s).toLowerCase().replace(/[0@1!345$7]/g, (c) => ({ 0: 'o', '@': 'a', 1: 'i', '!': 'i', 3: 'e', 4: 'a', 5: 's', $: 's', 7: 't' })[c]);
-    const toks = n.split(/[^a-z]+/).filter(Boolean), words = [...toks];
-    for (let i = 0; i < toks.length;) {                 // letters spaced out (m e r d a): joined back into a word
-        let j = i; while (j < toks.length && toks[j].length === 1) j++;
-        if (j - i >= 3) words.push(toks.slice(i, j).join(''));
+    const n = plain(s).toLowerCase().replace(/[0@1!|345$7]/g, (c) => ({ 0: 'o', '@': 'a', 1: 'i', '!': 'i', '|': 'i', 3: 'e', 4: 'a', 5: 's', $: 's', 7: 't' })[c]);
+    const toks = n.split(/[^a-z*]+/).map((t) => (/^\*.*\*$/.test(t) ? t.replace(/^\*+|\*+$/g, '') : t)).filter((t) => /[a-z]/.test(t)), words = [], pairs = [];
+    for (const t of toks) {
+        if (!t.includes('*')) { words.push(t); continue; }
+        const re = new RegExp(`^${t.replace(/\*/g, '[a-z]')}$`);       // f*ck, sh**: a star stands for one letter
+        if (WORD_ALL.some((b) => re.test(b))) return true;
+        words.push(...t.split('*').filter(Boolean));
+    }
+    const plainToks = toks.map((t) => t.replace(/\*/g, ''));
+    for (let i = 0; i < plainToks.length;) {            // letters spaced out (m e r d a): joined back into a word
+        let j = i; while (j < plainToks.length && plainToks[j].length === 1) j++;
+        if (j - i >= 3) words.push(plainToks.slice(i, j).join(''));
         i = Math.max(j, i + 1);
     }
-    return words.some((w) => {
-        const q = squeeze(w);
-        return WORD_ALL.has(w) || WORD_SQ.has(q) || HIDE.some((b) => w.includes(b)) || HIDE_SQ.some((b) => q.includes(b))
-            || BAD_EXTRA.some((b) => w === b || q === squeeze(b) || (b.length >= 5 && w.includes(b)));
-    });
+    for (let i = 0; i + 1 < plainToks.length; i++) {    // a word cut in two short pieces (fu ck, sh it)
+        const a = plainToks[i], b = plainToks[i + 1];
+        if ((a.length <= 2 || b.length <= 2) && a.length + b.length >= 4) pairs.push(a + b);
+    }
+    if (pairs.some((w) => RE_WORD.test(w) || !!(RE_EXTRA_W && RE_EXTRA_W.test(w)))) return true;   // only a whole blocked word
+    return words.some((w) => badWord(w) || (w.startsWith('ph') && badWord('f' + w.slice(2))));
 }
 
 // ---- animations ----

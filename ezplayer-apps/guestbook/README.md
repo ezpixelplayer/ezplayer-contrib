@@ -42,6 +42,8 @@ player; the lease is only open while something is on the lights), `main.mjs`.
 
 ## Changes
 
+- **Version 3:** bug fixes: no request to EZPlayer can freeze the game any more (each has a time limit, and the lease is opened again when frames are refused), and an error in one frame starts the game again instead of stopping the app; the word filter no longer blocks normal sentences ("as", "às", "kkkkk", "Nigeria"…) and catches "f*ck", "sh|t", "fu ck"; the book is never overwritten with an empty one when the player was not ready at start; faster: the book is not filtered again every frame. The overlay leases stay exclusive (PR #21).
+
 - **Version 2:** the overlay leases are **exclusive**, with the app token, like the other apps (PR #21); without it EZPlayer refused them ("overlay: mode must be 'exclusive' or 'layer'").
 
 - **Version 1:** the first version.

@@ -59,6 +59,8 @@ Picking up to 3 pictures in a row (ShowPlay's page could queue three at once); h
 
 ## Changes
 
+- **Version 6:** bug fixes: no request to EZPlayer can freeze the game any more (each has a time limit, and the lease is opened again when frames are refused), and an error in one frame starts the game again instead of stopping the app; the word filter no longer blocks normal sentences ("as", "às", "kkkkk", "Nigeria"…) and catches "f*ck", "sh|t", "fu ck". The overlay leases stay exclusive (PR #21).
+
 - **Version 5:** the overlay leases are **exclusive** again, with the app token, as PR #21 made them (a later upload had undone it: "Could not light …: overlay: mode must be 'exclusive' or 'layer'"). A model another app is using is refused with that app's name.
 
 - **Version 4:** ready for the theme packs (New Year, wedding, baptism, Easter, Halloween, Thanksgiving): a `theme.mjs` next to the app (empty here, so this Christmas app looks and plays exactly as before) and the small pictures of `sprites.mjs`. The packs are made from this app by `_themes/make_pack.py`.

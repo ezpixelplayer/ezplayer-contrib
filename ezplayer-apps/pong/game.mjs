@@ -99,7 +99,7 @@ export class Game {
             this.touched = now;
         } else if (d.type === 'quit') {
             if (this.phase === 'waiting') this.reset();
-            else if (this.phase === 'playing') this.finish(2 - me, `${this.players[me].name} left the game.`, now);
+            else if (this.phase === 'playing') this.finish(0, `${this.players[me].name} left the game.`, now);   // nobody wins, no ending
         }
         return '';
     }
