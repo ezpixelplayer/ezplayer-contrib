@@ -1,0 +1,18 @@
+  .choose { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+  .choose.small { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); }
+  .choose button { min-height: 58px; border-radius: 14px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 13px/1.2 system-ui, sans-serif; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px; }
+  .choose button .e { font-size: 24px; }
+  .choose button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .choose button:disabled { opacity: .4; }
+  .choose button .busy { font-size: 11px; color: var(--accent); font-weight: 600; }
+  .pals { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+  .pals button { border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 13px/1.2 system-ui, sans-serif; cursor: pointer; padding: 6px; display: flex; flex-direction: column; gap: 5px; }
+  .pals button .bar { height: 12px; border-radius: 6px; }
+  .pals button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .sw { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
+  .sw button { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; font: 800 14px/1 system-ui, sans-serif; color: #0009; }
+  .sw button[aria-pressed="true"] { border-color: #fff; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  .seg button { min-height: 44px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 14px/1 system-ui, sans-serif; cursor: pointer; }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  #preview { width: 100%; max-width: 360px; display: block; margin: 0 auto; background: #000; border-radius: 10px; image-rendering: pixelated; }

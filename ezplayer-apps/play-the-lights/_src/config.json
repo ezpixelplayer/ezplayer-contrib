@@ -1,0 +1,19 @@
+{"title": "Play the lights", "icon": "🎹", "min": [1, 1], "fps": 25, "target": "none",
+ "intro": "Every model of the props below becomes a key on the visitors' phones, like a keyboard. One visitor plays at a time, for a turn; the others wait in line. A tapped key flashes its model, a held key keeps it lit, then it fades back to the show.",
+ "fields": [
+  {"section": "The keys"},
+  {"id": "props", "type": "textarea", "label": "Props to play, one a line: icon name | models or groups, separated by commas", "default": "",
+   "hint": "Each model is one key (up to 48). Make a prop from a group (all the snowflakes) and each snowflake is its own key."},
+  {"id": "picker", "type": "models", "for": "props", "lines": true, "label": "The show's models and groups"},
+  {"id": "order", "type": "select", "label": "Order of the keys", "options": [["layout", "Left to right, as in the layout"], ["list", "As listed above"]], "default": "layout"},
+  {"id": "fx", "type": "select", "label": "How a key lights its model", "options": [["solid", "Colours (plain)"], ["wave", "Colour wave"], ["rise", "Rising"], ["sparkle", "Sparkle"], ["chase", "Chase"], ["flap", "Flap"], ["spin", "Spin"], ["fire", "Fire"], ["ripple", "Ripples"], ["comet", "Comet"]], "default": "solid", "end": true},
+  {"id": "rainbow", "type": "check", "text": "Keys start with different colours, like a rainbow keyboard (visitors can also pick one colour)", "default": true},
+  {"section": "Turns"},
+  {"id": "turnSecs", "type": "number", "label": "Seconds of a turn", "min": 10, "max": 300, "default": 30},
+  {"id": "idleSecs", "type": "number", "label": "The turn passes on after (seconds) without a tap", "min": 5, "max": 120, "default": 10},
+  {"id": "queueMax", "type": "number", "label": "Most in line", "min": 1, "max": 50, "default": 20, "end": true},
+  {"section": "Keys"},
+  {"id": "pulse", "type": "number", "label": "A tap lights for (seconds)", "min": 0.1, "max": 3, "step": 0.1, "default": 0.5},
+  {"id": "attack", "type": "number", "label": "Attack: time to full light (seconds)", "min": 0, "max": 2, "step": 0.1, "default": 0},
+  {"id": "release", "type": "number", "label": "Release: fade out after letting go (seconds)", "min": 0, "max": 4, "step": 0.1, "default": 0.8}
+ ]}

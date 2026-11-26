@@ -8,26 +8,26 @@ settings page on the home network.
 
 | App | Version | What visitors do | Ways to play |
 |---|---|---|---|
-| 🎁 **catch-the-presents** | 5 | Catch the presents falling down a matrix in a sleigh, alone or against a friend; a golden star is 3, coal takes 2 off | 👆 finger · 📱 tilt · 🧍 body |
-| 🏓 **pong** | 5 | Pong on a matrix, against the computer or a friend | 👆 finger · 📱 tilt · 🧍 body |
-| 👾 **space-invaders** | 5 | Defend the show from space invaders: move the ship, it fires | 👆 finger · 📱 tilt · 🧍 body |
-| 🍬 **slice-the-treats** | 4 | Swipe to slice the Christmas treats thrown up a matrix, not the coal | 👆 finger (swipe) |
-| 🐍 **snake** | 4 | Steer a snake, eat the apples, don't hit the walls | 👆 arrows or swipes |
-| ⭕ **tic-tac-toe** | 4 | Tic-tac-toe on a matrix, against the computer or a friend | 👆 tap |
-| 🔴 **four-in-a-row** | 4 | Four in a Row on a matrix, against the computer or a friend | 👆 tap |
-| 🟢 **simon** | 4 | Repeat the colours the lights show; one more each round | 👆 tap |
-| 🔢 **count-the-colours** | 3 | Party game for up to 8 phones: count how many times a colour flashes | 👆 tap |
-| 🌟 **race-to-the-star** | 3 | Up to 8 phones race climbers up a tree or matrix (tap, sing, shake or run); the winner lights the star | 👆 tap · 🎤 voice · 📱 shake · 🏃 run |
-| 💬 **messages** | 4 | Send a message, an animated picture (73 GIFs), an effect or a drawing to a matrix | — |
-| 📅 **advent-calendar** | 3 | Open one more door every day of December and see its surprise | — |
-| 🎄 **decorate-the-tree** | 13 | Hang decorations (baubles, candy canes, bells, presents…) with colours and effects, several at once; change the star's colour and effect, and the tree's colour | — |
-| 🎁 **fun** | 7 | Photo frame, wheel of fortune, animals, paint by numbers, the bell, snow on request (web address or DMX, with modes and lights), treasure hunt, guess the song | — |
-| ✨ **props** | 3 | Light up real models of the show (wings, arches, canes…) with an effect and colours | — |
-| 🎹 **play-the-lights** | 3 | Each model becomes a key on the phone: take turns playing the show like a keyboard | — |
-| 🎤 **sing** | 4 | Record a song; a singing model sings it on the show's speakers | — |
-| 🪢 **tug-of-war** | 1 | Two teams of phones tap as fast as they can; the rope moves to the side that pulls harder (alone: against the computer) | 👆 tap |
-| 📸 **photo-pixels** | 1 | Take a selfie and see it on a matrix in pixels, in a frame of the season; nothing is saved | 📸 camera |
-| 📝 **guestbook** | 1 | Leave your name and a short note; new notes scroll on a matrix and the book is read every few minutes | — |
+| 🎁 **catch-the-presents** | 6 | Catch the presents falling down a matrix in a sleigh, alone or against a friend; a golden star is 3, coal takes 2 off | 👆 finger · 📱 tilt · 🧍 body |
+| 🏓 **pong** | 6 | Pong on a matrix, against the computer or a friend | 👆 finger · 📱 tilt · 🧍 body |
+| 👾 **space-invaders** | 6 | Defend the show from space invaders: move the ship, it fires | 👆 finger · 📱 tilt · 🧍 body |
+| 🍬 **slice-the-treats** | 5 | Swipe to slice the Christmas treats thrown up a matrix, not the coal | 👆 finger (swipe) |
+| 🐍 **snake** | 5 | Steer a snake, eat the apples, don't hit the walls | 👆 arrows or swipes |
+| ⭕ **tic-tac-toe** | 5 | Tic-tac-toe on a matrix, against the computer or a friend | 👆 tap |
+| 🔴 **four-in-a-row** | 5 | Four in a Row on a matrix, against the computer or a friend | 👆 tap |
+| 🟢 **simon** | 5 | Repeat the colours the lights show; one more each round | 👆 tap |
+| 🔢 **count-the-colours** | 4 | Party game for up to 8 phones: count how many times a colour flashes | 👆 tap |
+| 🌟 **race-to-the-star** | 4 | Up to 8 phones race climbers up a tree or matrix (tap, sing, shake or run); the winner lights the star | 👆 tap · 🎤 voice · 📱 shake · 🏃 run |
+| 💬 **messages** | 5 | Send a message, an animated picture (73 GIFs), an effect or a drawing to a matrix | — |
+| 📅 **advent-calendar** | 4 | Open one more door every day of December and see its surprise | — |
+| 🎄 **decorate-the-tree** | 14 | Hang decorations (baubles, candy canes, bells, presents…) with colours and effects, several at once; change the star's colour and effect, and the tree's colour | — |
+| 🎁 **fun** | 8 | Photo frame, wheel of fortune, animals, paint by numbers, the bell, snow on request (web address or DMX, with modes and lights), treasure hunt, guess the song | — |
+| ✨ **props** | 4 | Light up real models of the show (wings, arches, canes…) with an effect and colours | — |
+| 🎹 **play-the-lights** | 4 | Each model becomes a key on the phone: take turns playing the show like a keyboard | — |
+| 🎤 **sing** | 5 | Record a song; a singing model sings it on the show's speakers | — |
+| 🪢 **tug-of-war** | 2 | Two teams of phones tap as fast as they can; the rope moves to the side that pulls harder (alone: against the computer) | 👆 tap |
+| 📸 **photo-pixels** | 2 | Take a selfie and see it on a matrix in pixels, in a frame of the season; nothing is saved | 📸 camera |
+| 📝 **guestbook** | 2 | Leave your name and a short note; new notes scroll on a matrix and the book is read every few minutes | — |
 
 **Ways to play**: 👆 finger on the phone; 📱 tilt: tilting the phone (needs the page in https); 🧍 body: the body
 sensor at the lights, see below.
@@ -126,3 +126,9 @@ sensor at the lights, see below.
   white, old photo; only a few squares leave the phone and nothing is saved) and **guestbook** (names and notes on the
   lights, the book read every few minutes, kept across restarts, the word filter also on notes already in it, a book
   number to start a new one). All three are in the 11 theme packs too (20 apps per pack).
+- **ShowPlay v40:** Tug of war, Photo in pixels and Guestbook are in the ShowPlay bridge too (🎮 Games and 🎁 Fun on the
+  visitors' page), so the apps and ShowPlay have the same features. From now on every new feature goes into both.
+- **🔧 Exclusive overlay leases again (with ShowPlay v41):** PR #21 (merryoncherry) had made every app's overlay
+  lease exclusive, with the app token; a later upload of older files undid it, and EZPlayer then refused the leases
+  ("overlay: mode must be 'exclusive' or 'layer'"). Back in every app (new versions), in the three new ones, in the
+  machine's lease and in the 11 theme packs.

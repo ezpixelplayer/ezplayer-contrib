@@ -1,0 +1,17 @@
+{"title": "Props of the show", "icon": "✨", "min": [1, 1], "fps": 20, "target": "none",
+ "intro": "Visitors light up real models of the show from their phone: a pair of wings, the bats, a row of arches. They pick a prop, one of 12 effects, colours and a speed; the effect plays on top of the sequence, and when it ends the models go back to the show.",
+ "fields": [
+  {"section": "The props"},
+  {"id": "props", "type": "textarea", "label": "Props, one a line: icon name | models or groups, separated by commas | across (optional)", "default": "",
+   "hint": "Up to 12 props, 64 models each. A group adds all its models. Without \"across\" each model does the same (a pair of wings); with it, one effect runs over all the models together (a row of arches). A model whose name ends in Left / Right (or L / R) is a wing: the effects start from its body."},
+  {"id": "picker", "type": "models", "for": "props", "lines": true, "label": "The show's models and groups"},
+  {"section": "Choices for visitors"},
+  {"id": "fx", "type": "checks", "label": "Effects", "options": [["flap", "Flap"], ["wave", "Colour wave"], ["rise", "Rising"], ["spin", "Spin"], ["breathe", "Breathe"], ["sparkle", "Sparkle"], ["fire", "Fire"], ["ripple", "Ripples"], ["chase", "Chase"], ["comet", "Comet"], ["confetti", "Confetti"], ["solid", "Colours"]], "default": ["flap", "wave", "rise", "spin", "breathe", "sparkle", "fire", "ripple", "chase", "comet", "confetti", "solid"]},
+  {"id": "pals", "type": "checks", "label": "Palettes", "options": [["rainbow", "Rainbow"], ["halloween", "Halloween"], ["christmas", "Christmas"], ["fire", "Fire"], ["ice", "Ice"], ["ocean", "Ocean"], ["candy", "Candy"], ["forest", "Forest"], ["sunset", "Sunset"], ["gold", "Gold"], ["party", "Party"]], "default": ["rainbow", "halloween", "christmas", "fire", "ice", "ocean", "candy", "forest", "sunset", "gold", "party"]},
+  {"id": "mine", "type": "check", "text": "My colours: visitors may pick 1 to 3 colours of their own", "default": true},
+  {"section": "Timing"},
+  {"id": "secs", "type": "number", "label": "Seconds of each request", "min": 5, "max": 120, "default": 20},
+  {"id": "waitSecs", "type": "number", "label": "Each phone waits (seconds)", "min": 0, "max": 600, "default": 20, "end": true},
+  {"id": "queue", "type": "check", "text": "A request for a busy prop waits its turn (off: it replaces the one showing)", "default": true},
+  {"id": "queueMax", "type": "number", "label": "Most waiting for one prop", "min": 1, "max": 20, "default": 5}
+ ]}

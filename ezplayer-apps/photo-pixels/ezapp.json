@@ -1,7 +1,7 @@
 {
     "id": "photo-pixels",
     "name": "Photo in pixels",
-    "version": "1",
+    "version": "2",
     "description": "Visitors take a selfie on their phone and see it on a matrix of the show in pixels, in a frame of the season; nothing is saved",
     "icon": "📸",
     "runtime": "node",

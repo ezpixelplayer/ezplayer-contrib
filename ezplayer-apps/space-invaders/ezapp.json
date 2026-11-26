@@ -1,7 +1,7 @@
 {
     "id": "space-invaders",
     "name": "Space Invaders",
-    "version": "5",
+    "version": "6",
     "description": "Defend the show from space invaders on a matrix: slide your phone to move the ship",
     "icon": "👾",
     "runtime": "node",

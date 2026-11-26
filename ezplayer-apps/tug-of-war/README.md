@@ -46,4 +46,6 @@ send their taps in small batches four times a second; more than about 30 taps a 
 
 ## Changes
 
+- **Version 2:** the overlay leases are **exclusive**, with the app token, like the other apps (PR #21); without it EZPlayer refused them ("overlay: mode must be 'exclusive' or 'layer'"). The machine's lease (DMX through EZPlayer) too.
+
 - **Version 1:** the first version.

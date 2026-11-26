@@ -135,8 +135,10 @@ export class MachineLink {
             const base = (process.env.EZP_API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
             if (this.lease && this.key !== cfg.model) await this.close();
             if (!this.lease) {
-                const res = await fetch(`${base}/api/ezp/overlays`, { method: 'POST', headers: { 'content-type': 'application/json' },
-                    body: JSON.stringify({ model: cfg.model, format: 'nodes', blend: 'replace', ttlMs: 5000, name: 'machine' }), signal: AbortSignal.timeout(4000) });
+                // exclusive, with the app token, like the app's own leases (PR #21)
+                const headers = { 'content-type': 'application/json', ...(process.env.EZP_APP_TOKEN ? { 'x-ezp-app-token': process.env.EZP_APP_TOKEN } : {}) };
+                const res = await fetch(`${base}/api/ezp/overlays`, { method: 'POST', headers,
+                    body: JSON.stringify({ model: cfg.model, format: 'nodes', mode: 'exclusive', blend: 'replace', ttlMs: 5000, name: 'machine' }), signal: AbortSignal.timeout(4000) });
                 const o = await res.json().catch(() => ({}));
                 if (!o.ok || !o.lease) throw new Error('EZPlayer: ' + (o.error ?? 'HTTP ' + res.status));
                 this.lease = { ...o.lease, base, seq: 1, payload: new Uint8Array(o.lease.frameBytes) }; this.key = cfg.model;
