@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0a16">
+<title>Statues</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --raise: #261d3a; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; --c1: #ff2a2a; --c2: #2a7bff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 12px 14px 24px; gap: 12px; min-height: 100dvh; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  h1 { margin: 4px 0 0; font-size: 24px; text-align: center; }
+  .panel { width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  label { color: var(--dim); font-size: 14px; }
+  input[type=text] { width: 100%; font: inherit; font-size: 18px; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 12px; padding: 12px; user-select: text; -webkit-user-select: text; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  .seg button, .grid button { min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .btn { min-height: 54px; border-radius: 14px; border: 0; background: var(--accent); color: #1a1200; font: 800 18px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; width: 100%; }
+  .btn.ghost { background: var(--raise); color: var(--text); border: 1px solid var(--line); min-height: 44px; font-size: 15px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #msg { text-align: center; font-weight: 700; font-size: 18px; min-height: 26px; max-width: 420px; }
+  #note { text-align: center; color: #ff9a9a; min-height: 20px; font-size: 15px; max-width: 420px; }
+  #timer { text-align: center; color: var(--dim); font-size: 14px; min-height: 18px; }
+  .players { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+  .players span { flex: 1; text-align: center; padding: 6px; border-radius: 10px; border: 2px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .players span.turn { border-color: var(--accent); }
+  .big { text-align: center; font: 900 34px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .hidden { display: none !important; }
+  .tip { color: var(--dim); font-size: 13px; margin: 0; }
+  .light { border-radius: 18px; min-height: 120px; display: flex; align-items: center; justify-content: center; background: var(--raise); border: 1px solid var(--line); transition: background .15s; }
+  .light span { font: 900 40px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+  .round { text-align: center; color: var(--dim); font-weight: 700; }
+  .meter { position: relative; height: 16px; border-radius: 8px; background: var(--raise); border: 1px solid var(--line); overflow: hidden; }
+  .meter div:first-child { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--accent); transition: width .2s; }
+  .meter .mark { position: absolute; top: 0; bottom: 0; width: 3px; background: #ff4040; }
+  .plist { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .plist span { padding: 6px 10px; border-radius: 10px; border: 2px solid var(--line); font-weight: 700; }
+  .plist span.out { opacity: .45; text-decoration: line-through; }
+  .plist span.me { border-color: var(--accent); }
+
+</style>
+</head>
+<body>
+<h1>🗽 Statues</h1>
+<div class="panel" id="namePanel">
+  <label for="name">Your name</label>
+  <input type="text" id="name" maxlength="16" placeholder="Your name" autocomplete="off">
+</div>
+<div class="panel" id="setup">
+  <label>Play with</label>
+  <div class="seg" id="ways"></div>
+  <p class="tip" id="wayTip"></p>
+  <button class="btn" id="go" disabled>New game</button>
+  <button class="btn hidden" id="join">Join the game</button>
+</div>
+<div class="panel hidden" id="play">
+  <div class="light" id="light"><span id="word"></span></div>
+  <div class="round" id="round"></div>
+  <div class="meter hidden" id="meter"><div id="meterFill"></div><div class="mark" id="meterMark"></div></div>
+  <div class="plist" id="plist"></div>
+  <button class="btn hidden" id="startNow">Start now</button>
+  <button class="btn ghost hidden" id="quit">Leave the game</button>
+</div>
+
+<div id="timer"></div>
+<div id="msg">Connecting...</div>
+<div id="note"></div>
+<script>
+  const el = (id) => document.getElementById(id);
+  let app = null, status = { phase: 'idle', players: [] }, skew = 0, lastNoteText = '', lastNoteAt = 0;
+  try { el('name').value = localStorage.getItem('spName') || ''; } catch (e) {}
+  el('name').addEventListener('input', () => { try { localStorage.setItem('spName', el('name').value); } catch (e) {} });
+  const myName = () => el('name').value.trim();
+  const me = () => (app && (status.players || []).find((p) => p.id === app.clientId)) || null;
+  const meIndex = () => (app ? (status.players || []).findIndex((p) => p.id === app.clientId) : -1);
+  const nowMs = () => Date.now() + skew;
+  const say = (t) => { el('msg').textContent = t; };
+  const send = (o) => (app ? app.send(o).catch((e) => { el('note').textContent = 'Could not send: ' + e.message; lastNoteAt = Date.now(); }) : Promise.resolve());
+  function seg(box, list, cur, set) {
+    box.replaceChildren(...list.map(([v, t]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-pressed', String(v === cur));
+      b.addEventListener('click', () => { set(v); render(); }); return b;
+    }));
+  }
+  const secsLeft = (at) => Math.max(0, Math.ceil((at - nowMs()) / 1000));
+  let draw = () => {}, tickGame = () => '', onStatus = () => {};
+  // ---- Statues: dance on the go light, freeze on the stop light ----
+  // 🧍 body: the body sensor sees who moves (the phone only starts the game); 📱 phone: each player holds their phone,
+  // which feels its own movement during the stop light and sends a level (0-100) every 300 ms.
+  // The motion sensor needs a phone that has one and the page opened in https (browsers keep it from plain http
+  // pages); on an iPhone the visitor allows it once, when tapping New game or Join.
+  const WAY_NAMES = { body: '🧍 Body sensor', phone: '📱 Phone in my hand' };
+  let way = 'phone';
+  try { way = localStorage.getItem('stWay') || 'phone'; } catch (e) { /* private mode */ }
+  const motionOk = () => typeof window.DeviceMotionEvent !== 'undefined' && window.isSecureContext !== false;
+  const motion = { on: false, got: false, peak: 0, level: 0, g: null };
+  async function motionAsk() {
+    try {
+      if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') {
+        const r = await DeviceMotionEvent.requestPermission();
+        if (r === 'denied') { el('note').textContent = 'The motion sensor was not allowed: it is needed to play with the phone.'; return false; }
+      }
+    } catch (e) { /* asked outside a tap, or not needed */ }
+    if (!motion.on) { addEventListener('devicemotion', onMotion); motion.on = true; }
+    return true;
+  }
+  function onMotion(e) {
+    let m = 0;
+    const a = e.acceleration;
+    if (a && a.x != null) m = Math.hypot(a.x, a.y || 0, a.z || 0);
+    else {   // only with gravity: what changes quickly is the movement
+      const g = e.accelerationIncludingGravity;
+      if (!g || g.x == null) return;
+      const v = [g.x, g.y || 0, g.z || 0];
+      if (!motion.g) motion.g = v.slice();
+      motion.g = motion.g.map((x, i) => x * 0.9 + v[i] * 0.1);
+      m = Math.hypot(v[0] - motion.g[0], v[1] - motion.g[1], v[2] - motion.g[2]);
+    }
+    const r = e.rotationRate;   // turning the phone counts too (about 30 degrees a second is like 1 m/s²)
+    if (r && r.alpha != null) m = Math.max(m, Math.hypot(r.alpha, r.beta || 0, r.gamma || 0) / 30);
+    motion.got = true;
+    motion.peak = Math.max(motion.peak, m);
+  }
+  const playingPhone = () => status.phase === 'playing' && status.mode === 'phone' && me() && !me().out;
+  // every 300 ms: the strongest movement since the last time, sent during the stop light after its grace time
+  setInterval(() => {
+    motion.level = Math.min(100, Math.round(motion.peak * 10)); motion.peak = 0;
+    const s = status;
+    if (playingPhone() && s.light === 'stop' && nowMs() >= s.lightAt + s.graceMs) send({ type: 'move', level: motion.level, cue: s.cue });
+    if (playingPhone()) { el('meterFill').style.width = motion.level + '%'; el('meterMark').style.left = (s.level || 20) + '%'; }
+  }, 300);
+
+  const isStarter = () => app && status.starter === app.clientId;
+  draw = () => {
+    const s = status, m = me(), ps = s.players || [], W = s.words || { go: 'Dance!', stop: 'Freeze!', greeting: '' };
+    const c = s.colors || { go: '30e050', stop: 'ff2020' };
+    const ways = [s.wayBody !== false && s.sensor && s.sensor.ok && 'body', s.wayPhone !== false && 'phone'].filter(Boolean);
+    if (!ways.includes(way) && ways.length) way = ways[0];
+    seg(el('ways'), ways.map((k) => [k, WAY_NAMES[k]]), way, (v) => { way = v; try { localStorage.setItem('stWay', v); } catch (e) { /* */ } });
+    const noMotion = way === 'phone' && !motionOk();
+    el('wayTip').textContent = way === 'body'
+      ? 'Everyone stands in front of the lights (up to 3 people); the sensor sees who moves. No phone needed to play.' + (s.sensor ? ' It sees ' + s.sensor.n + ' ' + (s.sensor.n === 1 ? 'person' : 'people') + ' now.' : '')
+      : noMotion ? 'This phone cannot feel its movement here: the motion sensor needs the page opened with https:// (browsers hide it from http pages) and a phone that has one.'
+        : 'Hold your phone in your hand while you dance; it feels if you move when the light is red. On an iPhone, allow Motion when asked.';
+    const busy = s.phase === 'waiting' || s.phase === 'playing';
+    el('go').disabled = !app || busy || s.phase === 'unconfigured' || noMotion || !ways.length;
+    el('go').textContent = s.phase === 'over' ? 'Play again' : 'New game';
+    const canJoin = s.phase === 'waiting' && s.mode === 'phone' && !m;
+    el('join').classList.toggle('hidden', !canJoin);
+    el('join').disabled = !motionOk();
+    el('go').classList.toggle('hidden', s.phase === 'waiting');
+    el('setup').classList.toggle('hidden', (!!m || isStarter()) && busy);
+    el('namePanel').classList.toggle('hidden', way === 'body' || (!!m && busy));
+    el('play').classList.toggle('hidden', !busy && s.phase !== 'over');
+    el('startNow').classList.toggle('hidden', !(s.phase === 'waiting' && (m || isStarter())));
+    el('quit').classList.toggle('hidden', !(busy && (m ? !m.out : isStarter())));
+    el('quit').textContent = s.mode === 'body' && isStarter() && !m ? 'Stop the game' : 'Leave the game';
+    // the big light: the colour and the word, as on the matrix
+    const L = el('light'), col = s.light === 'go' ? c.go : s.light === 'stop' ? c.stop : '';
+    L.style.background = col ? '#' + col : '';
+    el('word').textContent = s.light === 'go' ? W.go : s.light === 'stop' ? W.stop : s.light === 'ready' ? 'Get ready…' : s.phase === 'over' ? (W.greeting || '🎉') : s.phase === 'waiting' ? '…' : '';
+    el('round').textContent = s.phase === 'playing' && s.light !== 'ready' ? 'Round ' + Math.min(s.rounds, s.round + 1) + ' of ' + s.rounds : '';
+    el('meter').classList.toggle('hidden', !playingPhone());
+    el('plist').replaceChildren(...ps.map((p) => {
+      const sp = document.createElement('span');
+      sp.textContent = (p.out ? '✗ ' : (s.winners || []).includes(p.id) ? '🏆 ' : '') + p.name + (app && p.id === app.clientId ? ' (you)' : '');
+      sp.style.color = '#' + p.col; sp.className = (p.out ? 'out' : '') + (app && p.id === app.clientId ? ' me' : '');
+      return sp;
+    }));
+    let t = s.message || '';
+    if (s.phase === 'waiting' && s.mode === 'body') t = 'Stand in front of the lights. The sensor sees ' + ((s.sensor && s.sensor.n) || 0) + ' now. The game starts soon' + (isStarter() ? ', or tap Start now.' : '.');
+    else if (s.phase === 'waiting' && m) t = ps.length + (ps.length === 1 ? ' player' : ' players') + ' in. Friends open this page and tap Join; ' + (isStarter() ? 'tap Start now when everyone is in.' : 'the game starts soon.');
+    if (s.phase === 'playing' && m && m.out) t = m.why === 'moved' ? '😅 You moved: you are out! Watch the others.' : 'You are out of this game.';
+    else if (s.phase === 'playing' && m && s.light === 'stop') t = W.stop + ' Do not move!';
+    else if (s.phase === 'playing' && m && s.light === 'go') t = W.go + ' Dance with your phone in your hand!';
+    if (s.phase === 'playing' && m && !m.out && !motion.got && s.light !== 'ready') t += ' (This phone feels no movement yet: is Motion allowed?)';
+    if (s.phase === 'over' && m) t = ((s.winners || []).includes(m.id) ? '🎉 You win! ' : '') + s.message;
+    say(t);
+  };
+  tickGame = () => {
+    const s = status;
+    if (s.phase === 'waiting' && s.waitEndsAt) return 'Starting in ' + secsLeft(s.waitEndsAt) + ' s';
+    if (s.phase === 'playing' && s.lightEndsAt && s.light !== 'go') return (s.light === 'stop' ? 'Hold still for ' : 'Starting in ') + secsLeft(s.lightEndsAt) + ' s';
+    return '';
+  };
+  el('go').addEventListener('click', async () => {
+    el('go').disabled = true;
+    if (way === 'phone' && !(await motionAsk())) { render(); return; }
+    send({ type: 'new', control: way, name: myName() }); say('Starting…'); setTimeout(render, 1500);
+  });
+  el('join').addEventListener('click', async () => {
+    if (!(await motionAsk())) return;
+    send({ type: 'join', name: myName() }); say('Joining…');
+  });
+  el('startNow').addEventListener('click', () => send({ type: 'start' }));
+  el('quit').addEventListener('click', () => send({ type: 'quit' }));
+
+  function render() {
+    draw();
+    el('timer').textContent = tickGame() || '';
+    const n = app && status.notices && status.notices[app.clientId];
+    if (n && n !== lastNoteText) { lastNoteText = n; lastNoteAt = Date.now(); el('note').textContent = n; }
+    if (!n) lastNoteText = '';
+    if (Date.now() - lastNoteAt > 5000) el('note').textContent = '';
+  }
+  function init() {
+    app = EZApp.connect();
+    app.onStatus((s, snap) => {
+      if (!s) return;
+      if (snap && typeof snap.at === 'number') skew = snap.at - Date.now();
+      const old = status; status = s; onStatus(old, s);
+      render();
+    });
+    app.ready.then(render).catch((e) => say('Could not reach the player: ' + e.message));
+    setInterval(() => { el('timer').textContent = tickGame() || ''; }, 250);
+    render();
+  }
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => say('Could not load the app SDK.');
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>

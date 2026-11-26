@@ -28,6 +28,12 @@ settings page on the home network.
 | 🪢 **tug-of-war** | 3 | Two teams of phones tap as fast as they can; the rope moves to the side that pulls harder (alone: against the computer) | 👆 tap |
 | 📸 **photo-pixels** | 3 | Take a selfie and see it on a matrix in pixels, in a frame of the season; nothing is saved | 📸 camera |
 | 📝 **guestbook** | 3 | Leave your name and a short note; new notes scroll on a matrix and the book is read every few minutes | — |
+| 🥁 **rhythm** | 1 | Notes fall down a matrix in 4 coloured lanes to a beat the app makes itself; up to 4 phones tap the pads in time (judged on the phone, to the millisecond) | 👆 tap |
+| 🗽 **statue** | 1 | Musical statues: dance while the lights are green, freeze when they turn red; whoever moves is out (the body sensor or the phone in the hand sees it) | 🧍 body · 📱 phone |
+| 🎟️ **raffle** | 1 | A prize draw: names, ticket numbers or visitors who join from their phone spin on a matrix and stop on the winner; the host draws from the settings page or a show button | — |
+| ⏱️ **live-countdown** | 1 | A big countdown on a matrix to a moment (midnight, the couple's entrance, the finale), the last 10 seconds huge, then fireworks, a message, sound and a machine | — |
+| 🎛️ **host-panel** | 1 | For whoever runs the show: one page with every app (state, players now, on/off, start/stop) and "theme of the night" to switch on one pack and off the others. No visitors' page | — |
+| 🗓️ **agenda** | 1 | For whoever runs the show: one page to give every app its times (the player's own schedules, so they work with Agenda off) and dates such as 1 Dec–6 Jan | — |
 
 **Ways to play**: 👆 finger on the phone; 📱 tilt: tilting the phone (needs the page in https); 🧍 body: the body
 sensor at the lights, see below.
@@ -134,3 +140,14 @@ sensor at the lights, see below.
   machine's lease and in the 11 theme packs.
 - **🔧 Bug fixes (all 20 apps, 2026-11-26):** the word filter no longer blocks normal sentences ("as", "às", "kkkkk") and catches "f*ck", "sh|t", "fu ck"; "Only the lights" in fun no longer starts the machine, and a machine is switched off again if the first try fails and always when the app stops; no request to EZPlayer can freeze a game (time limits, the lease opened again when frames are refused); the guestbook and the tree are never overwritten with empty ones when the player or the show is not ready at start; props no longer crash when a missing model is back; fixes in tug-of-war, race-to-the-star, count-the-colours, tic-tac-toe, slice-the-treats, catch-the-presents, pong, space-invaders, play-the-lights, sing, advent-calendar (calendars starting in January or February, summer time) and photo-pixels; the Raspberry Pi speaker refuses requests from other web sites, keys with accents and too many big uploads at once. The overlay leases stay exclusive (PR #21). Each app's README lists its own fixes.
 - **🎄 A round mega tree (decorate-the-tree 16):** the middle of the phone is the front of the real tree, with the visitors' left and right; the front is set on the settings page while a white stripe shows it on the tree (◀ ▶ in 15° steps, invert); the phones show only the front half (180°) or the whole tree with ◀ ▶ to turn it (360°). The shared `multi.mjs` can read a document the settings page changes live (`app.live`).
+- **🆕 Six new apps (2026-11-26), each also in the 11 theme packs:** **rhythm** (a rhythm game with its own music), **statue**
+  (musical statues with the body sensor or the phone), **raffle** (a prize draw for the host), **live-countdown** (a big countdown
+  to a moment, with a celebration at zero), **host-panel** (one page to see and switch every app, and the theme of the night) and
+  **agenda** (every app's times and dates in one page, written as the player's own schedules). Show inputs (a physical button):
+  raffle `draw` and live-countdown `start`; map them on the Apps card. Only events the player marks as show inputs (source
+  `input:…`) reach them, so a phone cannot fake a button. host-panel and agenda use the player's owner API and work on the home
+  network only; set **agenda** to "Always" (it applies the dates while it runs).
+- **_tools/**: `build.mjs` builds an app's two pages from its `_src` (the visitors' page and the settings page share their look and
+  SDK code with every other app; `afterBuild` in `_src/config.json` names a script that finishes a settings page with more than
+  the shared fields: the raffle's host buttons, the countdown's Start/Stop, the host panel, the agenda); `make_pack.mjs <app>` makes the
+  11 theme-pack versions from `_tools/packs/<app>.json` and `_tools/packs.json` (each pack's name, emoji, colours and greeting).

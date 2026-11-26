@@ -1,0 +1,14 @@
+{
+ "christmas":    { "name": "Christmas",        "emoji": "🎄", "colour": "ffc83c", "cols": ["ff2a2a", "39d353", "ffc83c", "2bb7ff"], "back": "snow",     "greeting": "Merry Christmas!" },
+ "newyear":      { "name": "New Year",         "emoji": "🎆", "colour": "ffd23f", "cols": ["ffd23f", "ffffff", "ff4fd8", "2bb7ff"], "back": "confetti", "greeting": "Happy New Year!" },
+ "wedding":      { "name": "Wedding",          "emoji": "💍", "colour": "ff9ec7", "cols": ["ff9ec7", "ffffff", "ffd23f", "c39bff"], "back": "petals",   "greeting": "Congratulations to the happy couple!" },
+ "baptism":      { "name": "Baptism",          "emoji": "🕊️", "colour": "8ec9ff", "cols": ["8ec9ff", "ffffff", "ffb3d9", "ffd86b"], "back": "bubbles",  "greeting": "Welcome, little one!" },
+ "easter":       { "name": "Easter",           "emoji": "🐣", "colour": "ffd86b", "cols": ["ffd86b", "8ee07a", "c39bff", "ff9ec7"], "back": "petals",   "greeting": "Happy Easter!" },
+ "halloween":    { "name": "Halloween",        "emoji": "🎃", "colour": "ff8a1a", "cols": ["ff8a1a", "9b5cff", "39d353", "ffffff"], "back": "bats",     "greeting": "Happy Halloween!" },
+ "thanksgiving": { "name": "Thanksgiving",     "emoji": "🦃", "colour": "ffa53a", "cols": ["ffa53a", "c0392b", "ffd23f", "8b5a2b"], "back": "leaves",   "greeting": "Happy Thanksgiving!" },
+ "carnival":     { "name": "Carnival",         "emoji": "🎭", "colour": "ffcc00", "cols": ["ffcc00", "ff2a6d", "2bb7ff", "39d353"], "back": "confetti", "greeting": "Happy Carnival!" },
+ "valentines":   { "name": "Valentine's Day",  "emoji": "💘", "colour": "ff4d6d", "cols": ["ff4d6d", "ff9ec7", "ffffff", "c2185b"], "back": "petals",   "greeting": "Happy Valentine's Day!" },
+ "birthday":     { "name": "Birthday",         "emoji": "🎂", "colour": "ff6fd8", "cols": ["ff6fd8", "ffd23f", "2bb7ff", "39d353"], "back": "confetti", "greeting": "Happy Birthday!" },
+ "childrensday": { "name": "Children's Day",   "emoji": "🧒", "colour": "ffd23f", "cols": ["ffd23f", "2bb7ff", "39d353", "ff4fd8"], "back": "bubbles",  "greeting": "Happy Children's Day!" },
+ "july4":        { "name": "4th of July",      "emoji": "🇺🇸", "colour": "ff3b3b", "cols": ["ff3b3b", "ffffff", "2b6bff", "ffd23f"], "back": "stars",    "greeting": "Happy 4th of July!" }
+}

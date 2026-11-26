@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rhythm on the lights settings</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 640px; margin-inline: auto; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  h2 { font-size: 14px; margin: 24px 0 4px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+  label { display: block; margin: 12px 0 4px; color: var(--dim); font-size: 14px; }
+  textarea { width: 100%; min-height: 110px; font: 14px/1.4 ui-monospace, Consolas, monospace; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  select, input[type=number], input[type=text] { width: 100%; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .checks { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+  .checks label { display: inline-flex; align-items: center; gap: 8px; margin: 0; color: var(--text); }
+  input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
+  input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: none; padding: 2px; }
+  button { font: inherit; font-weight: 600; color: #1a1200; background: var(--accent); border: 0; border-radius: 10px; padding: 12px 20px; margin-top: 18px; cursor: pointer; }
+  button:disabled { opacity: 0.5; }
+  #note { margin-left: 12px; color: var(--dim); }
+  details { margin-top: 24px; }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12px; overflow: auto; max-height: 50vh; white-space: pre-wrap; }
+  .hint { color: var(--dim); font-size: 13px; margin: 4px 0 0; }
+  .picker { max-height: 220px; overflow: auto; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  .picker button { margin: 0; padding: 6px 10px; font-size: 13px; font-weight: 500; color: var(--text); background: #2a2140; border: 1px solid var(--line); border-radius: 999px; }
+  .picker button.g { border-color: var(--accent); }
+</style>
+</head>
+<body>
+<h1>🥁 Rhythm on the lights settings</h1>
+<p class="hint">A rhythm game on a matrix of the show: notes fall down 4 coloured lanes to the beat of a song the app makes itself, and up to 4 phones tap the matching pad when a note reaches the line. Perfect timing is 3 points, good 1, and a long run of notes in a row earns more. Alone, or friends join within a few seconds. The best scores of the day are shown on the phones. Pick the matrix, then Save.</p>
+<div id="matrixBlock">
+<h2>The matrix</h2>
+<label for="target">The matrix</label>
+<select id="target"><option value="">Loading models...</option></select>
+<p class="hint" id="targetsNote"></p>
+</div>
+<div class="row">
+  <div><label for="fps">Frames per second (5 to 30)</label><input id="fps" type="number" min="5" max="30" step="1" value="30"></div>
+  <div><label for="brightness">Brightness (%)</label><input id="brightness" type="number" min="10" max="100" step="5" value="100"></div>
+</div>
+<div id="fields"></div>
+<button id="save" disabled>Save</button><span id="note"></span>
+<details>
+  <summary>Current status (debug)</summary>
+  <pre id="status">No status yet.</pre>
+</details>
+<script>
+  const el = (id) => document.getElementById(id);
+  const MIN = { w: 8, h: 8 };
+  const FIELDS = [{"section": "The song"}, {"id": "bpm", "type": "select", "label": "Speed of the beat", "options": [["90", "Slow (90 beats a minute)"], ["110", "Medium (110 beats a minute)"], ["130", "Fast (130 beats a minute)"]], "default": "110"}, {"id": "level", "type": "select", "label": "Difficulty (how many notes, and how fast they fall)", "options": [["easy", "Easy"], ["normal", "Normal"], ["hard", "Hard"]], "default": "normal", "end": true}, {"id": "secs", "type": "number", "label": "Length of the song (seconds)", "min": 30, "max": 120, "step": 5, "default": 60}, {"id": "maxPlayers", "type": "number", "label": "Players on the same song (1 to 4)", "min": 1, "max": 4, "default": 4}, {"id": "waitSecs", "type": "number", "label": "Seconds friends have to join", "min": 5, "max": 60, "default": 15}, {"id": "partySecs", "type": "number", "label": "Seconds of result at the end", "min": 3, "max": 30, "default": 6, "end": true}, {"section": "🔊 The music"}, {"id": "sound", "type": "select", "label": "Music", "options": [["built", "Made by the app: drums, bass and a tune on the notes (no files needed)"], ["file", "My own WAV file (and its speed)"], ["off", "No sound: the beat only pulses on the lights"]], "default": "built"}, {"id": "musicVolume", "type": "number", "label": "Volume (5 to 100)", "min": 5, "max": 100, "default": 70}, {"id": "musicBus", "type": "select", "label": "Where it plays", "options": [["immediate", "The show's speakers (EZPlayer)"], ["main", "Mixed with the show's music (EZPlayer)"], ["local", "This computer's speaker"], ["pi", "A Raspberry Pi on the network (ShowPlay speaker)"]], "default": "immediate", "end": true}, {"id": "musicPi", "type": "text", "label": "Raspberry Pi: its IP address (add :port if not 8765)", "default": "", "placeholder": "192.168.1.70"}, {"id": "musicPiKey", "type": "text", "label": "Raspberry Pi: its key (only if you set one)", "default": "", "end": true}, {"id": "musicDelay", "type": "number", "label": "Sound delay (ms): if the notes reach the line before you hear the beat, make it bigger", "min": -500, "max": 1500, "step": 10, "default": 0, "end": true}, {"id": "musicFile", "type": "text", "label": "My own WAV file (on this computer; plain 8- or 16-bit WAV)", "default": "", "placeholder": "C:Musicsong.wav"}, {"id": "musicBpm", "type": "number", "label": "Its speed (beats a minute)", "min": 40, "max": 240, "default": 120}, {"id": "musicStart", "type": "number", "label": "Where its first beat is (ms from the start of the file)", "min": 0, "max": 10000, "step": 10, "default": 0, "end": true, "hint": "The notes follow the beat of your file: its speed must be right. The song is as long as the setting above, or the file if shorter."}, {"section": "🎉 When someone wins or loses"}, {"id": "endWin", "type": "check", "text": "🏆 When someone wins (or a new best score of the day)", "default": true}, {"id": "endLose", "type": "check", "text": "🎵 When someone played alone (the song is over)", "default": true}, {"id": "endSound", "type": "select", "label": "🔊 Sound", "options": [["off", "Off"], ["built", "Built in: a fanfare for a win, a \"wah wah\" for a loss"], ["files", "My own WAV files"]], "default": "off"}, {"id": "endVolume", "type": "number", "label": "Volume (5 to 100)", "min": 5, "max": 100, "default": 80}, {"id": "endBus", "type": "select", "label": "Where it plays", "options": [["immediate", "The show's speakers (EZPlayer)"], ["main", "Mixed with the show's music (EZPlayer)"], ["local", "This computer's speaker"], ["pi", "A Raspberry Pi on the network (ShowPlay speaker)"]], "default": "immediate", "end": true}, {"id": "endPi", "type": "text", "label": "Raspberry Pi: its IP address (add :port if not 8765)", "default": "", "placeholder": "192.168.1.70"}, {"id": "endPiKey", "type": "text", "label": "Raspberry Pi: its key (only if you set one)", "default": "", "end": true}, {"id": "endWinWav", "type": "text", "label": "My own sound for a win (a WAV file on this computer)", "default": "", "placeholder": "C:\\Sounds\\win.wav"}, {"id": "endLoseWav", "type": "text", "label": "My own sound for a loss", "default": "", "placeholder": "C:\\Sounds\\lose.wav", "end": true}, {"id": "endVoice", "type": "check", "text": "🗣️ Say the words out loud (the computer's own voice, after the sound)", "default": false}, {"id": "endVoiceLang", "type": "text", "label": "Voice language (en, pt, es…; the computer must have that voice)", "default": "en", "placeholder": "en"}, {"id": "endBanner", "type": "check", "text": "🔤 Write the words across the lights", "default": false}, {"id": "endWinText", "type": "text", "label": "Words for a win: {winner}, {colour}, {score}, {greeting} (the season's greeting)", "default": "{winner} wins! {greeting}"}, {"id": "endRecordText", "type": "text", "label": "Words for a new best score of the day", "default": "New record: {score}! {greeting}"}, {"id": "endLoseText", "type": "text", "label": "Words when someone plays alone (no new record)", "default": "Song over: {score} points. {greeting}", "end": true}, {"id": "endMachine", "type": "check", "text": "🫧 A machine for a few seconds (bubbles, fog, snow, lights…)", "default": false}, {"id": "endHow", "type": "select", "label": "How the app reaches the machine", "options": [["url", "Web address (smart plug, relay, Shelly, Tasmota)"], ["ezp", "DMX through EZPlayer (a model in the layout)"], ["ddp", "DMX by DDP (WLED or a board with a DMX output)"], ["artnet", "DMX by Art-Net (a DMX node)"], ["e131", "DMX by E1.31 / sACN (a DMX node)"]], "default": "url", "end": true}, {"id": "endOnUrl", "type": "text", "label": "Web address: for on", "default": "", "placeholder": "http://192.168.1.50/relay/0?turn=on"}, {"id": "endOffUrl", "type": "text", "label": "Web address: for off", "default": "", "placeholder": "http://192.168.1.50/relay/0?turn=off"}, {"id": "endLoseUrl", "type": "check", "text": "Web address: also when someone loses", "default": false, "end": true}, {"id": "endHost", "type": "text", "label": "DMX by DDP / Art-Net / E1.31: the board's IP address", "default": "", "placeholder": "192.168.1.60"}, {"id": "endUniverse", "type": "number", "label": "Art-Net / E1.31: universe", "min": 0, "max": 63999, "default": 1, "end": true}, {"id": "endPicker", "type": "models", "for": "endModel", "single": true, "label": "DMX through EZPlayer: the show's models (tap the machine's model)"}, {"id": "endModel", "type": "text", "label": "DMX through EZPlayer: the model", "default": "", "placeholder": "BubbleMachine", "end": true}, {"id": "endWinCh", "type": "text", "label": "DMX for a win: channel=value (e.g. 1=255, 2=180, 3=220, 5=255, 9=255)", "default": "1=255"}, {"id": "endWinSecs", "type": "number", "label": "Seconds for a win", "min": 1, "max": 60, "default": 5}, {"id": "endLoseCh", "type": "text", "label": "DMX for a loss (empty: the machine stays off; e.g. only a red light 5=255, 6=255)", "default": ""}, {"id": "endLoseSecs", "type": "number", "label": "Seconds for a loss", "min": 1, "max": 60, "default": 3}, {"id": "endGap", "type": "number", "label": "The machine rests between two (seconds)", "min": 0, "max": 600, "default": 20, "end": true, "hint": "Every other DMX channel is 0, and all go back to 0 at the end. The fun README explains each way of reaching a machine, and DMX channels."}];
+  const TARGET = "required";   // 'required', 'optional' (a matrix is not needed) or 'none' (no matrix at all)
+  if (TARGET === 'none') el('matrixBlock').querySelectorAll('h2, label, select, .hint').forEach((x) => x.style.display = 'none');
+  let app;
+  // a list of the show's models and groups: a click adds the name to the field it serves, at the cursor
+  async function fillPickers() {
+    const pk = FIELDS.filter((f) => f.type === 'models');
+    if (!pk.length) return;
+    let models = [], groups = {};
+    try {
+      if (app.apiBase !== null) { const r = await fetch(`${app.apiBase}/api/ezp/overlays/targets`); if (r.ok) models = ((await r.json()).targets || []).map((t) => t.model); }
+    } catch (e) { /* listed only on the home network */ }
+    try { groups = (await app.get('private', 'groups')) || {}; } catch (e) { /* the app writes the groups once it has read the show */ }
+    // a box of prop lines ("icon name | models | ..."): a tap on an empty line makes a whole prop line, with an icon and
+    // a name guessed from the model or group; a tap on a line that has one adds the model or group to it
+    const ICONS = [[/wing|butterfl/, '🦋'], [/\bbats?\b|bat \d|bat_/, '🦇'], [/spider|web|widow/, '🕷️'], [/ghost|boo\b/, '👻'], [/skull|tomb|grave/, '💀'],
+      [/pumpkin|jack|lantern/, '🎃'], [/dragon/, '🐉'], [/cane/, '🍭'], [/arch/, '🌈'], [/snow ?man/, '⛄'], [/flake|snow/, '❄️'], [/star|peace/, '⭐'],
+      [/tree|pine/, '🎄'], [/present|gift/, '🎁'], [/wreath/, '🎀'], [/bell/, '🔔'], [/sing|face|bulb|mouth/, '🎤'], [/spinner|spin|fan/, '🌀'],
+      [/icicle/, '🧊'], [/window|door/, '🪟'], [/roof|outline|house|trim|eave/, '🏠'], [/matrix|panel|screen/, '🟦'], [/candle/, '🕯️'],
+      [/deer|reindeer/, '🦌'], [/angel/, '👼'], [/santa/, '🎅'], [/hedge|bush|flower|bed/, '🌳'], [/firework|burst/, '🎆'], [/heart/, '❤️']];
+    const iconFor = (n) => (ICONS.find(([re]) => re.test(n.toLowerCase())) || [0, '✨'])[1];
+    const niceName = (n) => n.replace(/[_]+/g, ' ').replace(/^(all|ge|ppd|nsr|boscoyo|chromaglow)\s+/i, '').replace(/^(ge|ppd|nsr|boscoyo|chromaglow)\s+/i, '')
+      .replace(/\s*\/.*$/, '').replace(/\s+/g, ' ').trim().slice(0, 24) || n.slice(0, 24);
+    function addToLine(t, n) {
+      const v = t.value, at = Math.min(t.selectionStart ?? v.length, v.length);
+      const s0 = v.lastIndexOf('\n', at - 1) + 1, e0 = v.indexOf('\n', at) < 0 ? v.length : v.indexOf('\n', at);
+      const line = v.slice(s0, e0);
+      let nl;
+      if (!line.trim()) nl = iconFor(n) + ' ' + niceName(n) + ' | ' + n;
+      else if (!line.includes('|')) nl = line.trimEnd() + ' | ' + n;
+      else { const parts = line.split('|'); const ms = parts[1].trim(); if (ms.split(',').map((x) => x.trim()).includes(n)) return; parts[1] = ' ' + (ms ? ms + ', ' : '') + n + (parts.length > 2 ? ' ' : ''); nl = parts.join('|'); }
+      t.value = v.slice(0, s0) + nl + v.slice(e0); t.focus(); t.selectionStart = t.selectionEnd = s0 + nl.length;
+    }
+    for (const f of pk) {
+      const box = el('pk_' + f.id), q = el('pq_' + f.id);
+      if (f.lines && el('nl_' + f.id)) el('nl_' + f.id).addEventListener('click', () => {   // a new prop: an empty line at the end
+        const t = el('f_' + f.for); t.value = t.value.replace(/\s*$/, '') + (t.value.trim() ? '\n' : ''); t.focus(); t.selectionStart = t.selectionEnd = t.value.length;
+      });
+      const show = () => {
+        const s = q.value.trim().toLowerCase();
+        const items = [...Object.keys(groups).map((g) => [g, true]), ...models.map((m) => [m, false])].filter(([n]) => !s || n.toLowerCase().includes(s)).slice(0, 300);
+        box.replaceChildren(...items.map(([n, g]) => {
+          const b = document.createElement('button'); b.type = 'button'; b.textContent = (g ? '👥 ' : '') + n; if (g) b.className = 'g';
+          b.title = g ? 'Group: ' + groups[n].join(', ') : 'Model';
+          b.addEventListener('click', () => {
+            if (f.single) { el('f_' + f.for).value = n; return; }   // a box for one model: the name replaces what was there
+            if (f.lines) { addToLine(el('f_' + f.for), n); return; }
+            const t = el('f_' + f.for), at = t.selectionStart ?? t.value.length, before = t.value.slice(0, at), after = t.value.slice(at);
+            const sep = !before || /[|,\n]\s*$/.test(before) ? (/[|,]$/.test(before) ? ' ' : '') : ', ';
+            t.value = before + sep + n + after; t.focus(); t.selectionStart = t.selectionEnd = (before + sep + n).length;
+          });
+          return b;
+        }));
+        if (!items.length) box.textContent = app.apiBase === null ? 'The models are listed only on the home network.' : 'No model found.';
+      };
+      q.addEventListener('input', show); show();
+    }
+  }
+  function build() {
+    const box = el('fields');
+    let row = null;
+    for (const f of FIELDS) {
+      if (f.section) { const h = document.createElement('h2'); h.textContent = f.section; box.append(h); row = null; continue; }
+      if (f.type === 'checks' || f.type === 'check') {
+        const wrap = document.createElement('div');
+        if (f.label) { const l = document.createElement('label'); l.textContent = f.label; wrap.append(l); }
+        const c = document.createElement('div'); c.className = 'checks';
+        for (const [v, t] of f.type === 'check' ? [[f.id, f.text]] : f.options) {
+          const l = document.createElement('label'); const i = document.createElement('input'); i.type = 'checkbox';
+          i.dataset.f = f.id; i.value = v; l.append(i, ' ' + t); c.append(l);
+        }
+        wrap.append(c); box.append(wrap); row = null;
+        if (f.hint) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = f.hint; box.append(p); }
+        continue;
+      }
+      if (f.type === 'models') {
+        const wrap = document.createElement('div');
+        const l = document.createElement('label'); l.textContent = f.label; l.htmlFor = 'pq_' + f.id;
+        const q = document.createElement('input'); q.type = 'text'; q.id = 'pq_' + f.id; q.placeholder = 'Search models and groups (👥)…';
+        const pkb = document.createElement('div'); pkb.className = 'picker'; pkb.id = 'pk_' + f.id; pkb.textContent = 'Loading…';
+        wrap.append(l, q, pkb);
+        if (f.lines) {   // a button for a new prop line, and how the taps work
+          const nb = document.createElement('button'); nb.type = 'button'; nb.id = 'nl_' + f.id; nb.textContent = '➕ New prop'; nb.style.marginTop = '8px';
+          const h = document.createElement('p'); h.className = 'hint'; h.textContent = 'Tap a group or model on an empty line: a whole prop line is made, with an icon and a name you can change. Tap more to add them to that prop. ➕ New prop starts the next one.';
+          wrap.append(nb, h);
+        }
+        box.append(wrap); row = null;
+        if (f.hint) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = f.hint; box.append(p); }
+        continue;
+      }
+      if (!row) { row = document.createElement('div'); row.className = 'row'; box.append(row); }
+      const cell = document.createElement('div');
+      const l = document.createElement('label'); l.textContent = f.label; l.htmlFor = 'f_' + f.id;
+      let i;
+      if (f.type === 'select') { i = document.createElement('select'); for (const [v, t] of f.options) i.append(new Option(t, v)); }
+      else if (f.type === 'textarea') { i = document.createElement('textarea'); if (f.placeholder) i.placeholder = f.placeholder; cell.style.gridColumn = '1 / -1'; }
+      else { i = document.createElement('input'); i.type = f.type; if (f.placeholder) i.placeholder = f.placeholder; if (f.type === 'text') cell.style.gridColumn = '1 / -1'; if (f.type === 'number') { i.min = f.min; i.max = f.max; i.step = f.step || 1; } }
+      i.id = 'f_' + f.id; i.dataset.f = f.id;
+      cell.append(l, i); row.append(cell);
+      if (f.hint) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = f.hint; cell.append(p); }
+      if (f.end) row = null;
+    }
+  }
+  function fill(s) {
+    if (typeof s.fps === 'number') el('fps').value = s.fps;
+    if (typeof s.brightness === 'number') el('brightness').value = s.brightness;
+    for (const f of FIELDS) {
+      if (f.section || f.type === 'models') continue;
+      const v = s[f.id] !== undefined ? s[f.id] : f.default;
+      if (f.type === 'checks') for (const c of document.querySelectorAll(`[data-f="${f.id}"]`)) c.checked = Array.isArray(v) && v.includes(c.value);
+      else if (f.type === 'check') document.querySelector(`[data-f="${f.id}"]`).checked = !!v;
+      else if (f.type === 'color') el('f_' + f.id).value = '#' + v;
+      else el('f_' + f.id).value = v;
+    }
+  }
+  function gather() {
+    const clamp = (i, lo, hi, st = 1) => { const x = Math.min(hi, Math.max(lo, Number(i.value) || lo)), v = Math.round(Math.round(x / st) * st * 1000) / 1000; i.value = v; return v; };
+    const out = { target: el('target').value, fps: clamp(el('fps'), 5, 30), brightness: clamp(el('brightness'), 10, 100) };
+    for (const f of FIELDS) {
+      if (f.section || f.type === 'models') continue;
+      if (f.type === 'checks') out[f.id] = [...document.querySelectorAll(`[data-f="${f.id}"]:checked`)].map((c) => c.value);
+      else if (f.type === 'check') out[f.id] = document.querySelector(`[data-f="${f.id}"]`).checked;
+      else if (f.type === 'color') out[f.id] = el('f_' + f.id).value.slice(1);
+      else if (f.type === 'number') out[f.id] = clamp(el('f_' + f.id), f.min, f.max, f.step || 1);
+      else out[f.id] = f.numeric ? Number(el('f_' + f.id).value) : el('f_' + f.id).value;
+    }
+    return out;
+  }
+  async function loadTargets(current) {
+    if (app.apiBase === null) {
+      el('target').replaceChildren(new Option(current || 'Open this page on the home network to pick a matrix', current || ''));
+      el('target').disabled = true;
+      el('targetsNote').textContent = 'The list of models is only available on the home network; the other settings can still be saved.';
+      return;
+    }
+    const res = await fetch(`${app.apiBase}/api/ezp/overlays/targets`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { targets = [] } = await res.json();
+    const rows = targets.filter((t) => t.width >= MIN.w && t.height >= MIN.h)
+      .map((t) => ({ name: t.model, label: `${t.model} (${t.width} x ${t.height})` }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    const sel = el('target');
+    sel.replaceChildren(new Option(TARGET === 'optional' ? 'None' : 'Pick a matrix...', ''));
+    for (const r of rows) sel.append(new Option(r.label, r.name));
+    if (current && !rows.some((r) => r.name === current)) sel.append(new Option(`${current} (not in this layout)`, current));
+    sel.value = current || '';
+    if (!rows.length) el('targetsNote').textContent = `No matrix found: the show has no model at least ${MIN.w} x ${MIN.h} pixels.`;
+  }
+  async function init() {
+    build();
+    app = EZApp.connect();
+    try { await app.ready; } catch (e) { el('note').textContent = `Could not reach the player: ${e.message}`; return; }
+    app.onStatus((s) => { el('status').textContent = JSON.stringify(s, null, 2); });
+    let settings = null;
+    try { settings = await app.get('private', 'settings'); } catch (e) { /* not readable here; the form keeps its defaults */ }
+    fill(settings || {});
+    if (TARGET !== 'none') { try { await loadTargets(settings?.target); } catch (e) { el('note').textContent = `Could not list models: ${e.message}`; } }
+    fillPickers();
+    el('save').disabled = false;
+  }
+  el('save').addEventListener('click', async () => {
+    const body = gather();
+    if (!body.target && TARGET === 'required') { el('note').textContent = 'Pick a matrix first.'; return; }
+
+    el('save').disabled = true;
+    try {
+      await app.put('private', 'settings', body);
+      el('note').textContent = TARGET === 'required' ? 'Saved. The app picks it up within a few seconds (after the current game).' : 'Saved. The app picks it up within a few seconds.';
+    } catch (e) {
+      el('note').textContent = `Save failed: ${e.message}`;
+    }
+    el('save').disabled = false;
+  });
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => { el('note').textContent = 'Could not load the app SDK.'; };
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>

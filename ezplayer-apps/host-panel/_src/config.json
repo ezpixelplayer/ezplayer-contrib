@@ -1,0 +1,8 @@
+{
+ "title": "Host panel",
+ "icon": "🎛️",
+ "target": "none",
+ "intro": "One page to see and switch every app of the show. This page is made from _src/panel.html by _src/make_panel.mjs, not from fields.",
+ "fields": [],
+ "afterBuild": "host-panel/_src/make_panel.mjs"
+}

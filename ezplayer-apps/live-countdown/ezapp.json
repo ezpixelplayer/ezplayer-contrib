@@ -1,0 +1,14 @@
+{
+    "id": "live-countdown",
+    "name": "Live countdown",
+    "version": "1",
+    "description": "A big countdown on a matrix of the show to a moment (midnight, the couple's entrance, the cake), then fireworks, a message and a fanfare; the phones count down with it",
+    "icon": "⏱️",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "inputs": [{ "name": "start", "kind": "event" }],
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 120, "perClientPerSecond": 2 }
+}

@@ -1,0 +1,11 @@
+  .tip { color: var(--dim); font-size: 13px; margin: 0; }
+  .light { border-radius: 18px; min-height: 120px; display: flex; align-items: center; justify-content: center; background: var(--raise); border: 1px solid var(--line); transition: background .15s; }
+  .light span { font: 900 40px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+  .round { text-align: center; color: var(--dim); font-weight: 700; }
+  .meter { position: relative; height: 16px; border-radius: 8px; background: var(--raise); border: 1px solid var(--line); overflow: hidden; }
+  .meter div:first-child { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--accent); transition: width .2s; }
+  .meter .mark { position: absolute; top: 0; bottom: 0; width: 3px; background: #ff4040; }
+  .plist { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .plist span { padding: 6px 10px; border-radius: 10px; border: 2px solid var(--line); font-weight: 700; }
+  .plist span.out { opacity: .45; text-decoration: line-through; }
+  .plist span.me { border-color: var(--accent); }

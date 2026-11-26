@@ -1,0 +1,12 @@
+  .scores { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .scores div { padding: 6px 10px; border-radius: 10px; background: var(--raise); border: 2px solid transparent; display: flex; justify-content: space-between; gap: 6px; font-weight: 700; overflow: hidden; }
+  .scores div.me { border-color: var(--accent); }
+  .scores div span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .clock { text-align: center; font: 700 18px/1 system-ui, sans-serif; color: var(--dim); }
+  .stage { position: relative; }
+  .stage canvas { display: block; height: 300px; image-rendering: auto; }
+  .judge { position: absolute; left: 0; right: 0; top: 38%; text-align: center; font: 900 30px/1 system-ui, sans-serif; text-shadow: 0 2px 8px #000; pointer-events: none; }
+  .pads { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; touch-action: none; }
+  .pads button { height: 120px; border-radius: 16px; border: 0; opacity: .75; cursor: pointer; touch-action: none; transition: transform .05s, opacity .05s; }
+  .pads button.on { opacity: 1; transform: scale(.94); box-shadow: 0 0 22px currentColor; }
+  .best { margin: 0; padding-left: 24px; font-size: 17px; line-height: 1.6; }

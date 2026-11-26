@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0a16">
+<title>Live countdown</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --raise: #261d3a; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; --c1: #ff2a2a; --c2: #2a7bff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 12px 14px 24px; gap: 12px; min-height: 100dvh; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  h1 { margin: 4px 0 0; font-size: 24px; text-align: center; }
+  .panel { width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  label { color: var(--dim); font-size: 14px; }
+  input[type=text] { width: 100%; font: inherit; font-size: 18px; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 12px; padding: 12px; user-select: text; -webkit-user-select: text; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  .seg button, .grid button { min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .btn { min-height: 54px; border-radius: 14px; border: 0; background: var(--accent); color: #1a1200; font: 800 18px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; width: 100%; }
+  .btn.ghost { background: var(--raise); color: var(--text); border: 1px solid var(--line); min-height: 44px; font-size: 15px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #msg { text-align: center; font-weight: 700; font-size: 18px; min-height: 26px; max-width: 420px; }
+  #note { text-align: center; color: #ff9a9a; min-height: 20px; font-size: 15px; max-width: 420px; }
+  #timer { text-align: center; color: var(--dim); font-size: 14px; min-height: 18px; }
+  .players { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+  .players span { flex: 1; text-align: center; padding: 6px; border-radius: 10px; border: 2px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .players span.turn { border-color: var(--accent); }
+  .big { text-align: center; font: 900 34px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .hidden { display: none !important; }
+  #cd { align-items: center; text-align: center; padding: 22px 14px; --cc: var(--accent); --cc2: var(--accent); }
+  .cdEmoji { font-size: 42px; line-height: 1; }
+  .cdBig { font: 900 64px/1.05 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: var(--cc); font-variant-numeric: tabular-nums; letter-spacing: 1px; overflow-wrap: anywhere; }
+  .cdBig.long { font-size: 44px; }
+  .cdBig.huge { font-size: 120px; }
+  .cdBig.party { font-size: 36px; animation: cdPulse 0.8s ease-in-out infinite alternate; }
+  .cdLabel { font-weight: 800; font-size: 20px; color: var(--cc2); min-height: 26px; }
+  .cdWhen { color: var(--dim); font-size: 14px; }
+  @keyframes cdPulse { from { transform: scale(0.94); } to { transform: scale(1.06); } }
+
+</style>
+</head>
+<body>
+<h1>⏱️ Live countdown</h1>
+<div class="panel" id="namePanel">
+  <label for="name">Your name</label>
+  <input type="text" id="name" maxlength="16" placeholder="Your name" autocomplete="off">
+</div>
+<div class="panel" id="cd">
+  <div class="cdEmoji" id="emoji"></div>
+  <div class="cdBig" id="big">…</div>
+  <div class="cdLabel" id="label"></div>
+  <div class="cdWhen" id="when"></div>
+</div>
+
+<div id="timer"></div>
+<div id="msg">Connecting...</div>
+<div id="note"></div>
+<script>
+  const el = (id) => document.getElementById(id);
+  let app = null, status = { phase: 'idle', players: [] }, skew = 0, lastNoteText = '', lastNoteAt = 0;
+  try { el('name').value = localStorage.getItem('spName') || ''; } catch (e) {}
+  el('name').addEventListener('input', () => { try { localStorage.setItem('spName', el('name').value); } catch (e) {} });
+  const myName = () => el('name').value.trim();
+  const me = () => (app && (status.players || []).find((p) => p.id === app.clientId)) || null;
+  const meIndex = () => (app ? (status.players || []).findIndex((p) => p.id === app.clientId) : -1);
+  const nowMs = () => Date.now() + skew;
+  const say = (t) => { el('msg').textContent = t; };
+  const send = (o) => (app ? app.send(o).catch((e) => { el('note').textContent = 'Could not send: ' + e.message; lastNoteAt = Date.now(); }) : Promise.resolve());
+  function seg(box, list, cur, set) {
+    box.replaceChildren(...list.map(([v, t]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-pressed', String(v === cur));
+      b.addEventListener('click', () => { set(v); render(); }); return b;
+    }));
+  }
+  const secsLeft = (at) => Math.max(0, Math.ceil((at - nowMs()) / 1000));
+  let draw = () => {}, tickGame = () => '', onStatus = () => {};
+  // The phones count down on their own with the player's clock (nowMs: corrected by the skew from the status), so they
+  // keep time with the lights; the app only says when the moment is (status.target).
+  el('namePanel').classList.add('hidden');
+  const p2 = (n) => String(n).padStart(2, '0');
+  function clock(S) {
+    const d = Math.floor(S / 86400), h = Math.floor(S / 3600) % 24, m = Math.floor(S / 60) % 60, s = S % 60;
+    if (d) return d + 'd ' + p2(h) + ':' + p2(m) + ':' + p2(s);
+    if (h) return h + ':' + p2(m) + ':' + p2(s);
+    return m + ':' + p2(s);
+  }
+  let lastBig = '', lastCls = '-';
+  function tick() {
+    const s = status, big = el('big');
+    let t = '—', cls = '';
+    if (s.paused != null) { t = clock(Math.ceil(s.paused / 1000)); cls = 'long'; }
+    else if (s.target != null) {
+      const left = s.target - nowMs();
+      if (left > 0) { const S = Math.ceil(left / 1000); t = S <= 10 ? String(S) : clock(S); cls = S <= 10 ? 'huge' : S >= 86400 ? 'long' : ''; }
+      else if (nowMs() < (s.partyUntil || 0)) { t = s.greeting || '🎉'; cls = 'party'; }
+    }
+    if (t !== lastBig) { big.textContent = t; lastBig = t; }
+    if (cls !== lastCls) { big.className = 'cdBig ' + cls; lastCls = cls; }
+  }
+  draw = () => {
+    const s = status;
+    document.documentElement.style.setProperty('--cc', '#' + (s.colour || 'ffc83c'));
+    document.documentElement.style.setProperty('--cc2', '#' + (s.colour2 || s.colour || 'ffc83c'));
+    el('emoji').textContent = s.emoji || '⏱️';
+    el('label').textContent = s.paused != null ? '⏸ Stopped' : s.target != null ? (s.label || '') : '';
+    el('when').textContent = s.target != null && s.when ? s.when : '';
+    tick();
+    say(s.message || '');
+  };
+  setInterval(tick, 100);
+
+  function render() {
+    draw();
+    el('timer').textContent = tickGame() || '';
+    const n = app && status.notices && status.notices[app.clientId];
+    if (n && n !== lastNoteText) { lastNoteText = n; lastNoteAt = Date.now(); el('note').textContent = n; }
+    if (!n) lastNoteText = '';
+    if (Date.now() - lastNoteAt > 5000) el('note').textContent = '';
+  }
+  function init() {
+    app = EZApp.connect();
+    app.onStatus((s, snap) => {
+      if (!s) return;
+      if (snap && typeof snap.at === 'number') skew = snap.at - Date.now();
+      const old = status; status = s; onStatus(old, s);
+      render();
+    });
+    app.ready.then(render).catch((e) => say('Could not reach the player: ' + e.message));
+    setInterval(() => { el('timer').textContent = tickGame() || ''; }, 250);
+    render();
+  }
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => say('Could not load the app SDK.');
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>

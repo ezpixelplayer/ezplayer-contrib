@@ -1,0 +1,181 @@
+{
+ "short": "rhythm",
+ "packs": {
+  "newyear": {
+   "name": "New Year rhythm",
+   "description": "A New Year rhythm game on a matrix of the show: notes fall to the beat, up to 4 phones tap them in time",
+   "icon": "🎆",
+   "theme": {
+    "cols": [
+     "ffd23f",
+     "ffffff",
+     "ff4fd8",
+     "2bb7ff"
+    ],
+    "title": "New Year rhythm",
+    "greeting": "Happy New Year!"
+   },
+   "intro": "🎆 New Year: a rhythm game on a matrix of the show. Notes fall down 4 lanes in the New Year colours to the beat of a song the app makes itself, and up to 4 phones tap the matching pad when a note reaches the line. Perfect timing is 3 points, good 1, and a long run of notes in a row earns more. Alone, or friends join within a few seconds. The words at the end can say \"Happy New Year!\" ({greeting}). Pick the matrix, then Save."
+  },
+  "wedding": {
+   "name": "Wedding rhythm",
+   "description": "A Wedding rhythm game on a matrix of the show: notes fall to the beat, up to 4 phones tap them in time",
+   "icon": "💍",
+   "theme": {
+    "cols": [
+     "ff9ec7",
+     "ffffff",
+     "ffd23f",
+     "c39bff"
+    ],
+    "title": "Wedding rhythm",
+    "greeting": "Congratulations to the happy couple!"
+   },
+   "intro": "💍 Wedding: a rhythm game on a matrix of the show. Notes fall down 4 lanes in the Wedding colours to the beat of a song the app makes itself, and up to 4 phones tap the matching pad when a note reaches the line. Perfect timing is 3 points, good 1, and a long run of notes in a row earns more. Alone, or friends join within a few seconds. The words at the end can say \"Congratulations to the happy couple!\" ({greeting}). Pick the matrix, then Save."
+  },
+  "baptism": {
+   "name": "Baptism rhythm",
+   "description": "A Baptism rhythm game on a matrix of the show: notes fall to the beat, up to 4 phones tap them in time",
+   "icon": "🕊️",
+   "theme": {
+    "cols": [
+     "8ec9ff",
+     "ffffff",
+     "ffb3d9",
+     "ffd86b"
+    ],
+    "title": "Baptism rhythm",
+    "greeting": "Welcome, little one!"
+   },
+   "intro": "🕊️ Baptism: a rhythm game on a matrix of the show. Notes fall down 4 lanes in the Baptism colours to the beat of a song the app makes itself, and up to 4 phones tap the matching pad when a note reaches the line. Perfect timing is 3 points, good 1, and a long run of notes in a row earns more. Alone, or friends join within a few seconds. The words at the end can say \"Welcome, little one!\" ({greeting}). Pick the matrix, then Save."
+  },
+  "easter": {
+   "name": "Easter rhythm",
+   "description": "A Easter rhythm game on a matrix of the show: notes fall to the beat, up to 4 phones tap them in time",
+   "icon": "🐣",
+   "theme": {
+    "cols": [
+     "ffd86b",
+     "8ee07a",
+     "c39bff",
+     "ff9ec7"
+    ],
+    "title": "Easter rhythm",
+    "greeting": "Happy Easter!"
+   },
+   "intro": "🐣 Easter: a rhythm game on a matrix of the show. Notes fall down 4 lanes in the Easter colours to the beat of a song the app makes itself, and up to 4 phones tap the matching pad when a note reaches the line. Perfect timing is 3 points, good 1, and a long run of notes in a row earns more. Alone, or friends join within a few seconds. The words at the end can say \"Happy Easter!\" ({greeting}). Pick the matrix, then Save."
+  },
+  "halloween": {
+   "name": "Halloween rhythm",
+   "description": "A Halloween rhythm game on a matrix of the show: notes fall to the beat, up to 4 phones tap them in time",
+   "icon": "🎃",
+   "theme": {
+    "cols": [
+     "ff8a1a",
+     "9b5cff",
+     "39d353",
+     "ffffff"
+    ],
+    "title": "Halloween rhythm",
+    "greeting": "Happy Halloween!"
+   },
+   "intro": "🎃 Halloween: a rhythm game on a matrix of the show. Notes fall down 4 lanes in the Halloween colours to the beat of a song the app makes itself, and up to 4 phones tap the matching pad when a note reaches the line. Perfect timing is 3 points, good 1, and a long run of notes in a row earns more. Alone, or friends join within a few seconds. The words at the end can say \"Happy Halloween!\" ({greeting}). Pick the matrix, then Save."
+  },
+  "thanksgiving": {
+   "name": "Thanksgiving rhythm",
+   "description": "A Thanksgiving rhythm game on a matrix of the show: notes fall to the beat, up to 4 phones tap them in time",
+   "icon": "🦃",
+   "theme": {
+    "cols": [
+     "ffa53a",
+     "c0392b",
+     "ffd23f",
+     "8b5a2b"
+    ],
+    "title": "Thanksgiving rhythm",
+    "greeting": "Happy Thanksgiving!"
+   },
+   "intro": "🦃 Thanksgiving: a rhythm game on a matrix of the show. Notes fall down 4 lanes in the Thanksgiving colours to the beat of a song the app makes itself, and up to 4 phones tap the matching pad when a note reaches the line. Perfect timing is 3 points, good 1, and a long run of notes in a row earns more. Alone, or friends join within a few seconds. The words at the end can say \"Happy Thanksgiving!\" ({greeting}). Pick the matrix, then Save."
+  },
+  "carnival": {
+   "name": "Carnival rhythm",
+   "description": "A Carnival rhythm game on a matrix of the show: notes fall to the beat, up to 4 phones tap them in time",
+   "icon": "🎭",
+   "theme": {
+    "cols": [
+     "ffcc00",
+     "ff2a6d",
+     "2bb7ff",
+     "39d353"
+    ],
+    "title": "Carnival rhythm",
+    "greeting": "Happy Carnival!"
+   },
+   "intro": "🎭 Carnival: a rhythm game on a matrix of the show. Notes fall down 4 lanes in the Carnival colours to the beat of a song the app makes itself, and up to 4 phones tap the matching pad when a note reaches the line. Perfect timing is 3 points, good 1, and a long run of notes in a row earns more. Alone, or friends join within a few seconds. The words at the end can say \"Happy Carnival!\" ({greeting}). Pick the matrix, then Save."
+  },
+  "valentines": {
+   "name": "Valentine's rhythm",
+   "description": "A Valentine's Day rhythm game on a matrix of the show: notes fall to the beat, up to 4 phones tap them in time",
+   "icon": "💘",
+   "theme": {
+    "cols": [
+     "ff4d6d",
+     "ff9ec7",
+     "ffffff",
+     "c2185b"
+    ],
+    "title": "Valentine's rhythm",
+    "greeting": "Happy Valentine's Day!"
+   },
+   "intro": "💘 Valentine's Day: a rhythm game on a matrix of the show. Notes fall down 4 lanes in the Valentine's Day colours to the beat of a song the app makes itself, and up to 4 phones tap the matching pad when a note reaches the line. Perfect timing is 3 points, good 1, and a long run of notes in a row earns more. Alone, or friends join within a few seconds. The words at the end can say \"Happy Valentine's Day!\" ({greeting}). Pick the matrix, then Save."
+  },
+  "birthday": {
+   "name": "Birthday rhythm",
+   "description": "A Birthday rhythm game on a matrix of the show: notes fall to the beat, up to 4 phones tap them in time",
+   "icon": "🎂",
+   "theme": {
+    "cols": [
+     "ff6fd8",
+     "ffd23f",
+     "2bb7ff",
+     "39d353"
+    ],
+    "title": "Birthday rhythm",
+    "greeting": "Happy Birthday!"
+   },
+   "intro": "🎂 Birthday: a rhythm game on a matrix of the show. Notes fall down 4 lanes in the Birthday colours to the beat of a song the app makes itself, and up to 4 phones tap the matching pad when a note reaches the line. Perfect timing is 3 points, good 1, and a long run of notes in a row earns more. Alone, or friends join within a few seconds. The words at the end can say \"Happy Birthday!\" ({greeting}). Pick the matrix, then Save."
+  },
+  "childrensday": {
+   "name": "Children's Day rhythm",
+   "description": "A Children's Day rhythm game on a matrix of the show: notes fall to the beat, up to 4 phones tap them in time",
+   "icon": "🧒",
+   "theme": {
+    "cols": [
+     "ffd23f",
+     "2bb7ff",
+     "39d353",
+     "ff4fd8"
+    ],
+    "title": "Children's Day rhythm",
+    "greeting": "Happy Children's Day!"
+   },
+   "intro": "🧒 Children's Day: a rhythm game on a matrix of the show. Notes fall down 4 lanes in the Children's Day colours to the beat of a song the app makes itself, and up to 4 phones tap the matching pad when a note reaches the line. Perfect timing is 3 points, good 1, and a long run of notes in a row earns more. Alone, or friends join within a few seconds. The words at the end can say \"Happy Children's Day!\" ({greeting}). Pick the matrix, then Save."
+  },
+  "july4": {
+   "name": "4th of July rhythm",
+   "description": "A 4th of July rhythm game on a matrix of the show: notes fall to the beat, up to 4 phones tap them in time",
+   "icon": "🇺🇸",
+   "theme": {
+    "cols": [
+     "ff3b3b",
+     "ffffff",
+     "2b6bff",
+     "ffd23f"
+    ],
+    "title": "4th of July rhythm",
+    "greeting": "Happy 4th of July!"
+   },
+   "intro": "🇺🇸 4th of July: a rhythm game on a matrix of the show. Notes fall down 4 lanes in the 4th of July colours to the beat of a song the app makes itself, and up to 4 phones tap the matching pad when a note reaches the line. Perfect timing is 3 points, good 1, and a long run of notes in a row earns more. Alone, or friends join within a few seconds. The words at the end can say \"Happy 4th of July!\" ({greeting}). Pick the matrix, then Save."
+  }
+ }
+}

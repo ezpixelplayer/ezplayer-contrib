@@ -1,0 +1,181 @@
+{
+ "short": "agenda",
+ "packs": {
+  "newyear": {
+   "name": "New Year agenda",
+   "description": "One page to give every New Year app its times (the player's own schedules, so they work even when this app is off), plus dates: an app only on the days of the party",
+   "icon": "🎆",
+   "theme": {
+    "title": "New Year agenda",
+    "icon": "🎆",
+    "accent": "ffd23f",
+    "cols": [
+     "ffd23f",
+     "ffffff",
+     "ff4fd8",
+     "2bb7ff"
+    ]
+   }
+  },
+  "wedding": {
+   "name": "Wedding agenda",
+   "description": "One page to give every Wedding app its times (the player's own schedules, so they work even when this app is off), plus dates: an app only on the days of the party",
+   "icon": "💍",
+   "theme": {
+    "title": "Wedding agenda",
+    "icon": "💍",
+    "accent": "ff9ec7",
+    "cols": [
+     "ff9ec7",
+     "ffffff",
+     "ffd23f",
+     "c39bff"
+    ]
+   }
+  },
+  "baptism": {
+   "name": "Baptism agenda",
+   "description": "One page to give every Baptism app its times (the player's own schedules, so they work even when this app is off), plus dates: an app only on the days of the party",
+   "icon": "🕊️",
+   "theme": {
+    "title": "Baptism agenda",
+    "icon": "🕊️",
+    "accent": "8ec9ff",
+    "cols": [
+     "8ec9ff",
+     "ffffff",
+     "ffb3d9",
+     "ffd86b"
+    ]
+   }
+  },
+  "easter": {
+   "name": "Easter agenda",
+   "description": "One page to give every Easter app its times (the player's own schedules, so they work even when this app is off), plus dates: an app only on the days of the party",
+   "icon": "🐣",
+   "theme": {
+    "title": "Easter agenda",
+    "icon": "🐣",
+    "accent": "ffd86b",
+    "cols": [
+     "ffd86b",
+     "8ee07a",
+     "c39bff",
+     "ff9ec7"
+    ]
+   }
+  },
+  "halloween": {
+   "name": "Halloween agenda",
+   "description": "One page to give every Halloween app its times (the player's own schedules, so they work even when this app is off), plus dates: an app only on the days of the party",
+   "icon": "🎃",
+   "theme": {
+    "title": "Halloween agenda",
+    "icon": "🎃",
+    "accent": "ff8a1a",
+    "cols": [
+     "ff8a1a",
+     "9b5cff",
+     "39d353",
+     "ffffff"
+    ]
+   }
+  },
+  "thanksgiving": {
+   "name": "Thanksgiving agenda",
+   "description": "One page to give every Thanksgiving app its times (the player's own schedules, so they work even when this app is off), plus dates: an app only on the days of the party",
+   "icon": "🦃",
+   "theme": {
+    "title": "Thanksgiving agenda",
+    "icon": "🦃",
+    "accent": "ffa53a",
+    "cols": [
+     "ffa53a",
+     "c0392b",
+     "ffd23f",
+     "8b5a2b"
+    ]
+   }
+  },
+  "carnival": {
+   "name": "Carnival agenda",
+   "description": "One page to give every Carnival app its times (the player's own schedules, so they work even when this app is off), plus dates: an app only on the days of the party",
+   "icon": "🎭",
+   "theme": {
+    "title": "Carnival agenda",
+    "icon": "🎭",
+    "accent": "ffcc00",
+    "cols": [
+     "ffcc00",
+     "ff2a6d",
+     "2bb7ff",
+     "39d353"
+    ]
+   }
+  },
+  "valentines": {
+   "name": "Valentine's agenda",
+   "description": "One page to give every Valentine's Day app its times (the player's own schedules, so they work even when this app is off), plus dates: an app only on the days of the party",
+   "icon": "💘",
+   "theme": {
+    "title": "Valentine's agenda",
+    "icon": "💘",
+    "accent": "ff4d6d",
+    "cols": [
+     "ff4d6d",
+     "ff9ec7",
+     "ffffff",
+     "c2185b"
+    ]
+   }
+  },
+  "birthday": {
+   "name": "Birthday agenda",
+   "description": "One page to give every Birthday app its times (the player's own schedules, so they work even when this app is off), plus dates: an app only on the days of the party",
+   "icon": "🎂",
+   "theme": {
+    "title": "Birthday agenda",
+    "icon": "🎂",
+    "accent": "ff6fd8",
+    "cols": [
+     "ff6fd8",
+     "ffd23f",
+     "2bb7ff",
+     "39d353"
+    ]
+   }
+  },
+  "childrensday": {
+   "name": "Children's Day agenda",
+   "description": "One page to give every Children's Day app its times (the player's own schedules, so they work even when this app is off), plus dates: an app only on the days of the party",
+   "icon": "🧒",
+   "theme": {
+    "title": "Children's Day agenda",
+    "icon": "🧒",
+    "accent": "ffd23f",
+    "cols": [
+     "ffd23f",
+     "2bb7ff",
+     "39d353",
+     "ff4fd8"
+    ]
+   }
+  },
+  "july4": {
+   "name": "4th of July agenda",
+   "description": "One page to give every 4th of July app its times (the player's own schedules, so they work even when this app is off), plus dates: an app only on the days of the party",
+   "icon": "🇺🇸",
+   "theme": {
+    "title": "4th of July agenda",
+    "icon": "🇺🇸",
+    "accent": "ff3b3b",
+    "cols": [
+     "ff3b3b",
+     "ffffff",
+     "2b6bff",
+     "ffd23f"
+    ]
+   }
+  }
+ }
+}

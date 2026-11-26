@@ -1,0 +1,13 @@
+{
+    "id": "agenda",
+    "name": "Agenda",
+    "version": "1",
+    "description": "One page to give every app its times (the player's own schedules, so they work even when Agenda is off), plus dates: an app only from 1 Dec to 6 Jan",
+    "icon": "🗓️",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 60, "perClientPerSecond": 1 }
+}

@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agenda settings</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --raise: #261d3a; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; --warn: #ff9a9a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 860px; margin-inline: auto; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  h2 { font-size: 14px; margin: 28px 0 6px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+  label { color: var(--dim); font-size: 14px; }
+  select, input[type=text] { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+  input.t { width: 5.2em; text-align: center; }
+  input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); vertical-align: middle; }
+  button { font: inherit; font-weight: 600; color: #1a1200; background: var(--accent); border: 0; border-radius: 10px; padding: 10px 16px; cursor: pointer; }
+  button.ghost { color: var(--text); background: var(--raise); border: 1px solid var(--line); font-weight: 500; }
+  button.x { color: var(--text); background: none; border: 1px solid var(--line); padding: 6px 10px; }
+  button:disabled { opacity: 0.5; }
+  .hint { color: var(--dim); font-size: 13px; margin: 4px 0 0; }
+  .warn { color: var(--warn); font-size: 14px; margin: 6px 0 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-top: 10px; }
+  .card.dirty { border-color: var(--accent); }
+  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .head .name { font-weight: 700; flex: 1 1 200px; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--raise); border: 1px solid var(--line); color: var(--dim); }
+  .badge.running { color: #8ee07a; border-color: #3d6b33; }
+  .badge.failed, .badge.missing { color: var(--warn); }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .seg button { color: var(--text); background: var(--raise); border: 2px solid var(--line); font-weight: 600; padding: 8px 12px; }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); }
+  .wins { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .win { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+  .acts .note { color: var(--dim); font-size: 14px; }
+  .dates { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; font-size: 14px; }
+  .dates select { padding: 6px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; }
+  .week { margin-top: 8px; }
+  .wday { display: grid; grid-template-columns: 44px 1fr; gap: 2px 8px; margin-top: 8px; align-items: center; }
+  .wday .d { font-weight: 700; font-size: 13px; color: var(--dim); }
+  .track { position: relative; height: 14px; background: var(--raise); border-radius: 4px; overflow: hidden; }
+  .track.off { opacity: 0.35; }
+  .track i { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+  .axis { position: relative; height: 16px; font-size: 11px; color: var(--dim); }
+  .axis span { position: absolute; transform: translateX(-50%); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; margin-top: 8px; }
+  .legend b { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  #main.hidden, .hidden { display: none !important; }
+  #note { margin-left: 12px; color: var(--dim); }
+  details { margin-top: 24px; }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12px; overflow: auto; max-height: 50vh; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>🗓️ Agenda settings</h1>
+<p class="hint">Give every app its times on one page. The times are kept by the player itself (the same as the Apps card), so they work even when Agenda is off. Dates ("only from 1 Dec to 6 Jan") are Agenda's own: they only work while Agenda runs, so keep Agenda itself on <b>Always</b>.</p>
+<p class="warn" id="net"></p>
+<div id="main" class="hidden">
+  <h2>Quick presets</h2>
+  <div class="presets">
+    <button class="ghost" id="pEvenings" type="button">🌙 Evenings 18:00–23:00 every day</button>
+    <button class="ghost" id="pWeekends" type="button">🎉 Weekends 10:00–22:00</button>
+    <button class="ghost" id="pFollow" type="button">↩️ Every app follows the default</button>
+  </div>
+  <p class="hint">A preset fills in the default times (or the choices below); nothing changes until you Save.</p>
+
+  <h2>Default times</h2>
+  <div class="card" id="defCard">
+    <p class="hint" style="margin:0">Every app that "follows the default" is on during these times. No times at all means always.</p>
+    <div class="wins" id="defWins"></div>
+    <div class="acts"><button class="ghost" type="button" id="defAdd">➕ Add times</button><button type="button" id="defSave">Save the default</button><span class="note" id="defNote"></span></div>
+  </div>
+
+  <h2>Apps</h2>
+  <p class="hint">A window that goes past midnight (18:00 to 02:00) is kept as two: until 24:00, and from 00:00 the next day.</p>
+  <p class="warn" id="selfWarn"></p>
+  <div id="apps"></div>
+  <div class="acts"><button type="button" id="saveAll">Save all</button><span class="note" id="allNote"></span></div>
+
+  <h2>This week</h2>
+  <p class="hint">When each app is on, with the times on this page (also the ones not saved yet). Dates are not shown here.</p>
+  <div class="legend" id="legend"></div>
+  <div class="week" id="week"></div>
+</div>
+<span id="note"></span>
+<details>
+  <summary>Current status (debug)</summary>
+  <pre id="status">No status yet.</pre>
+</details>
+<script>
+  const THEME = {};
+//@include plan.mjs
+  const el = (id) => document.getElementById(id);
+  const mk = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+  if (THEME.accent) document.documentElement.style.setProperty('--accent', '#' + THEME.accent);
+  const COLS = (THEME.cols && THEME.cols.length ? THEME.cols : []).concat(['ffc83c', '39d353', '2bb7ff', 'ff5fc8', 'ff8a1a', 'a05bff', '3cf0ff', 'ff2a2a', 'ffffff']);
+  let app, state = null, plan = { v: 1, dates: {} }, model = null;
+  // this page's own instance, from its address (/apps/<instance>/config/): Agenda never puts dates on itself
+  const SELF = decodeURIComponent((location.pathname.match(/\/apps\/([^/]+)\/config/) || [])[1] || '');
+  const isAgenda = (i) => i.name === SELF || i.appId === 'agenda' || /-agenda$/.test(i.appId || '');
+  const rowsOf = (list) => (list || []).map((w) => ({ id: w.id, days: w.days, startTime: w.startTime, endTime: w.endTime }));
+  const manifest = (i) => ((state.apps || []).find((a) => a.id === i.appId) || {}).manifest || {};
+
+  function fromState() {
+    model = { def: rowsOf(state.defaultSchedule), defDirty: false, inst: {} };
+    for (const i of state.instances || []) model.inst[i.name] = instModel(i);
+  }
+  function instModel(i) {
+    const d = plan.dates[i.name];
+    return { mode: !Array.isArray(i.schedule) ? 'default' : i.schedule.length ? 'own' : 'always', rows: rowsOf(i.schedule), enabled: !!i.enabled,
+      dates: d ? { on: true, from: d.from, to: d.to } : { on: false, from: '12-01', to: '01-06' }, dirty: false };
+  }
+  // the schedule this model would save: null = the default, [] = always
+  function scheduleOf(m) {
+    if (m.mode === 'default') return { list: null };
+    if (m.mode === 'always') return { list: [] };
+    const c = cleanWindows(m.rows);
+    if (!c.error && !c.list.length) return { error: 'Add at least one time, or pick Always.' };
+    return c;
+  }
+  const previewOf = (m) => (m.mode === 'default' ? (cleanWindows(model.def).list || []) : m.mode === 'always' ? [] : (cleanWindows(m.rows).list || []));
+
+  // ---- a list of time windows: days, start, end, remove; "Add times"
+  function windowsEditor(box, rows, changed) {
+    box.replaceChildren(...rows.map((r, k) => {
+      const days = mk('select', { 'ariaLabel': 'Days' });
+      for (const [v, t] of DAY_LABELS) days.append(new Option(t, v));
+      days.value = r.days;
+      const s = mk('input', { type: 'text', className: 't', value: r.startTime, placeholder: '18:00', inputMode: 'numeric', ariaLabel: 'From' });
+      const e = mk('input', { type: 'text', className: 't', value: r.endTime, placeholder: '23:00', inputMode: 'numeric', ariaLabel: 'Until' });
+      days.addEventListener('change', () => { r.days = days.value; changed(false); });
+      s.addEventListener('input', () => { r.startTime = s.value.trim(); changed(false); });
+      e.addEventListener('input', () => { r.endTime = e.value.trim(); changed(false); });
+      const x = mk('button', { type: 'button', className: 'x', textContent: '✕', title: 'Remove these times' });
+      x.addEventListener('click', () => { rows.splice(k, 1); changed(true); });
+      return mk('div', { className: 'win' }, days, mk('label', { textContent: 'from' }), s, mk('label', { textContent: 'until' }), e, x);
+    }));
+    if (!rows.length) box.append(mk('p', { className: 'hint', textContent: 'No times: always on.' }));
+  }
+  const newRow = (like) => ({ days: like?.days || 'all', startTime: like?.startTime || '18:00', endTime: like?.endTime || '23:00' });
+
+  function renderDefault() {
+    el('defCard').classList.toggle('dirty', model.defDirty);
+    windowsEditor(el('defWins'), model.def, (redraw) => { model.defDirty = true; el('defCard').classList.add('dirty'); if (redraw) renderDefault(); renderWeek(); });
+  }
+
+  function dateSelect(md, set) {
+    const d = mk('select', { ariaLabel: 'Day' }), m = mk('select', { ariaLabel: 'Month' });
+    for (let k = 1; k <= 31; k++) d.append(new Option(String(k), String(k).padStart(2, '0')));
+    MONTHS.forEach((n, k) => m.append(new Option(n, String(k + 1).padStart(2, '0'))));
+    m.value = md.slice(0, 2); d.value = md.slice(3);
+    const ch = () => set(m.value + '-' + d.value);
+    d.addEventListener('change', ch); m.addEventListener('change', ch);
+    return [d, m];
+  }
+
+  function renderApps() {
+    const list = (state.instances || []);
+    if (!list.length) { el('apps').replaceChildren(mk('p', { className: 'hint', textContent: 'No app instances yet: add them on the Apps card.' })); return; }
+    el('apps').replaceChildren(...list.map((i) => appCard(i)));
+    selfWarn();
+  }
+  function appCard(i) {
+    const m = model.inst[i.name], man = manifest(i), ag = isAgenda(i);
+    const card = mk('div', { className: 'card' + (m.dirty ? ' dirty' : '') });
+    card.dataset.name = i.name;
+    const touch = (redraw) => { m.dirty = true; card.classList.add('dirty'); if (redraw) card.replaceWith(appCard(i)); renderWeek(); selfWarn(); };
+    const en = mk('input', { type: 'checkbox', checked: m.enabled, title: 'On (off: the app never runs)' });
+    en.addEventListener('change', () => { m.enabled = en.checked; touch(false); });
+    card.append(mk('div', { className: 'head' },
+      mk('span', { className: 'name', textContent: (man.icon || '✨') + ' ' + (i.title || man.name || i.name) + (i.name === SELF ? ' (this app)' : '') }),
+      mk('span', { className: 'badge ' + (i.state || ''), textContent: i.state === 'unavailable' ? 'not scheduled now' : (i.state || '?') }),
+      mk('label', {}, en, ' On')));
+    const seg = mk('div', { className: 'seg' });
+    for (const [v, t] of [['default', 'Follows the default'], ['always', 'Always'], ['own', 'Its own times']]) {
+      const b = mk('button', { type: 'button', textContent: t });
+      b.setAttribute('aria-pressed', String(m.mode === v));
+      b.addEventListener('click', () => { m.mode = v; if (v === 'own' && !m.rows.length) m.rows = model.def.length ? rowsOf(model.def).map((r) => ({ ...r, id: undefined })) : [newRow()]; touch(true); });
+      seg.append(b);
+    }
+    card.append(seg);
+    if (m.mode === 'own') {
+      const wins = mk('div', { className: 'wins' });
+      windowsEditor(wins, m.rows, (redraw) => touch(redraw));
+      const add = mk('button', { type: 'button', className: 'ghost', textContent: '➕ Add times' });
+      add.addEventListener('click', () => { m.rows.push(newRow(m.rows[m.rows.length - 1])); touch(true); });
+      const copy = mk('button', { type: 'button', className: 'ghost', textContent: '📋 Copy these times to all apps' });
+      copy.addEventListener('click', () => copyToAll(i.name));
+      card.append(wins, mk('div', { className: 'acts' }, add, copy));
+    }
+    if (!ag) {
+      const on = mk('input', { type: 'checkbox', checked: m.dates.on });
+      on.addEventListener('change', () => { m.dates.on = on.checked; touch(true); });
+      const row = mk('div', { className: 'dates' }, mk('label', {}, on, ' Only from'));
+      if (m.dates.on) {
+        row.append(...dateSelect(m.dates.from, (v) => { m.dates.from = v; touch(false); }), mk('span', { textContent: 'to' }),
+          ...dateSelect(m.dates.to, (v) => { m.dates.to = v; touch(false); }), mk('span', { className: 'hint', textContent: '(every year; Agenda switches it on and off)' }));
+      }
+      card.append(row);
+    }
+    const note = mk('span', { className: 'note' });
+    const save = mk('button', { type: 'button', textContent: 'Save' });
+    save.addEventListener('click', async () => {
+      save.disabled = true; note.textContent = 'Saving…';
+      try { const t = await saveInstance(i.name); await savePlan(); note.textContent = t; m.dirty = false; card.classList.remove('dirty'); }
+      catch (e) { note.textContent = e.message; }
+      save.disabled = false;
+    });
+    card.append(mk('div', { className: 'acts' }, save, note));
+    return card;
+  }
+  function copyToAll(from) {
+    const src = model.inst[from];
+    const c = cleanWindows(src.rows);
+    if (c.error) { el('allNote').textContent = c.error; return; }
+    for (const i of state.instances || []) {
+      if (i.name === from || isAgenda(i)) continue;
+      const m = model.inst[i.name];
+      m.mode = 'own'; m.rows = c.list.map((w) => ({ days: w.days, startTime: w.startTime, endTime: w.endTime })); m.dirty = true;
+    }
+    renderApps(); renderWeek();
+    el('allNote').textContent = 'Copied. Press Save all to keep them.';
+  }
+  function selfWarn() {
+    const me = (state.instances || []).find((i) => i.name === SELF), hasDates = Object.values(model.inst).some((m) => m.dates.on);
+    el('selfWarn').textContent = me && hasDates && model.inst[SELF].mode !== 'always'
+      ? '⚠️ Some apps have dates: set Agenda itself to Always, or the dates are only kept while Agenda is on.' : '';
+  }
+
+  // ---- saving: the times go to the player, the dates to Agenda's own document "plan"
+  async function command(cmd) {
+    const res = await fetch(`${app.apiBase}/api/ezp/apps/command`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(cmd) });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok || out.error) throw new Error(out.error || `HTTP ${res.status}`);
+    if (out.lastError) throw new Error(out.lastError);
+    if (out.instances) state = out;   // the player answers with the new state
+    return out;
+  }
+  async function saveDefault() {
+    const c = cleanWindows(model.def);
+    if (c.error) throw new Error('Default times: ' + c.error);
+    await command({ op: 'setDefaultSchedule', schedule: c.list });
+    model.def = rowsOf(c.list); model.defDirty = false;
+    return 'Saved.';
+  }
+  async function saveInstance(name) {
+    const m = model.inst[name], s = scheduleOf(m), i = (state.instances || []).find((x) => x.name === name) || {};
+    if (s.error) throw new Error(s.error);
+    if (m.dates.on && !(cleanMd(m.dates.from) && cleanMd(m.dates.to))) throw new Error('Pick real dates (e.g. 1 Dec to 6 Jan).');
+    const patch = { schedule: s.list };
+    if (!!i.enabled !== m.enabled) patch.enabled = m.enabled;
+    await command({ op: 'setInstance', name, patch });
+    if (s.list && s.list.length) m.rows = rowsOf(s.list);
+    if (!isAgenda(i)) { if (m.dates.on) plan.dates[name] = { from: m.dates.from, to: m.dates.to }; else delete plan.dates[name]; }
+    return m.dates.on ? 'Saved. Agenda switches it on and off by its dates (while Agenda runs).' : 'Saved.';
+  }
+  const savePlan = () => app.put('private', 'plan', cleanPlan(plan));
+
+  // ---- the week: a bar per app per day, Monday first
+  function renderWeek() {
+    const list = (state.instances || []).filter((i) => i.name !== SELF);
+    el('legend').replaceChildren(...list.map((i, k) => mk('span', {}, Object.assign(mk('b'), { style: `background:#${COLS[k % COLS.length]}` }),
+      (manifest(i).icon || '✨') + ' ' + (i.title || manifest(i).name || i.name) + (model.inst[i.name].enabled ? '' : ' (off)'))));
+    const axis = mk('div', { className: 'axis' });
+    for (const h of [0, 6, 12, 18, 24]) axis.append(Object.assign(mk('span', { textContent: h + ':00' }), { style: h === 24 ? 'right:0;transform:none' : h === 0 ? 'left:0;transform:none' : `left:${h / 24 * 100}%` }));
+    const days = [1, 2, 3, 4, 5, 6, 0].map((d) => {
+      const g = mk('div', { className: 'wday' });
+      list.forEach((i, k) => {
+        const m = model.inst[i.name], tr = mk('div', { className: 'track' + (m.enabled ? '' : ' off'), title: i.title || i.name });
+        for (const [s, e] of dayBars(previewOf(m), d)) tr.append(Object.assign(mk('i'), { style: `left:${s / 1440 * 100}%;width:${(e - s) / 1440 * 100}%;background:#${COLS[k % COLS.length]}` }));
+        g.append(mk('span', { className: 'd', textContent: k === 0 ? DAY_SHORT[d] : '' }), tr);
+      });
+      return g;
+    });
+    el('week').replaceChildren(mk('div', { className: 'wday' }, mk('span'), axis), ...days);
+    if (!list.length) el('week').replaceChildren(mk('p', { className: 'hint', textContent: 'No apps to show.' }));
+  }
+  const renderAll = () => { renderDefault(); renderApps(); renderWeek(); };
+
+  async function load() {
+    const res = await fetch(`${app.apiBase}/api/ezp/apps`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    state = await res.json();
+    try { plan = cleanPlan(await app.get('private', 'plan')); } catch (e) { plan = cleanPlan(null); }
+    fromState(); renderAll();
+    el('main').classList.remove('hidden');
+  }
+
+  el('defAdd').addEventListener('click', () => { model.def.push(newRow(model.def[model.def.length - 1])); model.defDirty = true; renderDefault(); renderWeek(); });
+  el('defSave').addEventListener('click', async () => {
+    el('defNote').textContent = 'Saving…';
+    try { el('defNote').textContent = await saveDefault(); renderAll(); } catch (e) { el('defNote').textContent = e.message; }
+  });
+  el('pEvenings').addEventListener('click', () => { model.def = [newRow({ days: 'all', startTime: '18:00', endTime: '23:00' })]; model.defDirty = true; renderDefault(); renderWeek(); el('defNote').textContent = 'Press Save the default to keep it.'; });
+  el('pWeekends').addEventListener('click', () => { model.def = [newRow({ days: 'weekend-sat-sun', startTime: '10:00', endTime: '22:00' })]; model.defDirty = true; renderDefault(); renderWeek(); el('defNote').textContent = 'Press Save the default to keep it.'; });
+  el('pFollow').addEventListener('click', () => {
+    for (const i of state.instances || []) { if (isAgenda(i)) continue; const m = model.inst[i.name]; if (m.mode !== 'default') { m.mode = 'default'; m.dirty = true; } }
+    renderApps(); renderWeek(); el('allNote').textContent = 'Press Save all to keep it.';
+  });
+  el('saveAll').addEventListener('click', async () => {
+    el('saveAll').disabled = true; el('allNote').textContent = 'Saving…';
+    const bad = [];
+    try { if (model.defDirty) await saveDefault(); } catch (e) { bad.push(e.message); }
+    for (const [name, m] of Object.entries(model.inst)) {
+      if (!m.dirty) continue;
+      try { await saveInstance(name); m.dirty = false; } catch (e) { bad.push(name + ': ' + e.message); }
+    }
+    try { await savePlan(); } catch (e) { bad.push('Dates: ' + e.message); }
+    el('allNote').textContent = bad.length ? 'Not saved: ' + bad.join(' · ') : 'All saved.';
+    renderAll(); el('saveAll').disabled = false;
+  });
+
+  async function init() {
+    app = EZApp.connect();
+    try { await app.ready; } catch (e) { el('net').textContent = `Could not reach the player: ${e.message}`; return; }
+    app.onStatus((s) => { el('status').textContent = JSON.stringify(s, null, 2); });
+    if (app.apiBase === null) { el('net').textContent = 'Open this page on the home network to set the times: the apps and their schedules are only reachable there.'; return; }
+    try { await load(); } catch (e) { el('net').textContent = `Could not read the apps: ${e.message}`; }
+  }
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => { el('net').textContent = 'Could not load the app SDK.'; };
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>

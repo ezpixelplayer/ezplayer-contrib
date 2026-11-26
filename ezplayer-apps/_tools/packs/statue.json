@@ -1,0 +1,137 @@
+{
+ "short": "statue",
+ "packs": {
+  "newyear": {
+   "name": "New Year statues",
+   "description": "Dance into the New Year with the lights: party while the matrix is green, freeze when it turns red. The body sensor or each player's phone sees who moves",
+   "icon": "🎆",
+   "theme": {
+    "go": "Party!",
+    "stop": "Freeze!",
+    "back": "confetti",
+    "greeting": "Happy New Year!"
+   },
+   "intro": "Musical statues for New Year: everyone dances while the matrix is green (\"Party!\") and freezes when it turns red (\"Freeze!\"). Whoever moves during the red light is out; the last one standing wins. The body sensor or each player's phone sees who moves. Pick the matrix, then Save."
+  },
+  "wedding": {
+   "name": "Wedding statues",
+   "description": "Musical statues for the wedding party: dance while the matrix is green, strike a pose when it turns red. The body sensor or each player's phone sees who moves",
+   "icon": "💍",
+   "theme": {
+    "go": "Dance!",
+    "stop": "Pose!",
+    "back": "petals",
+    "greeting": "Congratulations to the happy couple!"
+   },
+   "intro": "Musical statues for Wedding: everyone dances while the matrix is green (\"Dance!\") and freezes when it turns red (\"Pose!\"). Whoever moves during the red light is out; the last one standing wins. The body sensor or each player's phone sees who moves. Pick the matrix, then Save."
+  },
+  "baptism": {
+   "name": "Little statues",
+   "description": "Musical statues for the family: wiggle while the matrix is green, freeze when it turns red. The body sensor or each player's phone sees who moves",
+   "icon": "🕊️",
+   "theme": {
+    "go": "Wiggle!",
+    "stop": "Freeze!",
+    "back": "bubbles",
+    "greeting": "Welcome, little one!"
+   },
+   "intro": "Musical statues for Baptism: everyone dances while the matrix is green (\"Wiggle!\") and freezes when it turns red (\"Freeze!\"). Whoever moves during the red light is out; the last one standing wins. The body sensor or each player's phone sees who moves. Pick the matrix, then Save."
+  },
+  "easter": {
+   "name": "Bunny statues",
+   "description": "Hop like a bunny while the matrix is green, freeze when it turns red. The body sensor or each player's phone sees who moves",
+   "icon": "🐣",
+   "theme": {
+    "go": "Hop!",
+    "stop": "Freeze!",
+    "back": "petals",
+    "greeting": "Happy Easter!"
+   },
+   "intro": "Musical statues for Easter: everyone dances while the matrix is green (\"Hop!\") and freezes when it turns red (\"Freeze!\"). Whoever moves during the red light is out; the last one standing wins. The body sensor or each player's phone sees who moves. Pick the matrix, then Save."
+  },
+  "halloween": {
+   "name": "Monster statues",
+   "description": "Dance like a monster while the matrix is green, freeze like a statue when it turns red. The body sensor or each player's phone sees who moves",
+   "icon": "🎃",
+   "theme": {
+    "go": "Boogie!",
+    "stop": "Freeze!",
+    "back": "bats",
+    "greeting": "Happy Halloween!"
+   },
+   "intro": "Musical statues for Halloween: everyone dances while the matrix is green (\"Boogie!\") and freezes when it turns red (\"Freeze!\"). Whoever moves during the red light is out; the last one standing wins. The body sensor or each player's phone sees who moves. Pick the matrix, then Save."
+  },
+  "thanksgiving": {
+   "name": "Turkey trot statues",
+   "description": "Trot like a turkey while the matrix is green, freeze when it turns red. The body sensor or each player's phone sees who moves",
+   "icon": "🦃",
+   "theme": {
+    "go": "Trot!",
+    "stop": "Freeze!",
+    "back": "leaves",
+    "greeting": "Happy Thanksgiving!"
+   },
+   "intro": "Musical statues for Thanksgiving: everyone dances while the matrix is green (\"Trot!\") and freezes when it turns red (\"Freeze!\"). Whoever moves during the red light is out; the last one standing wins. The body sensor or each player's phone sees who moves. Pick the matrix, then Save."
+  },
+  "carnival": {
+   "name": "Carnival statues",
+   "description": "Samba while the matrix is green, freeze in your costume when it turns red. The body sensor or each player's phone sees who moves",
+   "icon": "🎭",
+   "theme": {
+    "go": "Samba!",
+    "stop": "Freeze!",
+    "back": "confetti",
+    "greeting": "Happy Carnival!"
+   },
+   "intro": "Musical statues for Carnival: everyone dances while the matrix is green (\"Samba!\") and freezes when it turns red (\"Freeze!\"). Whoever moves during the red light is out; the last one standing wins. The body sensor or each player's phone sees who moves. Pick the matrix, then Save."
+  },
+  "valentines": {
+   "name": "Sweetheart statues",
+   "description": "Dance with your sweetheart while the matrix is green, freeze when it turns red. The body sensor or each player's phone sees who moves",
+   "icon": "💘",
+   "theme": {
+    "go": "Dance!",
+    "stop": "Freeze!",
+    "back": "petals",
+    "greeting": "Happy Valentine's Day!"
+   },
+   "intro": "Musical statues for Valentine's Day: everyone dances while the matrix is green (\"Dance!\") and freezes when it turns red (\"Freeze!\"). Whoever moves during the red light is out; the last one standing wins. The body sensor or each player's phone sees who moves. Pick the matrix, then Save."
+  },
+  "birthday": {
+   "name": "Birthday statues",
+   "description": "The birthday party game: dance while the matrix is green, freeze when it turns red. The body sensor or each player's phone sees who moves",
+   "icon": "🎂",
+   "theme": {
+    "go": "Party!",
+    "stop": "Freeze!",
+    "back": "confetti",
+    "greeting": "Happy Birthday!"
+   },
+   "intro": "Musical statues for Birthday: everyone dances while the matrix is green (\"Party!\") and freezes when it turns red (\"Freeze!\"). Whoever moves during the red light is out; the last one standing wins. The body sensor or each player's phone sees who moves. Pick the matrix, then Save."
+  },
+  "childrensday": {
+   "name": "Musical statues",
+   "description": "The classic party game with the lights: dance while the matrix is green, freeze when it turns red. The body sensor or each player's phone sees who moves",
+   "icon": "🧒",
+   "theme": {
+    "go": "Dance!",
+    "stop": "Freeze!",
+    "back": "bubbles",
+    "greeting": "Happy Children's Day!"
+   },
+   "intro": "Musical statues for Children's Day: everyone dances while the matrix is green (\"Dance!\") and freezes when it turns red (\"Freeze!\"). Whoever moves during the red light is out; the last one standing wins. The body sensor or each player's phone sees who moves. Pick the matrix, then Save."
+  },
+  "july4": {
+   "name": "Liberty statues",
+   "description": "Dance while the matrix is green, stand as still as the Statue of Liberty when it turns red. The body sensor or each player's phone sees who moves",
+   "icon": "🗽",
+   "theme": {
+    "go": "Dance!",
+    "stop": "Freeze!",
+    "back": "stars",
+    "greeting": "Happy 4th of July!"
+   },
+   "intro": "Musical statues for 4th of July: everyone dances while the matrix is green (\"Dance!\") and freezes when it turns red (\"Freeze!\"). Whoever moves during the red light is out; the last one standing wins. The body sensor or each player's phone sees who moves. Pick the matrix, then Save."
+  }
+ }
+}

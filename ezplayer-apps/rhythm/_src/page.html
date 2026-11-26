@@ -1,0 +1,22 @@
+<div class="panel" id="setup">
+  <label id="playLabel">Play</label>
+  <div class="seg" id="modes"></div>
+  <button class="btn" id="go" disabled>New song</button>
+  <button class="btn hidden" id="join">Join the game</button>
+  <button class="btn hidden" id="startNow">Start now</button>
+</div>
+<div class="panel hidden" id="play">
+  <div class="scores" id="scores"></div>
+  <div class="clock" id="clock"></div>
+  <div class="stage hidden" id="stage">
+    <canvas id="lanes" width="320" height="300"></canvas>
+    <div class="judge" id="judge"></div>
+  </div>
+  <div class="pads hidden" id="pads"></div>
+  <div class="hint hidden" id="howto" style="text-align:center">Tap the pad when a note reaches the line. Perfect: 3 points, good: 1, and more for a long run.</div>
+  <button class="btn ghost hidden" id="quit">Leave the game</button>
+</div>
+<div class="panel hidden" id="bestBox">
+  <label>🏆 Best of the day</label>
+  <ol class="best" id="best"></ol>
+</div>
