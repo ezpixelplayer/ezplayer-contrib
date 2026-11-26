@@ -1,0 +1,8 @@
+  .treebox svg { width: 100%; max-width: 340px; display: block; margin: 0 auto; background: radial-gradient(circle at 50% 30%, #0c2a18, #050f09); border-radius: 16px; touch-action: manipulation; }
+  .treebox circle { cursor: pointer; }
+  .sw { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .sw button { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+  .sw button[aria-pressed="true"] { border-color: #fff; }
+  .kinds { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .kinds button { border-radius: 999px; border: 2px solid var(--line); background: var(--raise); color: var(--text); padding: 7px 11px; font: 700 13px/1.2 system-ui, sans-serif; cursor: pointer; }
+  .kinds button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }

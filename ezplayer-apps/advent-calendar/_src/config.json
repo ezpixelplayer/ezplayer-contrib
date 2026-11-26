@@ -1,0 +1,117 @@
+{
+ "title": "Advent calendar",
+ "icon": "📅",
+ "min": [
+  8,
+  5
+ ],
+ "fps": 25,
+ "intro": "24 doors on the visitors' page: one more opens every day from the first day. Each door holds an effect or a message; tapping an open door shows it on the matrix, in turn. Doors not open yet stay a surprise. Pick the matrix, then Save.",
+ "fields": [
+  {
+   "id": "first",
+   "type": "number",
+   "label": "First day",
+   "min": 1,
+   "max": 28,
+   "default": 1
+  },
+  {
+   "id": "month",
+   "type": "select",
+   "label": "Month",
+   "options": [
+    [
+     "1",
+     "January"
+    ],
+    [
+     "2",
+     "February"
+    ],
+    [
+     "3",
+     "March"
+    ],
+    [
+     "4",
+     "April"
+    ],
+    [
+     "5",
+     "May"
+    ],
+    [
+     "6",
+     "June"
+    ],
+    [
+     "7",
+     "July"
+    ],
+    [
+     "8",
+     "August"
+    ],
+    [
+     "9",
+     "September"
+    ],
+    [
+     "10",
+     "October"
+    ],
+    [
+     "11",
+     "November"
+    ],
+    [
+     "12",
+     "December"
+    ]
+   ],
+   "default": 12,
+   "numeric": true
+  },
+  {
+   "id": "days",
+   "type": "number",
+   "label": "Doors",
+   "min": 1,
+   "max": 24,
+   "default": 24
+  },
+  {
+   "id": "testDay",
+   "type": "number",
+   "label": "Test: pretend today is door (0 = the real date)",
+   "min": 0,
+   "max": 24,
+   "default": 0,
+   "end": true
+  },
+  {
+   "id": "doors",
+   "type": "textarea",
+   "label": "The doors, one a line from door 1: \"fx: snowfall\" for an effect (snowfall, candy, retro, twinkle, fireworks, bursts, haunted, eyes, fire, lightning, firenoise, blackhole, rainbow, plasma, ripple, matrix, pacifica) or \"text: Ho ho ho!\" for a message (up to 30 letters)",
+   "default": "fx: snowfall\ntext: Hello December!\nfx: candy\ntext: Ho ho ho!\nfx: retro\ntext: Let it snow!\nfx: twinkle\ntext: Santa is coming!\nfx: fireworks\ntext: Happy Holidays!\nfx: bursts\ntext: Almost Christmas!\nfx: snowfall\ntext: Hello December!\nfx: candy\ntext: Ho ho ho!\nfx: retro\ntext: Let it snow!\nfx: twinkle\ntext: Santa is coming!\nfx: fireworks\ntext: Happy Holidays!\nfx: bursts\ntext: MERRY CHRISTMAS!",
+   "end": true
+  },
+  {
+   "id": "secs",
+   "type": "number",
+   "label": "Seconds on the lights (a message: at least one full scroll)",
+   "min": 5,
+   "max": 120,
+   "default": 15
+  },
+  {
+   "id": "waitSecs",
+   "type": "number",
+   "label": "Each phone waits (seconds)",
+   "min": 0,
+   "max": 600,
+   "default": 20
+  }
+ ]
+}

@@ -1,0 +1,7 @@
+  .doors { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+  .doors button { aspect-ratio: 1; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 800 16px/1.1 system-ui, sans-serif; cursor: pointer; padding: 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+  .doors button .e { font-size: 20px; }
+  .doors button.shut { color: var(--dim); background: repeating-linear-gradient(45deg, #ffffff08 0 6px, transparent 6px 12px), var(--panel); cursor: default; }
+  .doors button.today { border-color: var(--accent); animation: glow 1.4s ease-in-out infinite alternate; }
+  @keyframes glow { from { box-shadow: 0 0 6px #ffc83c55; } to { box-shadow: 0 0 18px #ffc83ccc; } }
+  .count { text-align: center; font-size: 18px; font-weight: 800; }
