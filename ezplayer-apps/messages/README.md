@@ -59,6 +59,8 @@ Picking up to 3 pictures in a row (ShowPlay's page could queue three at once); h
 
 ## Changes
 
+- **Version 4:** ready for the theme packs (New Year, wedding, baptism, Easter, Halloween, Thanksgiving): a `theme.mjs` next to the app (empty here, so this Christmas app looks and plays exactly as before) and the small pictures of `sprites.mjs`. The packs are made from this app by `_themes/make_pack.py`.
+
 - **Version 2:** the **Picture** tab: the 73 animated GIFs of the ShowPlay page, filtered by the theme.
 
 - **Version 3:** the word filter is much longer (Portuguese and English), sees through letters spaced out (`m e r d a`) and repeated letters (`fuuuck`), no longer joins separate words (so "por nossa senhora" passes), and a new setting **Extra blocked words** adds your own words (commas or one a line).

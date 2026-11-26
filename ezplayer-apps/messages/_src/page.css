@@ -1,0 +1,18 @@
+  .tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; width: 100%; max-width: 420px; }
+  .tabs button { min-height: 46px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel); color: var(--text); font: 700 15px/1 system-ui, sans-serif; cursor: pointer; }
+  .tabs button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button { border-radius: 999px; border: 1px solid var(--line); background: var(--raise); color: var(--text); padding: 8px 12px; font: 600 14px/1.2 system-ui, sans-serif; cursor: pointer; }
+  .sw { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sw button { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+  .sw button[aria-pressed="true"] { border-color: #fff; }
+  .fxs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .fxs button { min-height: 56px; border-radius: 14px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 15px/1.2 system-ui, sans-serif; cursor: pointer; }
+  .fxs button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  canvas { width: 100%; border-radius: 10px; background: #000; touch-action: none; image-rendering: pixelated; }
+  .row2 { display: flex; gap: 8px; }
+  .row2 .btn { flex: 1; }
+  .gifs { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+  .gifs button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border-radius: 14px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 12px/1.2 system-ui, sans-serif; cursor: pointer; }
+  .gifs button img { width: 64px; height: 64px; image-rendering: pixelated; background: #000; border-radius: 8px; }
+  .gifs button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
