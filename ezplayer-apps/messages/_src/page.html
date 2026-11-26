@@ -1,0 +1,22 @@
+<div class="tabs" id="tabs"></div>
+<div class="panel" id="pText">
+  <label for="text" id="textLabel">Your message</label>
+  <input type="text" id="text" maxlength="40" autocomplete="off" placeholder="Merry Christmas!">
+  <div class="chips" id="presets"></div>
+  <label>Colour</label>
+  <div class="sw" id="colours"></div>
+</div>
+<div class="panel hidden" id="pGif">
+  <label>Pick a picture</label>
+  <div class="gifs" id="gifs"></div>
+</div>
+<div class="panel hidden" id="pFx">
+  <label>Pick an effect</label>
+  <div class="fxs" id="fxs"></div>
+</div>
+<div class="panel hidden" id="pDraw">
+  <canvas id="canvas"></canvas>
+  <div class="sw" id="pens"></div>
+  <div class="row2"><button class="btn ghost" id="clear" type="button">Clear</button></div>
+</div>
+<button class="btn" id="send" style="max-width:420px" disabled>Show it on the lights!</button>

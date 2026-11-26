@@ -10,6 +10,7 @@ import { num } from './player.mjs';
 import fs from 'node:fs';
 import { Text, Fx, Anim, FX_LIST, FX_NAMES, PAL, hexRgb, plain, isBad, setBadExtra } from './lights.mjs';
 import { readGif } from './gif.mjs';
+import { THEME } from './theme.mjs';
 
 /** the pictures: the GIFs of the ShowPlay page, in page/gifs (served with the phones' page) */
 const GIF_DIR = new URL('./page/gifs/', import.meta.url);
@@ -24,7 +25,7 @@ function gifOf(f) {
 }
 
 export const minSize = { w: 8, h: 5 };
-const DEFAULTS = { target: '', fps: 25, brightness: 100, theme: 'xm', free: true, presets: 'Merry Christmas!\nHappy holidays!\nHo ho ho!\nLet it snow!', badWords: '',
+const DEFAULTS = { target: '', fps: 25, brightness: 100, theme: THEME.fx ?? 'xm', free: true, presets: THEME.presets ?? 'Merry Christmas!\nHappy holidays!\nHo ho ho!\nLet it snow!', badWords: '',
     textSecs: 15, fxSecs: 15, drawSecs: 15, gifSecs: 10, waitSecs: 20, queueMax: 10, text: true, fx: true, draw: true, gif: true, gifAll: false };
 
 export function cleanSettings(raw) {

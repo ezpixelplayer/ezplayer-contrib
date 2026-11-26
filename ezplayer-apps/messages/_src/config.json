@@ -1,0 +1,20 @@
+{"title": "Messages on the lights", "icon": "💬", "min": [8, 5], "fps": 25,
+ "intro": "Visitors send a message (their own words or one of yours), an animated picture or an effect of the season, or their own drawing, and each is shown on the matrix in turn. Messages go through a word filter. Pick the matrix, then Save.",
+ "fields": [
+  {"id": "theme", "type": "select", "label": "Effects of", "options": [["xm", "Christmas"], ["hw", "Halloween"], ["ev", "Other celebrations"]], "default": "xm", "end": true},
+  {"id": "text", "type": "check", "text": "Messages", "default": true},
+  {"id": "gif", "type": "check", "text": "Pictures (73 animated GIFs of the season)", "default": true},
+  {"id": "fx", "type": "check", "text": "Effects", "default": true},
+  {"id": "draw", "type": "check", "text": "Drawings", "default": true},
+  {"id": "gifAll", "type": "check", "text": "Pictures of every theme (off: only those of the theme above)", "default": false},
+  {"id": "free", "type": "check", "text": "Visitors may write their own message (word filter on); off: only the messages below", "default": true},
+  {"id": "presets", "type": "textarea", "label": "Messages to pick from (one a line, up to 40 letters)", "default": "Merry Christmas!\nHappy holidays!\nHo ho ho!\nLet it snow!", "end": true},
+  {"id": "badWords", "type": "textarea", "label": "Extra blocked words, on top of the built-in Portuguese and English list (separated by commas or one a line)", "default": "", "placeholder": "e.g. a name, a team, a word you don't want on the lights"},
+  {"section": "Timing"},
+  {"id": "textSecs", "type": "number", "label": "Seconds for a message (at least one full scroll)", "min": 5, "max": 120, "default": 15},
+  {"id": "fxSecs", "type": "number", "label": "Seconds for an effect", "min": 5, "max": 120, "default": 15},
+  {"id": "gifSecs", "type": "number", "label": "Seconds for a picture", "min": 3, "max": 120, "default": 10},
+  {"id": "drawSecs", "type": "number", "label": "Seconds for a drawing", "min": 5, "max": 120, "default": 15, "end": true},
+  {"id": "waitSecs", "type": "number", "label": "Each phone waits (seconds)", "min": 0, "max": 600, "default": 20},
+  {"id": "queueMax", "type": "number", "label": "Most requests waiting", "min": 1, "max": 50, "default": 10}
+ ]}
