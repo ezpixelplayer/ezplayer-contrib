@@ -64,8 +64,31 @@
       if (app.apiBase !== null) { const r = await fetch(`${app.apiBase}/api/ezp/overlays/targets`); if (r.ok) models = ((await r.json()).targets || []).map((t) => t.model); }
     } catch (e) { /* listed only on the home network */ }
     try { groups = (await app.get('private', 'groups')) || {}; } catch (e) { /* the app writes the groups once it has read the show */ }
+    // a box of prop lines ("icon name | models | ..."): a tap on an empty line makes a whole prop line, with an icon and
+    // a name guessed from the model or group; a tap on a line that has one adds the model or group to it
+    const ICONS = [[/wing|butterfl/, '🦋'], [/\bbats?\b|bat \d|bat_/, '🦇'], [/spider|web|widow/, '🕷️'], [/ghost|boo\b/, '👻'], [/skull|tomb|grave/, '💀'],
+      [/pumpkin|jack|lantern/, '🎃'], [/dragon/, '🐉'], [/cane/, '🍭'], [/arch/, '🌈'], [/snow ?man/, '⛄'], [/flake|snow/, '❄️'], [/star|peace/, '⭐'],
+      [/tree|pine/, '🎄'], [/present|gift/, '🎁'], [/wreath/, '🎀'], [/bell/, '🔔'], [/sing|face|bulb|mouth/, '🎤'], [/spinner|spin|fan/, '🌀'],
+      [/icicle/, '🧊'], [/window|door/, '🪟'], [/roof|outline|house|trim|eave/, '🏠'], [/matrix|panel|screen/, '🟦'], [/candle/, '🕯️'],
+      [/deer|reindeer/, '🦌'], [/angel/, '👼'], [/santa/, '🎅'], [/hedge|bush|flower|bed/, '🌳'], [/firework|burst/, '🎆'], [/heart/, '❤️']];
+    const iconFor = (n) => (ICONS.find(([re]) => re.test(n.toLowerCase())) || [0, '✨'])[1];
+    const niceName = (n) => n.replace(/[_]+/g, ' ').replace(/^(all|ge|ppd|nsr|boscoyo|chromaglow)\s+/i, '').replace(/^(ge|ppd|nsr|boscoyo|chromaglow)\s+/i, '')
+      .replace(/\s*\/.*$/, '').replace(/\s+/g, ' ').trim().slice(0, 24) || n.slice(0, 24);
+    function addToLine(t, n) {
+      const v = t.value, at = Math.min(t.selectionStart ?? v.length, v.length);
+      const s0 = v.lastIndexOf('\n', at - 1) + 1, e0 = v.indexOf('\n', at) < 0 ? v.length : v.indexOf('\n', at);
+      const line = v.slice(s0, e0);
+      let nl;
+      if (!line.trim()) nl = iconFor(n) + ' ' + niceName(n) + ' | ' + n;
+      else if (!line.includes('|')) nl = line.trimEnd() + ' | ' + n;
+      else { const parts = line.split('|'); const ms = parts[1].trim(); if (ms.split(',').map((x) => x.trim()).includes(n)) return; parts[1] = ' ' + (ms ? ms + ', ' : '') + n + (parts.length > 2 ? ' ' : ''); nl = parts.join('|'); }
+      t.value = v.slice(0, s0) + nl + v.slice(e0); t.focus(); t.selectionStart = t.selectionEnd = s0 + nl.length;
+    }
     for (const f of pk) {
       const box = el('pk_' + f.id), q = el('pq_' + f.id);
+      if (f.lines && el('nl_' + f.id)) el('nl_' + f.id).addEventListener('click', () => {   // a new prop: an empty line at the end
+        const t = el('f_' + f.for); t.value = t.value.replace(/\s*$/, '') + (t.value.trim() ? '\n' : ''); t.focus(); t.selectionStart = t.selectionEnd = t.value.length;
+      });
       const show = () => {
         const s = q.value.trim().toLowerCase();
         const items = [...Object.keys(groups).map((g) => [g, true]), ...models.map((m) => [m, false])].filter(([n]) => !s || n.toLowerCase().includes(s)).slice(0, 300);
@@ -73,6 +96,8 @@
           const b = document.createElement('button'); b.type = 'button'; b.textContent = (g ? '👥 ' : '') + n; if (g) b.className = 'g';
           b.title = g ? 'Group: ' + groups[n].join(', ') : 'Model';
           b.addEventListener('click', () => {
+            if (f.single) { el('f_' + f.for).value = n; return; }   // a box for one model: the name replaces what was there
+            if (f.lines) { addToLine(el('f_' + f.for), n); return; }
             const t = el('f_' + f.for), at = t.selectionStart ?? t.value.length, before = t.value.slice(0, at), after = t.value.slice(at);
             const sep = !before || /[|,\n]\s*$/.test(before) ? (/[|,]$/.test(before) ? ' ' : '') : ', ';
             t.value = before + sep + n + after; t.focus(); t.selectionStart = t.selectionEnd = (before + sep + n).length;
@@ -106,7 +131,13 @@
         const l = document.createElement('label'); l.textContent = f.label; l.htmlFor = 'pq_' + f.id;
         const q = document.createElement('input'); q.type = 'text'; q.id = 'pq_' + f.id; q.placeholder = 'Search models and groups (👥)…';
         const pkb = document.createElement('div'); pkb.className = 'picker'; pkb.id = 'pk_' + f.id; pkb.textContent = 'Loading…';
-        wrap.append(l, q, pkb); box.append(wrap); row = null;
+        wrap.append(l, q, pkb);
+        if (f.lines) {   // a button for a new prop line, and how the taps work
+          const nb = document.createElement('button'); nb.type = 'button'; nb.id = 'nl_' + f.id; nb.textContent = '➕ New prop'; nb.style.marginTop = '8px';
+          const h = document.createElement('p'); h.className = 'hint'; h.textContent = 'Tap a group or model on an empty line: a whole prop line is made, with an icon and a name you can change. Tap more to add them to that prop. ➕ New prop starts the next one.';
+          wrap.append(nb, h);
+        }
+        box.append(wrap); row = null;
         if (f.hint) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = f.hint; box.append(p); }
         continue;
       }

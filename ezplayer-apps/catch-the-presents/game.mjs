@@ -9,6 +9,8 @@
  */
 
 import { cleanEnd, colourName } from './ending.mjs';
+import { THEME } from './theme.mjs';
+import { drawSprite, backdrop } from './sprites.mjs';
 import { painter, cleanName, num, hex, hexRgb } from './player.mjs';
 import { sensor, SENSOR_DEFAULTS, cleanSensor, StepTurns } from './sensor.mjs';
 
@@ -140,7 +142,8 @@ export class Game {
         const bw = this.box() / Math.max(1, this.w);
         const x = bw / 2 + Math.random() * (1 - bw);
         const sp = L.speed * (1 + 0.8 * this.progress(now)) * (0.85 + Math.random() * 0.3);
-        this.drops.push({ x, y: -this.box() / this.h, v: sp, kind, col: PRESENT_COLS[Math.floor(Math.random() * PRESENT_COLS.length)] });
+        const goods = THEME.good ?? [];
+        this.drops.push({ x, y: -this.box() / this.h, v: sp, kind, col: PRESENT_COLS[Math.floor(Math.random() * PRESENT_COLS.length)], spr: goods[Math.floor(Math.random() * goods.length)] });
     }
 
     /** players who play with the body: the sensor moves their sleigh (each in their own lane, left to right) */
@@ -237,6 +240,12 @@ export class Game {
 
     /** a present (with a gold ribbon when big enough), a golden star or a lump of coal, with its top-left at (x0, y0) */
     paintDrop(set, d, x0, y0, b, t) {
+        const spr = d.kind === 'coal' ? THEME.bad : d.kind === 'star' ? THEME.bonus : d.spr;   // a theme pack: its own pictures
+        if (spr) {   // a picture needs a few pixels: drawn bigger than the catching box on a small matrix, round its middle
+            const sb = Math.max(b, Math.min(8, Math.floor(Math.min(this.w, this.h) / 4))), ox = x0 - Math.floor((sb - b) / 2), oy = y0 - (sb - b);
+            drawSprite((x, y, c, k) => set(ox + x, oy + y, c, k), spr, d.col, sb, d.kind === 'star' ? 0.8 + 0.2 * Math.sin(t * 14) : 1);
+            return;
+        }
         if (d.kind === 'coal') {
             for (let y = 0; y < b; y++) for (let x = 0; x < b; x++) {
                 const corner = b > 2 && (x === 0 || x === b - 1) && (y === 0 || y === b - 1);
@@ -266,10 +275,7 @@ export class Game {
     render(out, w, h, now) {
         const set = painter(out, w, h), t = now / 1000, b = this.box();
         const cols = [hexRgb(this.s.color1), hexRgb(this.s.color2)];
-        if (this.s.snow) for (let i = 0; i < Math.ceil(w * h / 40); i++) {   // falling snow in the back
-            const x = (i * 7.3 + Math.sin(t * 0.7 + i) * 1.5) % w, y = ((i * 13.7) % h + t * (1.5 + (i % 3))) % h;
-            set((x + w) % w, y, [26, 26, 36]);
-        }
+        if (this.s.snow) backdrop(set, w, h, t, THEME.back ?? 'snow');   // falling snow in the back (a theme: its own)
         if (this.phase === 'over') {
             const col = this.winner === 2 ? cols[1] : this.winner === 1 ? cols[0] : GOLD;
             const k = 0.5 + 0.5 * Math.sin(t * 8);

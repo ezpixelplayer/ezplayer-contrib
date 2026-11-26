@@ -82,6 +82,8 @@ the player (while the number of spots stays the same).
 
 ## Changes
 
+- **Version 13:** ready for the theme packs (New Year, wedding, baptism, Easter, Halloween, Thanksgiving): a `theme.mjs` next to the app (empty here, so this Christmas app looks and plays exactly as before) and the small pictures of `sprites.mjs`. The packs are made from this app by `_themes/make_pack.py`.
+
 - **Version 2:** the Hang button stays off until the app answers (3 s at most), so a status arriving in between cannot let a phone send a second bauble.
 
 - **Version 3:** the spots are placed by the real positions of the tree's pixels, so a 360° mega tree is decorated

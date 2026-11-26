@@ -1,7 +1,7 @@
 {
     "id": "count-the-colours",
     "name": "Count the colours",
-    "version": "2",
+    "version": "3",
     "description": "A party game for up to eight phones: count how many times a colour flashes on the lights",
     "icon": "🔢",
     "runtime": "node",

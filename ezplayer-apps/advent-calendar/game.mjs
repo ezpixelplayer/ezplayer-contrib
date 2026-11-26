@@ -8,17 +8,18 @@
  */
 
 import { num } from './player.mjs';
+import { THEME } from './theme.mjs';
 import { Text, Fx, FX_LIST, FX_NAMES, plain, isBad, hexRgb } from './lights.mjs';
 
 export const minSize = { w: 8, h: 5 };
 const ALL_FX = Object.keys(FX_NAMES);
-const DEFAULT_DOORS = (() => {
+const DEFAULT_DOORS = THEME.doors ?? (() => {
     const fx = FX_LIST.xm.map(([k]) => k), texts = ['Hello December!', 'Ho ho ho!', 'Let it snow!', 'Santa is coming!', 'Happy Holidays!', 'Almost Christmas!'];
     const out = [];
     for (let d = 1; d <= 24; d++) out.push(d === 24 ? 'text: MERRY CHRISTMAS!' : d % 2 ? `fx: ${fx[(d >> 1) % fx.length]}` : `text: ${texts[(d / 2 - 1) % texts.length]}`);
     return out.join('\n');
 })();
-const DEFAULTS = { target: '', fps: 25, brightness: 100, month: 12, first: 1, days: 24, testDay: 0, doors: DEFAULT_DOORS, secs: 15, waitSecs: 20 };
+const DEFAULTS = { target: '', fps: 25, brightness: 100, month: THEME.month ?? 12, first: THEME.first ?? 1, days: THEME.days ?? 24, testDay: 0, doors: DEFAULT_DOORS, secs: 15, waitSecs: 20 };
 
 export function cleanSettings(raw) {
     const s = { ...DEFAULTS };

@@ -9,13 +9,15 @@
  * colour a visitor picked), shines at each new bauble and joins the party when the tree is full; then it starts again.
  */
 
+import { THEME } from './theme.mjs';
+import { SPRITES, spriteAt } from './sprites.mjs';
 import { num } from './multi-helpers.mjs';
 
 export const COLORS = ['ff2a2a', 'ffc83c', '2a7bff', 'ffffff', 'ff5fc8', 'a05bff', 'ff8c1a', '3cf0ff'];
 // the colours the tree itself can be (v12): green, red, blue, white, gold, pink, purple, ice blue (shown dim behind the decorations)
 export const TREE_COLS = ['1e9e3c', 'd21e1e', '2a6bff', 'ffffff', 'ffc83c', 'ff5fc8', 'a05bff', '3cf0ff'];
 /** the decorations: key, name, emoji (the phone draws each one in its colour) */
-export const KINDS = [['bauble', 'Bauble', '🔴'], ['cane', 'Candy cane', '🍭'], ['star', 'Star', '⭐'], ['bell', 'Bell', '🔔'], ['present', 'Present', '🎁'], ['flake', 'Snowflake', '❄️'], ['heart', 'Heart', '❤️']];
+export const KINDS = THEME.kinds ?? [['bauble', 'Bauble', '🔴'], ['cane', 'Candy cane', '🍭'], ['star', 'Star', '⭐'], ['bell', 'Bell', '🔔'], ['present', 'Present', '🎁'], ['flake', 'Snowflake', '❄️'], ['heart', 'Heart', '❤️']];
 
 /** how a decoration shines, and the star's effects: key, name, emoji (nothing flashes faster than about 3 times a second) */
 export const DECO_FX = [['glow', 'Glow', '✨'], ['steady', 'Steady', '💡'], ['blink', 'Blink', '💫'], ['twinkle', 'Twinkle', '🌟'], ['pulse', 'Pulse', '💓'], ['rainbow', 'Rainbow', '🌈']];
@@ -55,6 +57,11 @@ const FX_TURN = 2.5;   // several effects on one decoration take turns, this man
  */
 export function shapeAt(kind, x, y) {
     const d = Math.hypot(x, y);
+    if (THEME.kinds && SPRITES[kind]) {   // a theme pack: the decoration is one of the pictures of sprites.mjs (y goes up here)
+        const c = spriteAt(kind, x * 0.95, -y * 0.95, [1, 2, 3]);
+        if (!c) return null;
+        return c[0] === 1 && c[1] === 2 ? [1, 0] : c.join() === '255,255,255' ? [1, 1] : [1, 0, c];
+    }
     switch (kind) {
         case 'cane': {   // a hook: a stem, then a half circle at the top; stripes across it
             const stem = Math.abs(x + 0.2) < 0.32 && y > -1 && y < 0.35;
@@ -97,7 +104,7 @@ export function shapeAt(kind, x, y) {
         default: return d <= 1 ? [1, d < 0.35 && x < 0 && y > 0 ? 0.35 : 0] : null;   // a bauble with a shine
     }
 }
-const DEFAULTS = { target: '', shape: 'tree', star: '', kinds: KINDS.map(([k]) => k), fx: DECO_FX.map(([k]) => k), starFx: 'twinkle', starFxs: STAR_FX.map(([k]) => k), starPick: true, maxFx: 3, maxDeco: 5, starColor: 'ffbe28', starEvery: 30, treeColor: '1e9e3c', treePick: true, fps: 20, brightness: 100, spots: 30, every: 60, show: 30, always: false, bg: 'green', restart: true, size: 100 };
+const DEFAULTS = { target: '', shape: 'tree', star: '', kinds: KINDS.map(([k]) => k), fx: DECO_FX.map(([k]) => k), starFx: 'twinkle', starFxs: STAR_FX.map(([k]) => k), starPick: true, maxFx: 3, maxDeco: 5, starColor: 'ffbe28', starEvery: 30, treeColor: THEME.treeColor ?? '1e9e3c', treePick: true, fps: 20, brightness: 100, spots: 30, every: 60, show: 30, always: false, bg: 'green', restart: true, size: 100 };
 const PARTY_MS = 15000;
 const MAX_CANDIDATES = 3000;
 
@@ -440,7 +447,7 @@ export class App {
                         const [k, w] = decoLight(f, t, sp, i);
                         const own = f === 'rainbow' ? hsv(t * 0.5 + sp * 0.13) : hexRgb(COLORS[+this.orn[sp] - 1]);
                         const other = own.join() === '255,200,60' ? [255, 255, 255] : [255, 200, 60];   // a present's ribbon: gold (white on a gold box)
-                        const base = at[0] ? own : kind === 'cane' ? [255, 255, 255] : other;
+                        const base = at[2] ? at[2] : at[0] ? own : kind === 'cane' ? [255, 255, 255] : other;
                         c = base.map((v) => { const x = (v + (255 - v) * at[1]) * k; return Math.min(255, x + (255 - x) * w); });
                     }
                 }
