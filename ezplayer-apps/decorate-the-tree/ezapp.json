@@ -1,7 +1,7 @@
 {
     "id": "decorate-the-tree",
     "name": "Decorate the tree",
-    "version": "15",
+    "version": "16",
     "description": "Visitors decorate a tree of the show from their phones: baubles, candy canes, stars, bells, presents and more",
     "icon": "🎄",
     "runtime": "node",

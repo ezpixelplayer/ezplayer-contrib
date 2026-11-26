@@ -80,7 +80,30 @@ The page sends `hang` with `d`: a list of up to `maxDeco` decorations, each `[sp
 Nothing. The decorations, their effects and the star's colour and effect are kept in the instance's private `state` document, so they survive a restart of the app or
 the player (while the number of spots stays the same).
 
+## A round mega tree (360°)
+
+On the phones, **the middle of the tree is the front of the real tree**, as the visitors see it: a decoration tapped on
+the left of the phone lights up on their left. Set it once on the settings page, standing where the visitors stand:
+
+1. **The front of the tree**: press **💡 Show the front on the tree**. A white stripe lights the tree from top to bottom
+   (the rest goes dim) where the app takes the front to be. Turn it with **◀ 15°** and **15° ▶** until it faces the
+   visitors (the street, the door). If ▶ moves it to the left as you look at the tree, press **⇄ Invert left and
+   right** (a layout whose left and right are the other way round). Then **Save**. The stripe goes off by itself after
+   2 minutes, or with ⏹.
+2. **What the phones show of a round tree**:
+   - **Only the front (180°)** (the default): the spots are only on the half the visitors see, and the phone shows that
+     half. For a tree by a wall or a window, seen from one side.
+   - **All the way round (360°)**: spots all round the tree; on the phone, **◀ ▶** (or a swipe) turns the tree, with
+     where you are on top (Front, Right side, Back, Left side…). For a tree in the middle of a garden or a square.
+3. **360°: a thin gold stripe** (off by default): while a visitor turns the tree on the phone, a gold stripe shows for
+   2 s where the middle of their drawing is, so they can find their side on the real tree.
+
+Changing the front or the 180°/360° choice places the spots again (the decorations hung so far stay on the same spot
+numbers). A matrix or a flat model is not changed by any of this.
+
 ## Changes
+
+- **Version 16:** a round mega tree: the middle of the phone is the front of the real tree, with the visitors' left and right (the spots were turned a quarter round and mirrored); the front is set on the settings page while a white stripe shows it on the tree; the phones show only the front half (180°) or the whole tree with ◀ ▶ to turn it (360°), with an optional gold stripe where a visitor is looking; decorations are no longer mirrored on a round tree.
 
 - **Version 15:** bug fixes: no request to EZPlayer can freeze the tree any more (each has a time limit, and the lease is opened again when frames are refused), and an error in one frame starts the game again instead of stopping the app; the decorations are never overwritten with empty ones when the show is still loading, and setting up is tried again. The overlay leases stay exclusive (PR #21).
 

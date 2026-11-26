@@ -104,7 +104,7 @@ export function shapeAt(kind, x, y) {
         default: return d <= 1 ? [1, d < 0.35 && x < 0 && y > 0 ? 0.35 : 0] : null;   // a bauble with a shine
     }
 }
-const DEFAULTS = { target: '', shape: 'tree', star: '', kinds: KINDS.map(([k]) => k), fx: DECO_FX.map(([k]) => k), starFx: 'twinkle', starFxs: STAR_FX.map(([k]) => k), starPick: true, maxFx: 3, maxDeco: 5, starColor: 'ffbe28', starEvery: 30, treeColor: THEME.treeColor ?? '1e9e3c', treePick: true, fps: 20, brightness: 100, spots: 30, every: 60, show: 30, always: false, bg: 'green', restart: true, size: 100 };
+const DEFAULTS = { target: '', shape: 'tree', star: '', kinds: KINDS.map(([k]) => k), fx: DECO_FX.map(([k]) => k), starFx: 'twinkle', starFxs: STAR_FX.map(([k]) => k), starPick: true, maxFx: 3, maxDeco: 5, starColor: 'ffbe28', starEvery: 30, treeColor: THEME.treeColor ?? '1e9e3c', treePick: true, fps: 20, brightness: 100, spots: 30, every: 60, show: 30, always: false, bg: 'green', restart: true, size: 100, view: 'front', frontDeg: 0, mirror: false, lookGuide: false };
 const PARTY_MS = 15000;
 const MAX_CANDIDATES = 3000;
 
@@ -121,6 +121,9 @@ export function cleanSettings(raw) {
     if (typeof raw.starColor === 'string' && /^#?[0-9a-fA-F]{6}$/.test(raw.starColor)) s.starColor = raw.starColor.replace('#', '').toLowerCase();
     if (raw.bg === 'green' || raw.bg === 'off') s.bg = raw.bg;
     if (raw.shape === 'tree' || raw.shape === 'fill') s.shape = raw.shape;
+    if (raw.view === 'front' || raw.view === 'all') s.view = raw.view;
+    if (Number.isFinite(raw.frontDeg)) s.frontDeg = ((Math.round(raw.frontDeg / 15) * 15) % 360 + 360) % 360;
+    for (const k of ['mirror', 'lookGuide']) if (typeof raw[k] === 'boolean') s[k] = raw[k];
     return s;
 }
 
@@ -135,7 +138,8 @@ function hsv(h, s = 1, v = 1) {
  * pts: [x, y (up), z] for every pixel. n spots spread evenly over them (farthest-point, by the real distances, so the
  * strands of a mega tree count as far apart as they are), leaving out the top 10 % (a fifth on a round tree) and the bottom 5 % of the height;
  * each pixel within a bauble's radius belongs to the nearest spot. Also where each spot goes on the phone's drawing:
- * u across (round trees: the angle round the trunk, as if unrolled), v down from the top, both 0..1.
+ * u across, 0..1 (round trees: where it is round the trunk as the visitors see it, in turns from the front, -0.5..0.5,
+ * + to their right), v down from the top, 0..1.
  */
 /**
  * a flat model can stand at any angle in a 3D layout (a matrix turned 45°, a carpet lying flat): its pixels are turned
@@ -160,13 +164,23 @@ export function faceFront(pts) {
     return pts;                                                                                                              // round: a real 3D tree
 }
 
-export function layout(pts, n, size = 100, shape = 'tree') {
+/** where the front of a round tree is: the angle round the trunk (radians, as atan2(z, x)) that faces the visitors, and
+ *  which way is their right. deg turns the front to the visitors' right (15° steps, set on the settings page while a
+ *  white stripe shows it on the tree); mirror is for a layout whose left and right are the other way round. */
+export const frontOf = (deg = 0, mirror = false) => ({ a: Math.PI / 2 + (mirror ? 1 : -1) * deg * Math.PI / 180, m: mirror ? -1 : 1 });
+/** an angle round the tree as the visitors see it, in turns: 0 the front, + to their right, -0.5..0.5 */
+export const relOf = (a, f) => ((((f.a - a) / (2 * Math.PI)) % 1 + 1.5) % 1 - 0.5) * f.m;
+
+/** orient (round trees): { deg, mirror } where the front is, half: only the front half gets spots (the phones show it) */
+export function layout(pts, n, size = 100, shape = 'tree', orient = {}) {
     pts = faceFront(pts);
     const N = pts.length;
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const [x, y, z] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
     const H = (y1 - y0) || 1, W = (x1 - x0) || 1, vOf = (y) => (y1 - y) / H;
     const round = z1 - z0 > 0.25 * W, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    const F = frontOf(orient.deg, orient.mirror), half = round && !!orient.half;
+    const angOf = ([x, , z]) => Math.atan2(z - cz, x - cx), relP = (p) => relOf(angOf(p), F);
     // a flat model (a matrix) gets a tree drawn on it: a triangle (green), a trunk (brown) and a star on top; the
     // decorations go only on the triangle. Sizes by the real distances, so a wide matrix still gets a tree of tree shape.
     const drawn = !round && shape === 'tree';
@@ -182,7 +196,7 @@ export function layout(pts, n, size = 100, shape = 'tree') {
         else if (shapeAt('star', X / starR, (starAt - Y) / starR)) { zone[i] = 3; starDu[i] = X / starR; starDv[i] = (starAt - Y) / starR; }
     }
     const uOf = ([x, y, z]) => {
-        if (round) return ((Math.atan2(z - cz, x - cx) / (2 * Math.PI)) % 1 + 1) % 1;
+        if (round) return relP([x, y, z]);   // the front in the middle of the phone, the visitors' right to the right
         if (!drawn) return (x - x0) / W;
         const hw = hwAt(y1 - y); return Math.max(0, Math.min(1, 0.5 + (x - cx) / (2 * Math.max(hw, 1e-9))));   // across the triangle, as the phone draws it
     };
@@ -196,7 +210,7 @@ export function layout(pts, n, size = 100, shape = 'tree') {
         n = Math.max(3, Math.min(n, Math.floor(treePx / 12)));
     }
     if (drawn) { for (let i = 0; i < N; i++) { const Y = y1 - pts[i][1], X = pts[i][0] - cx; if (zone[i] === 1 && Y > yTop + 0.12 * (yBase - yTop) && Y < yBase - 0.03 * H && Math.abs(X) < hwAt(Y) * 0.85) cand.push(i); } }
-    else for (let i = 0; i < N; i++) { const v = vOf(pts[i][1]); if (v >= top && v <= 0.95) cand.push(i); }
+    else for (let i = 0; i < N; i++) { const v = vOf(pts[i][1]); if (v >= top && v <= 0.95 && (!half || Math.abs(relP(pts[i])) <= 0.25)) cand.push(i); }
     if (!cand.length) cand = [...Array(N).keys()];
     const step = Math.max(1, Math.floor(cand.length / MAX_CANDIDATES));
     cand = cand.filter((_, k) => k % step === 0);
@@ -204,7 +218,7 @@ export function layout(pts, n, size = 100, shape = 'tree') {
     // the first spot: near the top, in the middle (the front of a round tree)
     const topY = y1 - (top + 0.05) * H;
     let first = cand[0], best = Infinity;
-    for (const i of cand) { const [x, y, z] = pts[i]; const d = (x - cx) ** 2 + (y - topY) ** 2 + (round ? (z - z1) ** 2 : 0); if (d < best) { best = d; first = i; } }
+    for (const i of cand) { const [x, y] = pts[i]; const d = (round ? (relP(pts[i]) * Math.PI * W) ** 2 : (x - cx) ** 2) + (y - topY) ** 2; if (d < best) { best = d; first = i; } }
     const spots = [first];
     const dist = cand.map((i) => d2(i, first));
     while (spots.length < Math.min(n, cand.length)) {
@@ -231,15 +245,16 @@ export function layout(pts, n, size = 100, shape = 'tree') {
         const k = map[i];
         if (k < 0) continue;
         const [sx, sy, sz] = pts[spots[k]], [x, y, z] = pts[i];
-        if (round) { const a = Math.atan2(sz - cz, sx - cx); du[i] = ((x - sx) * -Math.sin(a) + (z - sz) * Math.cos(a)) / r; }
+        if (round) { const a = Math.atan2(sz - cz, sx - cx); du[i] = F.m * ((x - sx) * Math.sin(a) - (z - sz) * Math.cos(a)) / r; }   // + to the visitors' right, so shapes are not mirrored
         else du[i] = (x - sx) / r;
         dv[i] = (y - sy) / r;
     }
-    const r2d = (v) => Math.round(v * 100) / 100;
+    const r2d = (v) => Math.round(v * 1000) / 1000;
     const counts = new Int32Array(spots.length);
     for (let i = 0; i < N; i++) if (map[i] >= 0) counts[map[i]]++;
     const starAng = Float32Array.from(starDu, (x, i) => ((Math.atan2(starDv[i], x) / (2 * Math.PI)) % 1 + 1) % 1);
-    return { spots: spots.map((i) => [r2d(uOf(pts[i])), r2d(vPhone(pts[i][1]))]), map, du, dv, counts, round, drawn, zone, starAng };
+    return { spots: spots.map((i) => [r2d(uOf(pts[i])), r2d(vPhone(pts[i][1]))]), map, du, dv, counts, round, drawn, zone, starAng, half,
+        ang: round ? Float32Array.from(pts, angOf) : null };   // each pixel's angle round the trunk: for the stripes that show the front
 }
 
 async function targetOf(base, model) {
@@ -271,11 +286,13 @@ async function pixelsOf(base, model) {
 
 export class App {
     static startTypes = ['hang', 'star'];
+    live = 'calib';   // the settings page writes it while the front is being set (read twice a second, see multi.mjs)
 
     constructor(s) {
         this.s = s; this.ready = false; this.tree = null; this.star = null; this.lay = null; this.key = '';
         this.orn = ''; this.kinds = ''; this.fxs = ''; this.by = new Map(); this.last = -1; this.lastSet = []; this.hung = 0; this.lastAt = 0; this.lastBy = null; this.showUntil = 0; this.partyUntil = 0;
         this.problems = []; this.twinkle = null;
+        this.calib = null; this.calibN = null; this.looks = new Map();   // the front being set (a white stripe); visitors turning the tree (thin stripes)
         this.starCol = ''; this.starFx = null; this.starAng = null; this.starBy = new Map(); this.starAt = 0; this.starLastBy = null;
         this.treeCol = ''; this.treeBy = new Map(); this.treeAt = 0; this.treeLastBy = null;   // the tree's colour, picked by a visitor ('' = the one in the settings)
         // the star's colour, picked by a visitor ('' = the one in the settings)
@@ -298,9 +315,9 @@ export class App {
             } catch (e) { this.problems.push(`star: ${e.message}`); }
         }
         if (s.star && !stars.length) this.problems.push(`star: "${s.star}" is not a model or a group of the show`);
-        const key = [s.target, tree.geom.n, s.spots, s.size, s.shape].join('|');
+        const key = [s.target, tree.geom.n, s.spots, s.size, s.shape, s.view, s.frontDeg, s.mirror].join('|');
         if (key !== this.key) {
-            this.lay = layout(tree.pts, s.spots, s.size, s.shape);
+            this.lay = layout(tree.pts, s.spots, s.size, s.shape, { deg: s.frontDeg, mirror: s.mirror, half: s.view === 'front' });
             this.key = key;
             const n = this.lay.spots.length;
             if (this.saved && this.saved.orn.length === n && !this.orn.replace(/0/g, '')) { this.orn = this.saved.orn; this.kinds = this.saved.kinds; this.fxs = this.saved.fxs; }
@@ -327,7 +344,29 @@ export class App {
         if (Array.isArray(sf) && sf.length && sf.length <= MAX_FX && sf.every((k) => STAR_FX.some(([x]) => x === k))) this.starFx = sf;
     }
 
+    /** the settings page while the front is being set: { deg, mirror, n, secs }; a white stripe shows that front on the tree */
+    onLive(o, now) {
+        const n = o && typeof o === 'object' ? o.n : 'none';   // 'none': no such document yet
+        if (n === this.calibN) return;
+        const first = this.calibN === null;
+        this.calibN = n;
+        if (first || n === 'none') return;   // left from before the app started: not shown again
+        const secs = Math.max(0, Math.min(300, +o.secs || 0)), deg = ((Math.round((+o.deg || 0) / 15) * 15) % 360 + 360) % 360;
+        this.calib = secs ? { f: frontOf(deg, !!o.mirror), until: now + secs * 1000 } : null;
+    }
+
+    /** a visitor turning the tree on the phone (360°): a thin stripe shows for a moment where the middle of their drawing is */
+    look(client, d, now) {
+        if (!this.s.lookGuide || this.s.view !== 'all' || !this.lay?.round || typeof d.a !== 'number' || !Number.isFinite(d.a)) return '';
+        const prev = this.looks.get(client);
+        if (prev && now - prev.at < 800) return '';
+        this.looks.set(client, { a: ((d.a % 1) + 1) % 1, at: now, until: now + 2500 });
+        if (this.looks.size > 50) for (const [k, v] of this.looks) if (now > v.until) this.looks.delete(k);
+        return '';
+    }
+
     handle(client, d, now) {
+        if (d.type === 'look') return this.look(client, d, now);
         if (d.type === 'star') return this.colourStar(client, d, now);
         if (d.type === 'tree') return this.colourTree(client, d, now);
         if (d.type !== 'hang') return '';
@@ -402,12 +441,22 @@ export class App {
         if (this.partyUntil && now > this.partyUntil) { this.partyUntil = 0; this.lastSet = []; this.orn = '0'.repeat(this.orn.length); this.kinds = '0'.repeat(this.orn.length); this.fxs = '0'.repeat(this.orn.length); this.starCol = ''; this.starFx = null; this.treeCol = ''; }
     }
 
-    showing(now) { return this.ready && (this.s.always || now < this.showUntil || now < this.partyUntil); }
+    showing(now) {
+        return this.ready && (this.s.always || now < this.showUntil || now < this.partyUntil || (this.calib && now < this.calib.until)
+            || [...this.looks.values()].some((l) => now < l.until));
+    }
 
     frames(now) {
         if (!this.showing(now)) return [];
         const t = now / 1000, party = now < this.partyUntil, g = this.tree, map = this.lay.map, out = new Uint8Array(g.n * 3);
         const drawn = this.lay.drawn, zone = this.lay.zone;
+        // stripes on a round tree, top to bottom: the front being set (white, the rest dim), or where visitors are looking
+        // (gold); as wide as the nearest strand, so a tree with few strands still shows one
+        const ang = this.lay.ang, calibOn = !!(ang && this.calib && now < this.calib.until);
+        const stripes = !ang ? [] : calibOn ? [{ f: this.calib.f, a: 0 }]
+            : [...this.looks.values()].filter((l) => now < l.until).map((l) => ({ f: frontOf(this.s.frontDeg, this.s.mirror), a: l.a }));
+        const off = (i, st) => { const r = ((relOf(ang[i], st.f) - st.a) % 1 + 1.5) % 1 - 0.5; return Math.abs(r); };
+        const near = stripes.map((st) => { let m = 1; for (let i = 0; i < g.n; i++) m = Math.min(m, off(i, st)); return m + 0.012; });
         // the tree between the decorations: its colour (the settings', or a visitor's), dim; or off
         const bg = this.s.bg === 'off' ? [0, 0, 0] : hexRgb(this.treeCol || this.s.treeColor).map((v) => Math.round(v * (drawn ? 0.3 : 0.17)));
         const shine = Math.max(0, 1 - (now - Math.max(this.lastAt, this.starAt)) / 1200);
@@ -452,6 +501,8 @@ export class App {
                     }
                 }
             }
+            if (calibOn) c = off(i, stripes[0]) <= near[0] ? [255, 255, 255] : c.map((v) => v * 0.25);
+            else for (let k = 0; k < stripes.length; k++) if (off(i, stripes[k]) <= near[k]) c = [255, 210, 40];
             out[i * 3] = c[0]; out[i * 3 + 1] = c[1]; out[i * 3 + 2] = c[2];
         }
         const list = [{ geom: g, bytes: out }];
@@ -470,7 +521,8 @@ export class App {
     }
 
     status() {
-        return { spots: this.lay?.spots ?? [], round: !!this.lay?.round, orn: this.orn, kinds: this.kinds, kindList: KINDS.filter(([k]) => this.s.kinds.includes(k)), allKinds: KINDS.map(([k]) => k), colors: COLORS, every: this.s.every, party: Date.now() < this.partyUntil,
+        return { spots: this.lay?.spots ?? [], round: !!this.lay?.round, half: !!this.lay?.half, turn: this.s.view === 'all' && !!this.lay?.round,
+            lookGuide: this.s.lookGuide && this.s.view === 'all', orn: this.orn, kinds: this.kinds, kindList: KINDS.filter(([k]) => this.s.kinds.includes(k)), allKinds: KINDS.map(([k]) => k), colors: COLORS, every: this.s.every, party: Date.now() < this.partyUntil,
             last: this.last, lastSet: this.lastSet, hung: this.hung, maxDeco: this.s.maxDeco, lastBy: this.lastBy, star: !!this.star, starPick: !!this.star && this.s.starPick, starCol: this.starCol || this.s.starColor,
             starAt: this.starAt, starLastBy: this.starLastBy, starEvery: this.s.starEvery,
             treeCol: this.treeCol || this.s.treeColor, treePick: this.s.treePick && this.s.bg !== 'off', treeCols: TREE_COLS, treeAt: this.treeAt, treeLastBy: this.treeLastBy,

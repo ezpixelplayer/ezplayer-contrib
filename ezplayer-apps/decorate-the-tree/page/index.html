@@ -37,6 +37,10 @@
   .kinds button { border-radius: 999px; border: 2px solid var(--line); background: var(--raise); color: var(--text); padding: 7px 11px; font: 700 13px/1.2 system-ui, sans-serif; cursor: pointer; }
   .kinds button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
 
+  .turn { display: flex; align-items: center; justify-content: center; gap: 14px; }
+  .turn.hidden { display: none; }
+  .turn button { width: 52px; height: 42px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 20px/1 system-ui, sans-serif; cursor: pointer; }
+  .turn span { min-width: 110px; text-align: center; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -47,6 +51,7 @@
 </div>
 <div class="panel">
   <div class="treebox"><svg id="svg" viewBox="0 0 100 120" role="img" aria-label="The tree and its baubles"></svg></div>
+  <div class="turn hidden" id="turn"><button type="button" id="turnL" aria-label="Turn the tree to the left">◀</button><span id="turnLabel">Front</span><button type="button" id="turnR" aria-label="Turn the tree to the right">▶</button></div>
   <div class="kinds" id="kinds"></div>
   <div class="sw" id="cols"></div>
   <div class="hint" id="fxHint" style="text-align:center"></div>
@@ -269,6 +274,17 @@ function backdrop(set, w, h, t, kind) {
   let sel = -1, col = 0, tcol = 0, nextAt = 0, sentAt = 0, starNext = 0, treeNext = 0;   // sel: a spot, 'star' or 'tree'   // sentAt: a bauble on its way; the button waits for the answer (3 s at most)
   // a spot (u across, v down the tree's grid) drawn on a tree shape: narrow at the top, wide at the bottom
   const P = (u, v) => [50 + (u - 0.5) * (12 + 76 * v), 12 + v * 96];
+  // a round tree: a spot comes as where it is round the trunk (turns from the front, + to the right); the phone shows
+  // the half facing the visitor (va: how far they turned the tree, 360° only), the front in the middle
+  let va = 0, lookTimer = 0, swipeX = null;
+  const SIDES = ['Front', 'Front right', 'Right side', 'Back right', 'Back', 'Back left', 'Left side', 'Front left'];
+  const turnBy = (k) => { va = ((Math.round(va * 8) + k) % 8 + 8) % 8 / 8;
+    clearTimeout(lookTimer); if (status.lookGuide) lookTimer = setTimeout(() => send({ type: 'look', a: va }), 300);   // where they stopped turning
+    render(); };
+  el('turnL').addEventListener('click', () => turnBy(-1));
+  el('turnR').addEventListener('click', () => turnBy(1));
+  el('svg').addEventListener('touchstart', (e) => { swipeX = status.turn && e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
+  el('svg').addEventListener('touchend', (e) => { if (swipeX === null) return; const dx = e.changedTouches[0].clientX - swipeX; swipeX = null; if (Math.abs(dx) > 40) turnBy(dx < 0 ? 1 : -1); }, { passive: true });
   draw = () => {
     const s = status, svg = el('svg'), ns = 'http://www.w3.org/2000/svg', sp = s.spots || [], orn = s.orn || '';
     for (const i of [...picks.keys()]) if (orn[i] !== '0' || i >= sp.length) picks.delete(i);
@@ -290,8 +306,14 @@ function backdrop(set, w, h, t, kind) {
     if (s.starPick) { star.style.cursor = 'pointer'; star.onclick = () => { sel = 'star'; picks.clear(); render(); }; }
     svg.append(star);
     const kl = s.kindList || [['bauble', 'Bauble', '🔴']], all = s.allKinds || ['bauble'];
+    if (!s.turn) va = 0;
+    el('turn').classList.toggle('hidden', !s.turn);
+    el('turnLabel').textContent = SIDES[Math.round(va * 8) % 8];
+    const uOf = (u) => { if (!s.round) return u; const r = ((u - va) % 1 + 1.5) % 1 - 0.5; return Math.abs(r) <= 0.26 ? Math.max(0.03, Math.min(0.97, 0.5 + 2 * r)) : null; };
     if (!kl.some(([k]) => k === kind)) kind = kl[0][0];
-    sp.forEach(([u, v], i) => {
+    sp.forEach(([u0, v], i) => {
+      const u = uOf(u0);
+      if (u === null) return;   // on the other side of the tree
       const [x, y] = P(u, v), o = orn[i];
       let c;
       const pk = picks.get(i);
@@ -333,7 +355,7 @@ function backdrop(set, w, h, t, kind) {
       : sel === 'tree' ? (left > 0 ? 'You can change the tree\'s colour again in ' + left + ' s.' : 'Pick a colour for the tree, then press Colour the tree!')
       : sel === 'star' ? (left > 0 ? 'You can change the star again in ' + left + ' s.' : 'Pick a colour and an effect for the star, then press Colour the star!')
       : left > 0 ? 'You can hang more decorations in ' + left + ' s. (' + used + ' of ' + n + ')'
-      : !picks.size ? (maxD > 1 ? `Tap free spots on the tree (up to ${maxD})` : 'Tap a free spot on the tree') + (s.starPick || s.treePick ? ', or ' + [s.starPick && 'the star', s.treePick && 'the tree'].filter(Boolean).join(' or ') + ' to change its colour' : '') + '. (' + used + ' of ' + n + ' decorations)' + (s.round ? ' The tree is shown unrolled: the spots go all the way round it.' : '') : `Pick a decoration, a colour and effects for the one with the white ring. ${picks.size < maxD ? 'Tap more spots, or ' : ''}press Show it on the tree! (tap a chosen one twice to take it off)`);
+      : !picks.size ? (maxD > 1 ? `Tap free spots on the tree (up to ${maxD})` : 'Tap a free spot on the tree') + (s.starPick || s.treePick ? ', or ' + [s.starPick && 'the star', s.treePick && 'the tree'].filter(Boolean).join(' or ') + ' to change its colour' : '') + '. (' + used + ' of ' + n + ' decorations)' + (s.turn ? ' Turn the tree with ◀ ▶ (or swipe) to decorate it all the way round.' : s.round ? ' This is the front of the tree, as you see it.' : '') : `Pick a decoration, a colour and effects for the one with the white ring. ${picks.size < maxD ? 'Tap more spots, or ' : ''}press Show it on the tree! (tap a chosen one twice to take it off)`);
   };
   tickGame = () => { if (Math.max(nextAt, starNext) > Date.now() - 1000) draw(); return ''; };   // the countdown (draw only: render calls this)
   onStatus = (o, s) => { if (s.lastBy && app && s.lastBy === app.clientId && s.hung !== o.hung) { mine = new Set(s.lastSet || [s.last]); picks.clear(); sel = -1; nextAt = Date.now() + (s.every || 0) * 1000; sentAt = 0; }

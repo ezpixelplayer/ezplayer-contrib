@@ -169,13 +169,18 @@ export async function run({ name, App, cleanSettings }) {
         if (res?.ok) savedJson = j;
     };
 
-    let lastJson = '', lastAt = 0, lastPhase = '';
+    let lastJson = '', lastAt = 0, lastPhase = '', liveAt = 0;
     while (!quit) {
       try {   // an error in one frame must not stop the app (the models would stay as they were)
         const now = Date.now();
         if (now - lastCheck > 5000) {
             try { await checkSettings(now); }
             catch (e) { configError = `Player not reachable: ${e.message}`; }
+        }
+        if (app.live && now - liveAt > 500) {   // a document the settings page changes live (the tree's front while it is being set)
+            liveAt = now;
+            try { const r = await fetch(appUrl(`/data/private/${app.live}`), { headers: authHeaders, signal: within(2000) }); if (r.ok) app.onLive?.(await r.json(), now); else if (r.status === 404) app.onLive?.(null, now); }
+            catch { /* tried again in a moment */ }
         }
         app.step(now);
         const list = app.ready ? app.frames(now) : [];

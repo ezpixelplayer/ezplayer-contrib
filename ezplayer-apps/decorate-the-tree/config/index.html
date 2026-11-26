@@ -27,6 +27,10 @@
   .picker { max-height: 220px; overflow: auto; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
   .picker button { margin: 0; padding: 6px 10px; font-size: 13px; font-weight: 500; color: var(--text); background: #2a2140; border: 1px solid var(--line); border-radius: 999px; }
   .picker button.g { border-color: var(--accent); }
+  .frontRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  .frontRow button { margin: 0; padding: 10px 14px; }
+  .frontBtn { display: block; margin-top: 8px; }
+  #fr_val { min-width: 96px; text-align: center; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -51,10 +55,23 @@
 <script>
   const el = (id) => document.getElementById(id);
   const MIN = { w: 4, h: 4 };
-  const FIELDS = [{"id": "shape", "type": "select", "label": "On a matrix", "options": [["tree", "Draw a tree (triangle, trunk and star) and decorate it"], ["fill", "Decorate the whole matrix"]], "default": "tree", "end": true}, {"id": "star", "type": "text", "label": "The star on top (optional): a model or a group (several separated by commas)", "default": "", "placeholder": "e.g. Mega Tree Star, or All Stars", "end": true}, {"id": "picker", "type": "models", "for": "star", "single": true, "label": "The show's models and groups (👥) (tap one to put it in the star's box)"}, {"id": "starColor", "type": "color", "label": "The star's colour", "default": "ffbe28"}, {"id": "starEvery", "type": "number", "label": "Each phone waits (seconds) between star or tree colours", "min": 0, "max": 600, "default": 30, "end": true}, {"id": "starFx", "type": "select", "label": "The star's effect", "options": [["twinkle", "Twinkle"], ["steady", "Steady"], ["blink", "Blink"], ["pulse", "Pulse"], ["spin", "Spin"], ["sparkle", "Sparkle"], ["rainbow", "Rainbow"]], "default": "twinkle", "end": true}, {"id": "starFxs", "type": "checks", "label": "The star's effects visitors can choose", "options": [["twinkle", "Twinkle"], ["steady", "Steady"], ["blink", "Blink"], ["pulse", "Pulse"], ["spin", "Spin"], ["sparkle", "Sparkle"], ["rainbow", "Rainbow"]], "default": ["twinkle", "steady", "blink", "pulse", "spin", "sparkle", "rainbow"]}, {"id": "starPick", "type": "check", "text": "Visitors may change the star's colour and effect (tap the star on the phone)", "default": true}, {"id": "spots", "type": "number", "label": "Decorations on the tree (spots)", "min": 8, "max": 60, "default": 30}, {"id": "kinds", "type": "checks", "label": "Decorations visitors can hang", "options": [["bauble", "Bauble"], ["cane", "Candy cane"], ["star", "Star"], ["bell", "Bell"], ["present", "Present"], ["flake", "Snowflake"], ["heart", "Heart"]], "default": ["bauble", "cane", "star", "bell", "present", "flake", "heart"]}, {"id": "maxDeco", "type": "number", "label": "Decorations a visitor can hang at once (tap several spots, then one button; 1 = one at a time)", "min": 1, "max": 10, "default": 5, "end": true}, {"id": "maxFx", "type": "number", "label": "Effects a visitor can pick for one decoration or the star (they take turns on the lights; 1 = one at a time)", "min": 1, "max": 6, "default": 3, "end": true}, {"id": "fx", "type": "checks", "label": "Effects visitors can choose for their decoration", "options": [["glow", "Glow"], ["steady", "Steady"], ["blink", "Blink"], ["twinkle", "Twinkle"], ["pulse", "Pulse"], ["rainbow", "Rainbow"]], "default": ["glow", "steady", "blink", "twinkle", "pulse", "rainbow"]}, {"id": "size", "type": "number", "label": "Size of the decorations (%)", "min": 50, "max": 150, "default": 100}, {"id": "every", "type": "number", "label": "Each phone waits (seconds) between decorations", "min": 0, "max": 600, "default": 60}, {"id": "show", "type": "number", "label": "Show the tree for (seconds) after each new decoration", "min": 10, "max": 300, "default": 30, "end": true}, {"id": "always", "type": "check", "text": "Show the decorated tree all the time (off: the show's sequence plays between decorations)", "default": false}, {"id": "restart", "type": "check", "text": "When the tree is full: a party on the lights, then it starts again empty", "default": true}, {"id": "bg", "type": "select", "label": "The tree between the decorations", "options": [["green", "Lit in the tree's colour (dim)"], ["off", "Off"]], "default": "green"}, {"id": "treeColor", "type": "color", "label": "The tree's colour", "default": "1e9e3c"}, {"id": "treePick", "type": "check", "text": "Visitors may change the tree's colour (tap the tree on the phone; they wait like for the star)", "default": true}];
+  const FIELDS = [{"id": "shape", "type": "select", "label": "On a matrix", "options": [["tree", "Draw a tree (triangle, trunk and star) and decorate it"], ["fill", "Decorate the whole matrix"]], "default": "tree", "end": true}, {"id": "star", "type": "text", "label": "The star on top (optional): a model or a group (several separated by commas)", "default": "", "placeholder": "e.g. Mega Tree Star, or All Stars", "end": true}, {"id": "picker", "type": "models", "for": "star", "single": true, "label": "The show's models and groups (👥) (tap one to put it in the star's box)"}, {"id": "starColor", "type": "color", "label": "The star's colour", "default": "ffbe28"}, {"id": "starEvery", "type": "number", "label": "Each phone waits (seconds) between star or tree colours", "min": 0, "max": 600, "default": 30, "end": true}, {"id": "starFx", "type": "select", "label": "The star's effect", "options": [["twinkle", "Twinkle"], ["steady", "Steady"], ["blink", "Blink"], ["pulse", "Pulse"], ["spin", "Spin"], ["sparkle", "Sparkle"], ["rainbow", "Rainbow"]], "default": "twinkle", "end": true}, {"id": "starFxs", "type": "checks", "label": "The star's effects visitors can choose", "options": [["twinkle", "Twinkle"], ["steady", "Steady"], ["blink", "Blink"], ["pulse", "Pulse"], ["spin", "Spin"], ["sparkle", "Sparkle"], ["rainbow", "Rainbow"]], "default": ["twinkle", "steady", "blink", "pulse", "spin", "sparkle", "rainbow"]}, {"id": "starPick", "type": "check", "text": "Visitors may change the star's colour and effect (tap the star on the phone)", "default": true}, {"id": "spots", "type": "number", "label": "Decorations on the tree (spots)", "min": 8, "max": 60, "default": 30}, {"id": "kinds", "type": "checks", "label": "Decorations visitors can hang", "options": [["bauble", "Bauble"], ["cane", "Candy cane"], ["star", "Star"], ["bell", "Bell"], ["present", "Present"], ["flake", "Snowflake"], ["heart", "Heart"]], "default": ["bauble", "cane", "star", "bell", "present", "flake", "heart"]}, {"id": "maxDeco", "type": "number", "label": "Decorations a visitor can hang at once (tap several spots, then one button; 1 = one at a time)", "min": 1, "max": 10, "default": 5, "end": true}, {"id": "maxFx", "type": "number", "label": "Effects a visitor can pick for one decoration or the star (they take turns on the lights; 1 = one at a time)", "min": 1, "max": 6, "default": 3, "end": true}, {"id": "fx", "type": "checks", "label": "Effects visitors can choose for their decoration", "options": [["glow", "Glow"], ["steady", "Steady"], ["blink", "Blink"], ["twinkle", "Twinkle"], ["pulse", "Pulse"], ["rainbow", "Rainbow"]], "default": ["glow", "steady", "blink", "twinkle", "pulse", "rainbow"]}, {"id": "size", "type": "number", "label": "Size of the decorations (%)", "min": 50, "max": 150, "default": 100}, {"id": "every", "type": "number", "label": "Each phone waits (seconds) between decorations", "min": 0, "max": 600, "default": 60}, {"id": "show", "type": "number", "label": "Show the tree for (seconds) after each new decoration", "min": 10, "max": 300, "default": 30, "end": true}, {"id": "always", "type": "check", "text": "Show the decorated tree all the time (off: the show's sequence plays between decorations)", "default": false}, {"id": "restart", "type": "check", "text": "When the tree is full: a party on the lights, then it starts again empty", "default": true}, {"id": "bg", "type": "select", "label": "The tree between the decorations", "options": [["green", "Lit in the tree's colour (dim)"], ["off", "Off"]], "default": "green"}, {"id": "treeColor", "type": "color", "label": "The tree's colour", "default": "1e9e3c"}, {"id": "treePick", "type": "check", "text": "Visitors may change the tree's colour (tap the tree on the phone; they wait like for the star)", "default": true}, {"section": "A round mega tree (360°)"}, {"id": "view", "type": "select", "label": "What the phones show of a round tree", "options": [["front", "Only the front (180°): the half the visitors see"],["all", "All the way round (360°): visitors turn the tree with ◀ ▶"]], "default": "front", "end": true}, {"id": "frontDeg", "type": "front", "label": "The front of the tree (where the visitors stand)", "default": 0}, {"id": "lookGuide", "type": "check", "text": "360°: while a visitor turns the tree on the phone, a thin gold stripe shows for 2 s where the middle of their drawing is", "default": false}];
   const TARGET = "required";   // 'required', 'optional' (a matrix is not needed) or 'none' (no matrix at all)
   if (TARGET === 'none') el('matrixBlock').querySelectorAll('h2, label, select, .hint').forEach((x) => x.style.display = 'none');
   let app;
+  // the front of a round tree: turned in 15° steps while a white stripe shows it on the tree (the app reads "calib")
+  const front = { deg: 0, mirror: false, n: Date.now() % 1000000, on: false };
+  function frontShow() {
+    const v = el('fr_val'); if (!v) return;
+    v.textContent = front.deg + '°' + (front.mirror ? ' · inverted' : '');
+    el('fr_show').textContent = front.on ? '⏹ Stop showing the front' : '💡 Show the front on the tree';
+  }
+  function frontSend() {
+    frontShow();
+    if (!app) return;
+    app.put('private', 'calib', { deg: front.deg, mirror: front.mirror, n: ++front.n, secs: front.on ? 120 : 0 })
+      .catch((e) => { el('note').textContent = 'Could not show the front: ' + e.message; });
+  }
   // a list of the show's models and groups: a click adds the name to the field it serves, at the cursor
   async function fillPickers() {
     const pk = FIELDS.filter((f) => f.type === 'models');
@@ -126,6 +143,21 @@
         if (f.hint) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = f.hint; box.append(p); }
         continue;
       }
+      if (f.type === 'front') {
+        const wrap = document.createElement('div');
+        const l = document.createElement('label'); l.textContent = f.label;
+        const line = document.createElement('div'); line.className = 'frontRow';
+        const mkB = (t, id, fn) => { const b = document.createElement('button'); b.type = 'button'; b.id = id; b.textContent = t; b.addEventListener('click', fn); return b; };
+        const val = document.createElement('span'); val.id = 'fr_val';
+        const showB = mkB('', 'fr_show', () => { front.on = !front.on; frontSend(); }), invB = mkB('⇄ Invert left and right', 'fr_inv', () => { front.mirror = !front.mirror; front.on = true; frontSend(); });
+        showB.className = invB.className = 'frontBtn';
+        line.append(mkB('◀ 15°', 'fr_left', () => { front.deg = (front.deg + 345) % 360; front.on = true; frontSend(); }), val,
+          mkB('15° ▶', 'fr_right', () => { front.deg = (front.deg + 15) % 360; front.on = true; frontSend(); }));
+        const h = document.createElement('p'); h.className = 'hint';
+        h.textContent = 'Only for a round (360°) mega tree. Press Show: a white stripe lights the tree from top to bottom where the app takes the front to be. Turn it with ◀ ▶ until it faces the visitors (the street, the door). If ▶ moves it to the left as you look at the tree, press Invert. Then Save: on the phones, the middle of the tree is that stripe.';
+        wrap.append(l, showB, line, invB, h); box.append(wrap); row = null; frontShow();
+        continue;
+      }
       if (f.type === 'models') {
         const wrap = document.createElement('div');
         const l = document.createElement('label'); l.textContent = f.label; l.htmlFor = 'pq_' + f.id;
@@ -159,6 +191,7 @@
     if (typeof s.brightness === 'number') el('brightness').value = s.brightness;
     for (const f of FIELDS) {
       if (f.section || f.type === 'models') continue;
+      if (f.type === 'front') { front.deg = Number.isFinite(s.frontDeg) ? s.frontDeg : 0; front.mirror = !!s.mirror; frontShow(); continue; }
       const v = s[f.id] !== undefined ? s[f.id] : f.default;
       if (f.type === 'checks') for (const c of document.querySelectorAll(`[data-f="${f.id}"]`)) c.checked = Array.isArray(v) && v.includes(c.value);
       else if (f.type === 'check') document.querySelector(`[data-f="${f.id}"]`).checked = !!v;
@@ -171,6 +204,7 @@
     const out = { target: el('target').value, fps: clamp(el('fps'), 5, 30), brightness: clamp(el('brightness'), 10, 100) };
     for (const f of FIELDS) {
       if (f.section || f.type === 'models') continue;
+      if (f.type === 'front') { out.frontDeg = front.deg; out.mirror = front.mirror; continue; }
       if (f.type === 'checks') out[f.id] = [...document.querySelectorAll(`[data-f="${f.id}"]:checked`)].map((c) => c.value);
       else if (f.type === 'check') out[f.id] = document.querySelector(`[data-f="${f.id}"]`).checked;
       else if (f.type === 'color') out[f.id] = el('f_' + f.id).value.slice(1);

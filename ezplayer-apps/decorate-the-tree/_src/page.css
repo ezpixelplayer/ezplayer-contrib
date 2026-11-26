@@ -6,3 +6,7 @@
   .kinds { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
   .kinds button { border-radius: 999px; border: 2px solid var(--line); background: var(--raise); color: var(--text); padding: 7px 11px; font: 700 13px/1.2 system-ui, sans-serif; cursor: pointer; }
   .kinds button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .turn { display: flex; align-items: center; justify-content: center; gap: 14px; }
+  .turn.hidden { display: none; }
+  .turn button { width: 52px; height: 42px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 20px/1 system-ui, sans-serif; cursor: pointer; }
+  .turn span { min-width: 110px; text-align: center; font-weight: 700; }
