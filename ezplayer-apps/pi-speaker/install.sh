@@ -21,6 +21,9 @@ command -v aplay >/dev/null || { echo "Installing alsa-utils (aplay)..."; sudo a
 sudo mkdir -p "$DIR"
 sudo cp "$(dirname "$0")/showplay_speaker.py" "$(dirname "$0")/speaker_page.html" "$DIR/"
 USER_NAME=$(id -un)
+# started with sudo: the speaker still runs as the normal user, not as root
+if [ "$USER_NAME" = "root" ] && [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then USER_NAME=$SUDO_USER; fi
+if [ "$USER_NAME" = "root" ]; then echo "Run it as a normal user (sh install.sh), not as root: it asks for sudo itself."; exit 1; fi
 sudo tee "$SERVICE" >/dev/null <<EOF
 [Unit]
 Description=ShowPlay speaker (plays the show's sounds sent over the network)
@@ -37,6 +40,7 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 EOF
+sudo chmod 600 "$SERVICE"   # it may hold the key (--key): only root reads it
 sudo systemctl daemon-reload
 sudo systemctl enable --now showplay-speaker
 sudo systemctl restart showplay-speaker

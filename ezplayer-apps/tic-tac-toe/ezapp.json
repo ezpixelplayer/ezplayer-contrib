@@ -1,7 +1,7 @@
 {
     "id": "tic-tac-toe",
     "name": "Tic-tac-toe",
-    "version": "5",
+    "version": "6",
     "description": "Play tic-tac-toe on a matrix of the show from your phone, against the computer or a friend's phone",
     "icon": "⭕",
     "runtime": "node",

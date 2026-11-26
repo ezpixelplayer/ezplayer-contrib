@@ -268,6 +268,8 @@ Every part works on its own: only the sound, only the words, only the machine, o
 
 ## Changes
 
+- **Version 9:** bug fixes: no request to EZPlayer can freeze the game any more (each has a time limit, and the lease is opened again when frames are refused), and an error in one frame starts the game again instead of stopping the app; the machine is switched off again if the first try fails, and always when the app stops; a banner cut short does not show over the next game; a Raspberry Pi that does not answer holds the sounds for at most 30 s; the word filter no longer blocks normal sentences ("as", "às", "kkkkk", "Nigeria"…) and catches "f*ck", "sh|t", "fu ck"; "Only the lights" no longer switches the machine itself on; guess the song: names go through the word filter; the songs folder is only read again when a file changes; treasure hunt: clues in order, and "busy" when the lights are full; the per-phone waiting list no longer grows for ever. The overlay leases stay exclusive (PR #21).
+
 - **Version 8:** the overlay leases are **exclusive** again, with the app token, as PR #21 made them (a later upload had undone it: "Could not light …: overlay: mode must be 'exclusive' or 'layer'"). A model another app is using is refused with that app's name. The machine's lease (DMX through EZPlayer) too.
 
 - **Version 7:** ready for the theme packs (New Year, wedding, baptism, Easter, Halloween, Thanksgiving; later also Carnival, Valentine's Day, birthday, Children's Day and 4th of July, with a "Stars and stripes" photo frame): a `theme.mjs` next to the app (empty here, so this Christmas app looks and plays exactly as before) and the small pictures of `sprites.mjs`. The packs are made from this app by `_themes/make_pack.py`.

@@ -49,14 +49,18 @@ export class App {
             for (const g of r.geoms) { seen.add(g.model); keys.push({ g, n: g.model, grp: p.n, e: p.e }); }
         }
         if (this.s.order === 'layout') keys.sort((a, b) => a.g.x - b.g.x || b.g.y - a.g.y);
+        const sig = JSON.stringify(keys.slice(0, MAX_KEYS).map((k) => [k.n, k.g.n]));
         this.keys = keys.slice(0, MAX_KEYS); this.problems = problems;
-        this.env.clear(); this.down.clear(); this.eng.clear(); this.colOf.clear();
+        // the minute's check while a model is missing must not cut a turn: only a new list of keys starts over
+        if (sig !== this.keysSig) { this.keysSig = sig; this.env.clear(); this.down.clear(); this.eng.clear(); this.colOf.clear(); }
+        else this.eng.clear();
         this.ready = this.keys.length > 0;
         this.notReady = !props.length ? 'Not set up yet: add the props to play in the app settings.' : 'None of the models is in the show: check the app settings.';
     }
 
     next(now) {
         this.holder = this.queue.shift() ?? null;
+        this.down.clear();   // the keys the last player held are let go
         this.until = this.holder ? now + this.s.turnSecs * 1000 : 0;
         this.lastTap = now;
     }
@@ -82,7 +86,7 @@ export class App {
             this.taps++;
             const c = col ?? (this.s.rainbow ? COLS[k % 8] : COLS[8]);
             if (this.colOf.get(k) !== c) { this.colOf.set(k, c); this.eng.delete(k); }
-            this.down.set(k, { at: now, off: d.a === 'tap' ? now + this.s.pulse * 1000 : now + 30000 });
+            this.down.set(k, { at: now, off: d.a === 'tap' ? now + this.s.pulse * 1000 : now + Math.min(30000, this.s.idleSecs * 1000) });   // a phone that locks with a finger on a key does not hold it for long
         }
         return '';
     }

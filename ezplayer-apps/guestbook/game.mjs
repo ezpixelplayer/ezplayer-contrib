@@ -59,7 +59,10 @@ export class Game {
     notes() {
         if (this.s.loaded && this.s.book !== this.bookNo) { this.bookNo = this.s.book; this.book = []; }
         if (this.book.length > this.s.keep) this.book.length = this.s.keep;
-        return this.book.filter((x) => !isBad(x.n) && !isBad(x.t));
+        // filtered again only when the book or the blocked words change (not every frame)
+        const key = [this.book, this.book.length, this.book[0], this.bookNo, this.s.keep, this.s.badWords];
+        if (!this.shown || this.shown.key.some((v, i) => v !== key[i])) this.shown = { key, list: this.book.filter((x) => !isBad(x.n) && !isBad(x.t)) };
+        return this.shown.list;
     }
 
     handle(client, d, now) {

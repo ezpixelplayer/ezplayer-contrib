@@ -47,7 +47,8 @@ function cleanGame(raw) {
     return s;
 }
 
-const day = (now) => new Date(now).toISOString().slice(0, 10);
+// the local date (not UTC, which turns the day in the evening in the Americas)
+const day = (now) => { const d = new Date(now); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 /** the distance from point (px, py) to the segment (ax, ay)-(bx, by), with x scaled by the matrix's shape */
 function segDist(px, py, ax, ay, bx, by, sx) {
     const dx = (bx - ax) * sx, dy = by - ay, qx = (px - ax) * sx, qy = py - ay;
@@ -112,8 +113,8 @@ export class Game {
         } else if (d.type === 'quit') {
             if (this.phase === 'waiting') this.reset();
             else if (this.phase === 'playing') {
-                if (this.players.length > 1) this.finish(2 - me, `${this.players[me].name} left the game.`, now);
-                else this.finish(0, 'You left the game.', now);
+                // not counted: no winner, no ending, no best score (the one who stays is not declared the winner)
+                this.finish(0, this.players.length > 1 ? `${this.players[me].name} left the game.` : 'You left the game.', now);
             }
         }
         return '';
@@ -159,11 +160,14 @@ export class Game {
         }
         if (n > 1) this.score[p] += n - 1;                       // a combo: one more point for each extra treat in one swipe
         if (n > 0) this.lastCut[p] = n;
-        if (coal) this.hurt(now);
+        // with a friend the lives are shared: coal takes 2 points off the one who sliced it instead (as in catch the
+        // presents), so the leader cannot slice coal on purpose to end the game; the friend game ends when the time is up
+        if (coal && this.players.length > 1) { this.score[p] = Math.max(0, this.score[p] - 2); this.hurtAt = now; }
+        else if (coal) this.hurt(now);
     }
 
-    hurt(now) {
-        if (now - this.hurtAt < 600) return;
+    hurt(now, miss) {
+        if (!miss && now - this.hurtAt < 600) return;     // one swipe through coal: one life; every missed treat counts
         this.hurtAt = now;
         this.lives -= 1;
         if (this.lives <= 0) this.end(now, 'No lives left.');
@@ -228,7 +232,7 @@ export class Game {
             if (it.cut) continue;
             const [, y] = this.at(it, now);
             if (now > it.t0 + 300 && y > 1 + this.rad() * 2 && this.at(it, now + 50)[1] > y) {   // fell back down
-                if (this.s.missLoses && it.kind !== 'coal') this.hurt(now);
+                if (this.s.missLoses && it.kind !== 'coal') this.hurt(now, true);
                 if (this.phase !== 'playing') return;
                 continue;
             }

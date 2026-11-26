@@ -93,6 +93,7 @@ export class Game {
         }
         if (d.type === 'answer') {
             if ((this.phase !== 'show' && this.phase !== 'answer') || d.round !== this.round) return 'Too late for that round.';
+            if (me.left) return '';     // a player who left does not answer
             if (me.answer !== null) return 'You already answered.';
             if (!Number.isInteger(d.value) || d.value < 0 || d.value > 40) return '';
             me.answer = d.value;
@@ -124,7 +125,7 @@ export class Game {
             this.phase = 'answer';
             this.until = this.active().every((p) => p.answer !== null) ? now + 1000 : now + this.s.answerSecs * 1000;
         } else if (this.phase === 'answer') {
-            for (const p of this.players) if (p.answer === this.right) p.score += 1;
+            for (const p of this.active()) if (p.answer === this.right) p.score += 1;
             this.phase = 'result'; this.t0 = now; this.until = now + RESULT_MS;
         } else if (this.phase === 'result') {
             if (this.round >= this.s.rounds) this.finish('', now); else this.newRound(now);
@@ -146,6 +147,7 @@ export class Game {
         if (this.phase === 'result') return `${tn[0].toUpperCase() + tn.slice(1)} flashed ${this.right} times.`;
         if (this.reason) return this.reason;
         const top = Math.max(...this.players.map((p) => p.score));
+        if (top <= 0) return 'Nobody scored a point. Try again?';
         const win = this.players.filter((p) => p.score === top).map((p) => p.name);
         return `${win.join(' and ')} win${win.length > 1 ? '' : 's'} with ${top} point${top === 1 ? '' : 's'}!`;
     }

@@ -318,8 +318,10 @@
       const rank = order.indexOf(ps.indexOf(mine)) + 1;
       el('rank').textContent = phase === 'running' ? `You are number ${rank} of ${ps.length}. Keep going to the star!` : 'Get ready...';
       if (measuringRace !== status.raceId) {
-        measuringRace = status.raceId;
-        startMeasure(mine.mode).then(startSending);
+        // startMeasure() clears measuringRace, so set it after; a stop or a newer race meanwhile cancels the sending
+        const rid = status.raceId;
+        startMeasure(mine.mode).then(() => { if (measuringRace === rid) startSending(); });
+        measuringRace = rid;
         vibrate(200);
       }
     } else if (meas || sendTimer) {

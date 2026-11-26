@@ -17,7 +17,8 @@ const DEFAULTS = { target: '', fps: 25, brightness: 100, color1: 'ff2a2a', color
     maxPlayers: 16, lobbySecs: 20, roundSecs: 30, strength: 'normal', cpu: 'normal' };
 const STRENGTH = { easy: 0.6, normal: 1, hard: 1.6 };     // taps needed: hard asks for more
 const CPU = { off: 0, easy: 3.5, normal: 5, hard: 6.5 };    // the computer's taps a second
-const MAX_BATCH = 8, BATCH_MS = 250;                       // a phone sends its taps in batches; more than ~30 a second do not count
+const MAX_BATCH = 8, BATCH_MS = 250;                       // a phone sends its taps in batches
+const TAP_RATE = 30, TAP_BURST = 16;                       // each player's taps refill at ~30 a second, up to 16 saved; more do not count
 
 function cleanGame(raw) {
     const s = { ...DEFAULTS };
@@ -96,10 +97,12 @@ export class Game {
             return '';
         }
         if (d.type === 'pull') {
-            if (this.phase !== 'pull' || d.game !== this.id) return '';
-            const n = Number.isInteger(d.n) ? Math.max(0, Math.min(MAX_BATCH, d.n)) : 0;
-            if (now - me.last < BATCH_MS * 0.6) return '';     // too often: the batch does not count
-            me.last = now; me.taps += n;
+            if (this.phase !== 'pull' || d.game !== this.id || me.left) return '';     // a player who left does not pull
+            const asked = Number.isInteger(d.n) ? Math.max(0, Math.min(MAX_BATCH, d.n)) : 0;
+            me.tokens = Math.min(TAP_BURST, (me.tokens ?? TAP_BURST) + (now - me.last) * TAP_RATE / 1000);
+            me.last = now;
+            const n = Math.min(asked, Math.floor(me.tokens));     // taps beyond the bucket do not count
+            me.tokens -= n; me.taps += n;
             this.pull[me.team - 1] += n;
             return '';
         }
@@ -116,7 +119,7 @@ export class Game {
         this.cpuTeam = CPU[this.s.cpu] && (!a || !b) ? (a ? 2 : 1) : 0;
         if (!this.cpuTeam && (!a || !b)) {      // no computer: everybody on one side, so split them
             const all = this.players.filter((p) => !p.left);
-            if (all.length < 2) { this.cpuTeam = a ? 2 : 1; }
+            if (all.length < 2) { this.finish(0, 'Not enough players: the computer is off, so it takes two.', now); return; }
             else all.forEach((p, i) => { p.team = 1 + (i % 2); });
         }
         this.phase = 'count'; this.t0 = now; this.until = now + COUNT_MS;

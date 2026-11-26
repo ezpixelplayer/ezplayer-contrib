@@ -78,13 +78,13 @@ const THEME = {};
   draw = () => {
     const s = status, n = s.days || 24, day = s.day || 0;
     const now = new Date(), y = now.getMonth() === 11 && now.getDate() > 25 ? now.getFullYear() + 1 : now.getFullYear();
-    const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    let toXmas = Math.ceil((new Date(y, 11, 25) - today0) / 86400000);
+    const today0 = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());   // whole days in UTC: no daylight saving hour
+    let toXmas = Math.round((Date.UTC(y, 11, 25) - today0) / 86400000);
     const ev = THEME.event, em = THEME.emoji || '🎄';
     if (ev) {   // a theme pack: the big day is the day after the last door
-      let big = new Date(now.getFullYear(), (s.month || 12) - 1, (s.first || 1) + n);
-      if (big - today0 < -200 * 86400000) big = new Date(now.getFullYear() + 1, (s.month || 12) - 1, (s.first || 1) + n);
-      toXmas = Math.ceil((big - today0) / 86400000);
+      let by = now.getFullYear() - 1;   // the next big day (today counts)
+      while (Date.UTC(by, (s.month || 12) - 1, (s.first || 1) + n) < today0) by++;
+      toXmas = Math.round((Date.UTC(by, (s.month || 12) - 1, (s.first || 1) + n) - today0) / 86400000);
     }
     el('count').textContent = ev ? (day === 0 ? '📅 The calendar opens on ' + (s.first || 1) + '/' + (s.month || 12) + '. ' + toXmas + ' days to ' + ev + '!'
       : toXmas === 0 ? em + ' ' + THEME.greeting + ' ' + em : toXmas === 1 ? em + ' Tomorrow is ' + ev + '!' : em + ' ' + toXmas + ' days to ' + ev)

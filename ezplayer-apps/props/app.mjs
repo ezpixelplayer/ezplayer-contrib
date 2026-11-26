@@ -45,6 +45,8 @@ export class App {
         const same = JSON.stringify(props) === JSON.stringify(this.props);
         this.props = props; this.geoms = geoms; this.problems = problems;
         if (!same) { this.cur = props.map(() => null); this.queues = props.map(() => []); }
+        // the running effects are made again on the new pixels (a model that was missing may be back)
+        else this.cur = this.cur.map((c, i) => (c ? { ...c, eng: new PropFx(geoms[i], c.fx, c.cols, SPEEDS[c.speed]) } : null));
         this.ready = geoms.some((g) => g.length);
         this.notReady = !props.length ? 'Not set up yet: add a prop in the app settings.' : 'None of the props\' models is in the show: check the app settings.';
     }
@@ -65,6 +67,7 @@ export class App {
             if (q.length >= s.queueMax) return 'Too many waiting for this prop. Try another one!';
         }
         this.by.set(client, now);
+        if (this.by.size > 500) for (const [c, at] of this.by) if (now - at > s.waitSecs * 1000) this.by.delete(c);
         const item = { client, fx: d.fx, cols: coloursOf(d.pal, d.mine), speed, label: `${PROP_FX[d.fx]} on ${this.props[i].n}` };
         if (s.queue) q.push(item); else { q.length = 0; q.push(item); if (this.cur[i]) this.cur[i].until = 0; }
         return '';

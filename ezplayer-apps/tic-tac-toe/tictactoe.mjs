@@ -121,6 +121,7 @@ async function main() {
         if (d.type === 'new') {
             if (game.phase === 'waiting' || game.phase === 'playing') note(client, 'A game is already on. Wait for it to end.');
             else if (!pending) pending = { client, data: d };
+            else if (pending.client !== client) note(client, 'Someone else is starting a game.');
         } else if (d.type === 'join') note(client, game.join(client, d, now));
         else if (d.type === 'move') note(client, game.move(client, d.cell, d.game, now, d.n));
         else if (d.type === 'quit') game.quit(client, now);

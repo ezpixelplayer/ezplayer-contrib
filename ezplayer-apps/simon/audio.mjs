@@ -140,7 +140,7 @@ async function piPlay(host, key, wav, secs, onStart) {
     const url = `http://${/:\d+$/.test(host) ? host : host + ':8765'}/play`;
     onStart?.(300);
     const res = await fetch(url, { method: 'POST', body: wav, headers: { 'content-type': 'audio/wav', ...(key ? { 'x-showplay-key': key } : {}) },
-        signal: AbortSignal.timeout(secs * 1000 + 75000) });
+        signal: AbortSignal.timeout(secs * 1000 + 30000) });   // a Pi that does not answer does not hold the queue for long
     const o = await res.json().catch(() => ({}));
     if (!res.ok || !o.ok) throw new Error(o.error ?? 'HTTP ' + res.status);
 }

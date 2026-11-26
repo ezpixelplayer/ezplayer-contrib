@@ -50,9 +50,11 @@ export function doorsOf(s) {
 /** today's door: 0 before the first day, days + 1 after the last (all open) */
 export function today(s, now = new Date()) {
     if (s.testDay > 0) return Math.min(s.testDay, s.days);
-    const start = new Date(now.getFullYear(), s.month - 1, s.first);
-    if (now - start < -300 * 86400000) start.setFullYear(now.getFullYear() - 1);      // January: last year's calendar
-    const d = Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - start) / 86400000) + 1;
+    // whole days in UTC (no daylight saving hour); the calendar is last year's until 60 days after its last door, then next year's
+    const t = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000;
+    let y = now.getFullYear() - 1;
+    while (t - (Date.UTC(y, s.month - 1, s.first) / 86400000 + s.days - 1) > 60) y++;
+    const d = t - Date.UTC(y, s.month - 1, s.first) / 86400000 + 1;
     return d < 1 ? 0 : Math.min(d, s.days + 1);
 }
 
@@ -73,6 +75,7 @@ export class Game {
         if (this.queue.length >= 10) return 'The lights are busy. Try again in a moment.';
         this.queue.push({ ...doorsOf(this.s)[n - 1], door: n, client });
         this.byPhone.set(client, now);
+        if (this.byPhone.size > 2000) for (const [k, v] of this.byPhone) if (now - v > 3600000) this.byPhone.delete(k);
         return '';
     }
 

@@ -8,26 +8,26 @@ settings page on the home network.
 
 | App | Version | What visitors do | Ways to play |
 |---|---|---|---|
-| 🎁 **catch-the-presents** | 6 | Catch the presents falling down a matrix in a sleigh, alone or against a friend; a golden star is 3, coal takes 2 off | 👆 finger · 📱 tilt · 🧍 body |
-| 🏓 **pong** | 6 | Pong on a matrix, against the computer or a friend | 👆 finger · 📱 tilt · 🧍 body |
-| 👾 **space-invaders** | 6 | Defend the show from space invaders: move the ship, it fires | 👆 finger · 📱 tilt · 🧍 body |
-| 🍬 **slice-the-treats** | 5 | Swipe to slice the Christmas treats thrown up a matrix, not the coal | 👆 finger (swipe) |
-| 🐍 **snake** | 5 | Steer a snake, eat the apples, don't hit the walls | 👆 arrows or swipes |
-| ⭕ **tic-tac-toe** | 5 | Tic-tac-toe on a matrix, against the computer or a friend | 👆 tap |
-| 🔴 **four-in-a-row** | 5 | Four in a Row on a matrix, against the computer or a friend | 👆 tap |
-| 🟢 **simon** | 5 | Repeat the colours the lights show; one more each round | 👆 tap |
-| 🔢 **count-the-colours** | 4 | Party game for up to 8 phones: count how many times a colour flashes | 👆 tap |
-| 🌟 **race-to-the-star** | 4 | Up to 8 phones race climbers up a tree or matrix (tap, sing, shake or run); the winner lights the star | 👆 tap · 🎤 voice · 📱 shake · 🏃 run |
-| 💬 **messages** | 5 | Send a message, an animated picture (73 GIFs), an effect or a drawing to a matrix | — |
-| 📅 **advent-calendar** | 4 | Open one more door every day of December and see its surprise | — |
-| 🎄 **decorate-the-tree** | 14 | Hang decorations (baubles, candy canes, bells, presents…) with colours and effects, several at once; change the star's colour and effect, and the tree's colour | — |
-| 🎁 **fun** | 8 | Photo frame, wheel of fortune, animals, paint by numbers, the bell, snow on request (web address or DMX, with modes and lights), treasure hunt, guess the song | — |
-| ✨ **props** | 4 | Light up real models of the show (wings, arches, canes…) with an effect and colours | — |
-| 🎹 **play-the-lights** | 4 | Each model becomes a key on the phone: take turns playing the show like a keyboard | — |
-| 🎤 **sing** | 5 | Record a song; a singing model sings it on the show's speakers | — |
-| 🪢 **tug-of-war** | 2 | Two teams of phones tap as fast as they can; the rope moves to the side that pulls harder (alone: against the computer) | 👆 tap |
-| 📸 **photo-pixels** | 2 | Take a selfie and see it on a matrix in pixels, in a frame of the season; nothing is saved | 📸 camera |
-| 📝 **guestbook** | 2 | Leave your name and a short note; new notes scroll on a matrix and the book is read every few minutes | — |
+| 🎁 **catch-the-presents** | 7 | Catch the presents falling down a matrix in a sleigh, alone or against a friend; a golden star is 3, coal takes 2 off | 👆 finger · 📱 tilt · 🧍 body |
+| 🏓 **pong** | 7 | Pong on a matrix, against the computer or a friend | 👆 finger · 📱 tilt · 🧍 body |
+| 👾 **space-invaders** | 7 | Defend the show from space invaders: move the ship, it fires | 👆 finger · 📱 tilt · 🧍 body |
+| 🍬 **slice-the-treats** | 6 | Swipe to slice the Christmas treats thrown up a matrix, not the coal | 👆 finger (swipe) |
+| 🐍 **snake** | 6 | Steer a snake, eat the apples, don't hit the walls | 👆 arrows or swipes |
+| ⭕ **tic-tac-toe** | 6 | Tic-tac-toe on a matrix, against the computer or a friend | 👆 tap |
+| 🔴 **four-in-a-row** | 6 | Four in a Row on a matrix, against the computer or a friend | 👆 tap |
+| 🟢 **simon** | 6 | Repeat the colours the lights show; one more each round | 👆 tap |
+| 🔢 **count-the-colours** | 5 | Party game for up to 8 phones: count how many times a colour flashes | 👆 tap |
+| 🌟 **race-to-the-star** | 5 | Up to 8 phones race climbers up a tree or matrix (tap, sing, shake or run); the winner lights the star | 👆 tap · 🎤 voice · 📱 shake · 🏃 run |
+| 💬 **messages** | 6 | Send a message, an animated picture (73 GIFs), an effect or a drawing to a matrix | — |
+| 📅 **advent-calendar** | 5 | Open one more door every day of December and see its surprise | — |
+| 🎄 **decorate-the-tree** | 15 | Hang decorations (baubles, candy canes, bells, presents…) with colours and effects, several at once; change the star's colour and effect, and the tree's colour | — |
+| 🎁 **fun** | 9 | Photo frame, wheel of fortune, animals, paint by numbers, the bell, snow on request (web address or DMX, with modes and lights), treasure hunt, guess the song | — |
+| ✨ **props** | 5 | Light up real models of the show (wings, arches, canes…) with an effect and colours | — |
+| 🎹 **play-the-lights** | 5 | Each model becomes a key on the phone: take turns playing the show like a keyboard | — |
+| 🎤 **sing** | 6 | Record a song; a singing model sings it on the show's speakers | — |
+| 🪢 **tug-of-war** | 3 | Two teams of phones tap as fast as they can; the rope moves to the side that pulls harder (alone: against the computer) | 👆 tap |
+| 📸 **photo-pixels** | 3 | Take a selfie and see it on a matrix in pixels, in a frame of the season; nothing is saved | 📸 camera |
+| 📝 **guestbook** | 3 | Leave your name and a short note; new notes scroll on a matrix and the book is read every few minutes | — |
 
 **Ways to play**: 👆 finger on the phone; 📱 tilt: tilting the phone (needs the page in https); 🧍 body: the body
 sensor at the lights, see below.
@@ -132,3 +132,4 @@ sensor at the lights, see below.
   lease exclusive, with the app token; a later upload of older files undid it, and EZPlayer then refused the leases
   ("overlay: mode must be 'exclusive' or 'layer'"). Back in every app (new versions), in the three new ones, in the
   machine's lease and in the 11 theme packs.
+- **🔧 Bug fixes (all 20 apps, 2026-11-26):** the word filter no longer blocks normal sentences ("as", "às", "kkkkk") and catches "f*ck", "sh|t", "fu ck"; "Only the lights" in fun no longer starts the machine, and a machine is switched off again if the first try fails and always when the app stops; no request to EZPlayer can freeze a game (time limits, the lease opened again when frames are refused); the guestbook and the tree are never overwritten with empty ones when the player or the show is not ready at start; props no longer crash when a missing model is back; fixes in tug-of-war, race-to-the-star, count-the-colours, tic-tac-toe, slice-the-treats, catch-the-presents, pong, space-invaders, play-the-lights, sing, advent-calendar (calendars starting in January or February, summer time) and photo-pixels; the Raspberry Pi speaker refuses requests from other web sites, keys with accents and too many big uploads at once. The overlay leases stay exclusive (PR #21). Each app's README lists its own fixes.

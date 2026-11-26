@@ -109,6 +109,8 @@ Every part works on its own: only the sound, only the words, only the machine, o
 
 ## Changes
 
+- **Version 5:** bug fixes: the machine is switched off again if the first try fails, and always when the app stops; a Raspberry Pi that does not answer holds the sounds for at most 30 s; the word filter no longer blocks normal sentences ("as", "às", "kkkkk", "Nigeria"…) and catches "f*ck", "sh|t", "fu ck"; when time is up and nobody climbed there is no winner, and a tie is a draw; names are cleaned like in the other apps; a phone keeps measuring correctly from one race to the next. The overlay leases stay exclusive (PR #21).
+
 - **Version 4:** the overlay leases are **exclusive** again, with the app token, as PR #21 made them (a later upload had undone it: "Could not light …: overlay: mode must be 'exclusive' or 'layer'"). A model another app is using is refused with that app's name. The machine's lease (DMX through EZPlayer) too.
 
 - **Version 3:** 🔈 sounds can also play on **a Raspberry Pi on the network** running the ShowPlay speaker (see `pi-speaker/`): pick it in "Where it plays" and put in the Pi's IP address (and its key, if you set one). If the Pi does not answer, the sound plays on this computer.

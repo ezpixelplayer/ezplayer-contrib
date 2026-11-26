@@ -143,15 +143,17 @@ function hsv(h, s, v) {
 
 // ---- The race ----
 
+let raceCount = 0; // across Race objects, so every race gets a new id
+const cleanName = (name, d) => String(name ?? '').replace(/[^\p{L}\p{N} '.-]/gu, '').trim().slice(0, 16) || d;
+
 class Race {
     constructor(settings) {
         this.s = settings;
-        this.id = 0;
         this.reset();
     }
 
     reset() {
-        this.id++;
+        this.id = ++raceCount;
         this.phase = 'idle'; // idle | waiting | countdown | running | finished
         this.players = [];
         this.winner = null;
@@ -183,7 +185,7 @@ class Race {
         // A color already taken goes to the next free one, as the original does.
         if (!s.colors.includes(color) || taken.includes(color)) color = s.colors.find((c) => !taken.includes(c));
         if (!color) return 'No colors left';
-        const name = typeof d.name === 'string' && d.name.trim() ? d.name.trim().slice(0, 16) : `Player ${this.players.length + 1}`;
+        const name = cleanName(d.name, `Player ${this.players.length + 1}`);
         this.players.push({
             id: client,
             name,
@@ -282,9 +284,12 @@ class Race {
             }
         }
         if (now >= this.endsAt) {
-            let best = 0;
-            for (let j = 1; j < this.players.length; j++) if (this.players[j].pos > this.players[best].pos) best = j;
-            this.finish(best, `Time is up: ${this.players[best].name} was highest`, now);
+            const top = Math.max(0, ...this.players.map((p) => p.pos));
+            const best = this.players.filter((p) => p.pos === top);
+            // Nobody off the ground, or a tie at the top: no winner.
+            if (top <= 0) this.finish(null, 'Time is up: nobody climbed', now);
+            else if (best.length > 1) this.finish(null, `Time is up: a draw between ${best.map((p) => p.name).join(' and ')}`, now);
+            else this.finish(this.players.indexOf(best[0]), `Time is up: ${best[0].name} was highest`, now);
         }
     }
 }

@@ -72,7 +72,7 @@ export function dmxFrame(m, choice = {}) {
     if (L) for (const k of ['dim', 'r', 'g', 'b', 'a', 'w', 'macro', 'speed', 'strobe']) if (L[k]) put(L[k], 0);   // the light channels are known: sent, 0 when not used
     if (m.multi) add(m.fixed);
     if (!choice.wait) {
-        if (!m.multi) add(m.channels);
+        if (!m.multi && choice.mode !== -1) add(m.channels);   // "only the lights" never starts the machine itself
         else if (choice.mode >= 0 && m.modes[choice.mode]) add(m.modes[choice.mode].channels);
     }
     if (L) {
@@ -168,6 +168,28 @@ async function call(url) {
     const r = await fetch(url, { signal: AbortSignal.timeout(6000), headers: { 'user-agent': 'ShowPlay' } });
     if (!r.ok) throw new Error('answer ' + r.status);
 }
+/** switching off must not give up after one lost request (Wi-Fi): tried again after 1, 2, 4 and 8 s */
+async function callOff(url, log, tries = 5) {
+    for (let i = 0; ; i++) {
+        try { await call(url); return; } catch (e) {
+            if (i >= tries - 1) { log('could not be switched off:', e.message); return; }
+            await sleep(1000 * 2 ** i);
+        }
+    }
+}
+
+// the runs going on now, so that the app can switch everything off when it stops or fails (machinesOff)
+const ACTIVE = new Set();
+/** switches off every machine that is on now; called when the app stops or fails */
+export async function machinesOff(log = console.log) {
+    const runs = [...ACTIVE]; ACTIVE.clear();
+    await Promise.all(runs.map(async ({ cfg, how, link, size }) => {
+        if (how === 'url') return callOff(cfg.off, log, 3);
+        const end = new Uint8Array(size);
+        for (let i = 0; i < 3; i++) { await link.send(cfg, end).catch(() => undefined); await sleep(100); }
+        await link.close().catch(() => undefined);
+    }));
+}
 
 /**
  * a run: switches the machine on, waits, and always switches it off.
@@ -177,18 +199,24 @@ async function call(url) {
 export async function runMachine(cfg, secs, log = console.log, link = new MachineLink(log)) {
     const how = MACHINE_HOWS.includes(cfg.how) ? cfg.how : 'url';
     if (how === 'url') {
+        const run = { cfg, how };
+        ACTIVE.add(run);
         try { await call(cfg.on); log(`on for ${secs} s`); await sleep(secs * 1000); }
-        finally { await call(cfg.off).catch((e) => log('could not be switched off:', e.message)); }
+        finally { if (ACTIVE.delete(run)) await callOff(cfg.off, log); }
         return;
     }
     const vals = cfg.values ?? dmxValues(cfg.channels);
     if (!vals) throw new Error('no DMX channels set (for example 1=255)');
     const t0 = Date.now();
-    await link.send(cfg, vals);   // throws when it cannot start
+    const run = { cfg, how, link, size: vals.length };
+    ACTIVE.add(run);
+    try { await link.send(cfg, vals); }   // throws when it cannot start
+    catch (e) { ACTIVE.delete(run); throw e; }
     log(`on for ${secs} s (DMX by ${how})`);
     try {
-        while (Date.now() - t0 < secs * 1000) { await sleep(400); await link.send(cfg, vals).catch(() => undefined); }
+        while (Date.now() - t0 < secs * 1000 && ACTIVE.has(run)) { await sleep(400); if (ACTIVE.has(run)) await link.send(cfg, vals).catch(() => undefined); }
     } finally {
+        if (!ACTIVE.delete(run)) return;   // machinesOff() has already switched it off
         const after = cfg.after, end = new Uint8Array(Math.max(vals.length, after?.length ?? 0));
         if (after) end.set(after);
         for (let i = 0; i < 3; i++) { await link.send(cfg, end).catch(() => undefined); await sleep(150); }   // a few times in case one is lost
