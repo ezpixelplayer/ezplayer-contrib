@@ -189,6 +189,14 @@ export class Game {
         return p.id === 'cpu' ? { kind: 'lose', vars: { winner: 'The computer', colour, score: '' } } : { kind: 'win', vars: { winner: p.name, colour, score: '' } };
     }
 
+    /** the game for the statistics (player.mjs sends it when the game ends): null when it did not really end */
+    statResult() {
+        if (!this.winner || / left the game\.$/.test(this.reason)) return null;   // a player left: not counted
+        const w = this.winner === 3 ? null : this.players[this.winner - 1];
+        return { players: this.players.filter((p) => p.id !== 'cpu').map((p) => ({ name: p.name })),
+            winner: w && w.id !== 'cpu' ? w.name : '', cpuWon: w?.id === 'cpu', what: this.mode };
+    }
+
     step(now) {
         if (this.phase === 'waiting' && now > this.waitEndsAt) this.reset();
         else if (this.phase === 'playing') {

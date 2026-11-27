@@ -95,4 +95,6 @@ The page sends `new` (`mode`: `solo` or `group`, `name`), `join` (`name`), `star
 
 ## Changes
 
+- **Version 2:** 📊 statistics: each game played (its players, the winner and the scores) is reported to the host panel, which keeps them night by night.
+
 - **Version 1:** first version.

@@ -325,6 +325,7 @@ export class Game {
         this.by = new Map(); this.results = new Map(); this.solved = new Map();
         this.snowBusy = false; this.snowNext = 0; this.snowRuns = []; this.audioBusy = false;
         this.songs = []; this.songsAt = 0;
+        this.usesBy = {};   // what visitors did, for the statistics (player.mjs sends it): { extra: total }
         this.quiz = { st: 'idle', id: 0, players: [], scores: new Map(), answers: new Map(), n: 0, of: 0, opts: [], right: -1, until: 0 };
     }
 
@@ -378,6 +379,7 @@ export class Game {
         } else if (k === 'snow') return this.snow(client, now, d);
         else if (k === 'hunt') return this.hunt(client, d, now);
         else if (k === 'song') return this.songMsg(client, d, now);
+        this.usesBy[k] = (this.usesBy[k] ?? 0) + 1;
         this.results.set(client, { k, ok: true, at: now });
         return '';
     }
@@ -436,6 +438,7 @@ export class Game {
         if (c.mode === -1) {   // only the lights: allowed while the machine rests and out of hours, not counted in the night's runs
             const w = this.wait(client, 'snowlight', 10, now); if (w) return `You can light it again in ${w} s.`;
             void this.snowRun(s.snowRun, c);
+            this.usesBy['snow'] = (this.usesBy['snow'] ?? 0) + 1;
             this.results.set(client, { k: 'snow', ok: true, light: true, at: now });
             return '';
         }
@@ -447,6 +450,7 @@ export class Game {
         this.snowNext = now + (secs + s.snowGap) * 1000;
         void this.snowRun(secs, c);
         if (s.snowCube) this.enqueue({ kind: 'fx', client, label: mode ? mode.name : 'falling snow', fx: 'snowfall', secs: secs + 2 });
+        this.usesBy['snow'] = (this.usesBy['snow'] ?? 0) + 1;
         this.results.set(client, { k: 'snow', ok: true, at: now });
         return '';
     }
@@ -504,6 +508,7 @@ export class Game {
         const last = ok && cl.every((x, j) => j === i || me.done.has(j));   // the treasure: every clue solved
         if (ok && !this.enqueue(last ? { kind: 'fx', client, label: 'treasure found!', fx: 'fireworks', secs: 10 } : { kind: 'fx', client, label: `clue ${i + 1} solved`, fx: 'bursts', secs: 5 })) { this.by.delete(client + 'hunt'); return BUSY; }
         if (ok) me.done.add(i);
+        if (ok) this.usesBy['hunt'] = (this.usesBy['hunt'] ?? 0) + 1;
         if (ok && last) this.ending?.fire(this.s, 'win', { winner: 'The treasure hunter', colour: '', score: '' });
         this.results.set(client, { k: 'hunt', ok, i, last, at: now });
         return '';
@@ -517,6 +522,7 @@ export class Game {
             if (q.st !== 'idle' && q.st !== 'over') return 'A round is already on.';
             Object.assign(q, { st: 'lobby', id: q.id + 1, players: [{ id: client, name: nameOf(1) }], scores: new Map([[client, 0]]), answers: new Map(), n: 0, of: 0, opts: [], right: -1, until: now + 15000 });
             void this.runQuiz();
+            this.usesBy['song'] = (this.usesBy['song'] ?? 0) + 1;
             return '';
         }
         if (d.a === 'join') {
@@ -525,6 +531,7 @@ export class Game {
             if (q.players.length >= 8) return 'The round is full (8 players).';
             q.players.push({ id: client, name: nameOf(q.players.length + 1) });
             q.scores.set(client, 0);
+            this.usesBy['song'] = (this.usesBy['song'] ?? 0) + 1;
             return '';
         }
         if (d.a === 'ans') {

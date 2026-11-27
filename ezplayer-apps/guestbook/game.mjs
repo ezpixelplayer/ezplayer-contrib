@@ -42,6 +42,7 @@ export class Game {
     constructor(s) {
         this.s = s; this.w = 32; this.h = 16; this.book = []; this.bookNo = s.book; this.byPhone = new Map();
         this.reset(); this.nextRead = Date.now() + 60000;
+        this.usesBy = {};   // notes written, for the statistics (player.mjs sends it)
     }
 
     size(w, h) { this.w = w; this.h = h; }
@@ -80,6 +81,7 @@ export class Game {
         this.notes();
         const note = { n: name, t, c, at: now };
         this.book.unshift(note);
+        this.usesBy['note'] = (this.usesBy['note'] ?? 0) + 1;
         if (this.book.length > this.s.keep) this.book.length = this.s.keep;
         this.byPhone.set(client, now);
         if (this.byPhone.size > 2000) for (const [k, v] of this.byPhone) if (now - v > 3600000) this.byPhone.delete(k);

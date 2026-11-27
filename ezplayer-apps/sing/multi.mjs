@@ -19,6 +19,7 @@
  */
 
 import { groupsOf, showXml } from './models.mjs';
+import { statsReporter } from './stats.mjs';
 
 const IDLE_MS = 100;
 const NOTICE_MS = 6000;
@@ -50,6 +51,8 @@ export async function run({ name, App, cleanSettings }) {
     const notices = new Map();
     const note = (client, text) => { if (client && text) notices.set(client, { text, at: Date.now() }); };
     const startedAt = Date.now();
+    const stats = statsReporter();   // what visitors did, for the host panel's statistics
+    const usesSeen = {};
 
     // ---- settings and the show's groups
     async function checkSettings(now) {
@@ -183,6 +186,7 @@ export async function run({ name, App, cleanSettings }) {
             catch { /* tried again in a moment */ }
         }
         app.step(now);
+        for (const [w, n] of Object.entries(app.usesBy ?? {})) { const add = n - (usesSeen[w] ?? 0); if (add > 0) { stats.use(add, w === '_' ? '' : w); usesSeen[w] = n; } }
         const list = app.ready ? app.frames(now) : [];
         await send(list, (app.s.brightness ?? 100) / 100);
         if (app.saveState) await saveState(now);

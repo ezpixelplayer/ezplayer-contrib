@@ -33,6 +33,7 @@ export class App {
     constructor(s) {
         this.s = s; this.ready = false; this.props = []; this.geoms = []; this.problems = [];
         this.cur = []; this.queues = []; this.by = new Map(); this.last = 0;
+        this.usesBy = {};   // effects sent, for the statistics (multi.mjs sends it)
     }
 
     async prepare({ base, groups }) {
@@ -69,6 +70,7 @@ export class App {
         this.by.set(client, now);
         if (this.by.size > 500) for (const [c, at] of this.by) if (now - at > s.waitSecs * 1000) this.by.delete(c);
         const item = { client, fx: d.fx, cols: coloursOf(d.pal, d.mine), speed, label: `${PROP_FX[d.fx]} on ${this.props[i].n}` };
+        this.usesBy['effect'] = (this.usesBy['effect'] ?? 0) + 1;
         if (s.queue) q.push(item); else { q.length = 0; q.push(item); if (this.cur[i]) this.cur[i].until = 0; }
         return '';
     }

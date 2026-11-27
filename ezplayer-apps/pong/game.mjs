@@ -135,6 +135,14 @@ export class Game {
         return p.id === 'cpu' ? { kind: 'lose', vars: { winner: 'The computer', colour, score } } : { kind: 'win', vars: { winner: p.name, colour, score } };
     }
 
+    /** the game for the statistics (player.mjs sends it when the game ends): null when it did not really end */
+    statResult() {
+        const w = this.players[this.winner - 1];
+        if (!this.winner || !w) return null;   // a player left, or nobody was playing
+        return { players: this.players.flatMap((p, i) => (p.id === 'cpu' ? [] : [{ name: p.name, score: this.score[i] }])),
+            winner: w.id === 'cpu' ? '' : w.name, cpuWon: w.id === 'cpu', what: this.mode };
+    }
+
     step(now) {
         this.useSensor(now);
         if (this.phase === 'waiting' && now > this.waitEndsAt) { this.reset(); return; }

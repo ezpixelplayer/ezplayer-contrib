@@ -17,6 +17,8 @@
 import { Ending } from './ending.mjs';
 import { machinesOff } from './machine.mjs';
 
+import { statsReporter } from './stats.mjs';
+
 const MAX_GRID_PIXELS = 40000;
 const NOTICE_MS = 5000;
 const IDLE_MS = 250;
@@ -106,6 +108,8 @@ export async function run({ name, Game, cleanSettings, minSize }) {
     const notices = new Map();
     const note = (client, text) => { if (client && text) notices.set(client, { text, at: Date.now() }); };
     const startedAt = Date.now();
+    const stats = statsReporter();   // what happened, for the host panel's statistics
+    const usesSeen = {};
 
     const handleEvent = (ev) => {
         const d = ev?.data;
@@ -211,8 +215,13 @@ export async function run({ name, Game, cleanSettings, minSize }) {
             } catch { /* tried again in a moment */ }
         }
         game.step(Date.now());
+        // visitors' uses the app counted (game.usesBy: { what: total }), sent to the host panel as they grow
+        for (const [w, n] of Object.entries(game.usesBy ?? {})) { const add = n - (usesSeen[w] ?? 0); if (add > 0) { stats.use(add, w === '_' ? '' : w); usesSeen[w] = n; } }
         if (game.phase !== endPhase) {
             endPhase = game.phase;
+            if (endPhase === 'finished' || endPhase === 'over') {   // a game played: for the statistics
+                try { stats.game(game.statResult ? game.statResult() : basicResult(game)); } catch (e) { console.log('stats:', e.message); }
+            }
             if ((endPhase === 'finished' || endPhase === 'over') && game.outcome) {
                 try { const o = game.outcome(); if (o) ending.fire(game.s, o.kind, o.vars); } catch (e) { console.log('ending:', e.message); }
             }
@@ -272,6 +281,16 @@ export async function run({ name, Game, cleanSettings, minSize }) {
 }
 
 // ---- small helpers the games share ----
+
+/** a game's result for the statistics when it has no statResult(): its people, their score if it keeps one, and who won */
+function basicResult(game) {
+    const people = (game.players ?? []).filter((p) => p && p.id !== 'cpu' && !p.cpu);
+    if (!people.length) return null;
+    let o = null;
+    try { o = game.outcome?.() ?? null; } catch { o = null; }
+    return { players: people.map((p) => ({ name: p.name, score: typeof p.score === 'number' ? p.score : undefined })),
+        winner: o?.kind === 'win' ? String(o.vars?.winner ?? '') : '', cpuWon: o?.kind === 'lose' };
+}
 
 export const hexRgb = (h) => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 

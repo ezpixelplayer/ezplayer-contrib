@@ -213,6 +213,13 @@ export class Game {
         return { kind: 'win', vars: { winner: names, colour: colourName(COLS[w % 4]), score: p.score } };
     }
 
+    /** the game for the statistics (player.mjs sends it when the game ends): null when it did not really end */
+    statResult() {
+        if (!this.counted || !this.winner) return null;   // everyone left, or nobody hit a note
+        const w = this.players[this.winner - 1];
+        return { players: this.players.map((p) => ({ name: p.name, score: p.score })), winner: this.players.length > 1 && !this.draw ? w.name : '', cpuWon: false, what: this.mode };
+    }
+
     step(now) {
         if (this.phase === 'waiting' && now > this.waitEndsAt) { this.start(now); return; }
         if (this.phase === 'over') { if (now > this.until) this.reset(); return; }

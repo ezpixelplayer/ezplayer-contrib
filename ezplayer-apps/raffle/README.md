@@ -91,4 +91,6 @@ The page sends `join` (`name`) and `leave`. The status carries `count`, `left`, 
 
 ## Changes
 
+- **Version 2:** 📊 statistics: each use by a visitor is reported to the host panel, which keeps them night by night (the most used apps of the night).
+
 - **Version 1:** first version.

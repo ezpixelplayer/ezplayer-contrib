@@ -1,7 +1,7 @@
 {
     "id": "fun",
     "name": "Fun",
-    "version": "9",
+    "version": "10",
     "description": "Eight extras for visitors: photo frame, wheel of fortune, animals, paint by numbers, the bell, snow on request (web address or DMX, with modes and lights), a treasure hunt and guess the song",
     "icon": "🎁",
     "runtime": "node",

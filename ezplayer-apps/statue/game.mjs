@@ -234,6 +234,14 @@ export class Game {
         }
     }
 
+    /** the game for the statistics (player.mjs sends it when the game ends): null when it did not really end */
+    statResult() {
+        if (this.silent || !this.players.length) return null;   // stopped, or everyone left or went
+        const ws = this.players.filter((p) => this.winners.includes(p.id));
+        return { players: this.players.map((p) => ({ name: p.name, score: p.out ? p.outRound : this.round })),   // rounds stood still
+            winner: ws.length === 1 ? ws[0].name : '', cpuWon: false, what: this.mode };
+    }
+
     step(now) {
         this.useSensor(now);
         if (this.phase === 'waiting' && now > this.waitEndsAt) { this.reason = this.begin(now); return; }

@@ -215,6 +215,14 @@ export class Game {
         return { kind: 'win', vars: { winner: this.players[w]?.name ?? 'Player ' + this.winner, colour: colourName(w ? this.s.color2 : this.s.color1), score: this.score[w] } };
     }
 
+    /** the game for the statistics (player.mjs sends it when the game ends): null when it did not really end */
+    statResult() {
+        if (!this.winner || !this.players.length) return null;   // a player left, or nobody was playing
+        const solo = this.players.length < 2;
+        return { players: this.players.map((p, i) => ({ name: p.name, score: this.score[i] })),
+            winner: solo || this.winner === 3 ? '' : this.players[this.winner - 1]?.name ?? '', cpuWon: false, what: this.mode };
+    }
+
     step(now) {
         if (this.phase === 'waiting' && now > this.waitEndsAt) { this.reset(); return; }
         if (this.phase === 'over') { if (now > this.until) this.reset(); return; }
