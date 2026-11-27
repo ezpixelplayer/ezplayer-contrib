@@ -17,6 +17,7 @@
 
 import { Game, cleanSettings, render } from './game.mjs';
 import { Ending } from './ending.mjs';
+import { statsReporter } from './stats.mjs';
 
 const base = (process.env.EZP_API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
 const instance = process.env.EZP_APP_INSTANCE;
@@ -150,6 +151,7 @@ async function main() {
     let lastJson = '';
     let lastAt = 0;
     const ending = new Ending();   // a sound, the words, a machine when someone wins or loses
+    const stats = statsReporter();   // each game played, for the host panel's statistics
     let endPhase = game.phase;
     while (!quit) {
         const now = Date.now();
@@ -191,6 +193,7 @@ async function main() {
         game.step(now);
         if (game.phase !== endPhase) {
             endPhase = game.phase;
+            if (endPhase === 'finished') { try { stats.game(game.statResult()); } catch (e) { console.log('stats:', e.message); } }
             if (endPhase === 'finished') { try { const o = game.outcome(); if (o) ending.fire(game.s, o.kind, o.vars); } catch (e) { console.log('ending:', e.message); } }
         }
 

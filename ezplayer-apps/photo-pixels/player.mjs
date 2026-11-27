@@ -14,6 +14,8 @@
  * Settings come from the instance's private data key "settings".
  */
 
+import { statsReporter } from './stats.mjs';
+
 const MAX_GRID_PIXELS = 40000;
 const NOTICE_MS = 5000;
 const IDLE_MS = 250;
@@ -100,6 +102,8 @@ export async function run({ name, Game, cleanSettings, minSize }) {
     const notices = new Map();
     const note = (client, text) => { if (client && text) notices.set(client, { text, at: Date.now() }); };
     const startedAt = Date.now();
+    const stats = statsReporter();   // what happened, for the host panel's statistics
+    const usesSeen = {};
 
     const handleEvent = (ev) => {
         const d = ev?.data;
@@ -194,6 +198,8 @@ export async function run({ name, Game, cleanSettings, minSize }) {
         }
 
         game.step(Date.now());
+        // visitors' uses the app counted (game.usesBy: { what: total }), sent to the host panel as they grow
+        for (const [w, n] of Object.entries(game.usesBy ?? {})) { const add = n - (usesSeen[w] ?? 0); if (add > 0) { stats.use(add, w === '_' ? '' : w); usesSeen[w] = n; } }
         if (game.saveState) await saveState(now);
 
         if (lease) {

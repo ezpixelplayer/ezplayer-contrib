@@ -46,6 +46,8 @@ Nothing.
 
 ## Changes
 
+- **Version 6:** 📊 statistics: each use by a visitor is reported to the host panel, which keeps them night by night (the most used apps of the night).
+
 - **Version 5:** bug fixes: no request to EZPlayer can freeze the game any more (each has a time limit, and the lease is opened again when frames are refused), and an error in one frame starts the game again instead of stopping the app; the word filter no longer blocks normal sentences ("as", "às", "kkkkk", "Nigeria"…) and catches "f*ck", "sh|t", "fu ck"; a calendar that starts in January or February no longer opens every door in December; summer time no longer moves the day by one. The overlay leases stay exclusive (PR #21).
 
 - **Version 4:** the overlay leases are **exclusive** again, with the app token, as PR #21 made them (a later upload had undone it: "Could not light …: overlay: mode must be 'exclusive' or 'layer'"). A model another app is using is refused with that app's name.

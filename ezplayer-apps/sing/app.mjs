@@ -104,6 +104,7 @@ export class App {
     constructor(s) {
         this.s = s; this.ready = false; this.singers = []; this.problems = [];
         this.parts = new Map(); this.queue = []; this.cur = null; this.busy = false; this.from = new Map(); this.t = 0;
+        this.usesBy = {};   // songs sent, for the statistics (multi.mjs sends it)
     }
 
     async prepare({ base, groups }) {
@@ -164,6 +165,7 @@ export class App {
         const clip = a.subarray(0, Math.min(n, Math.round(p.rate * (s.maxSecs + 0.5))));
         this.from.set(client, now);
         const who = this.singers.find((x) => x.k === p.s);
+        this.usesBy['song'] = (this.usesBy['song'] ?? 0) + 1;
         this.queue.push({ client, k: p.s, who: `${who.e} ${who.n}`, rate: p.rate, a: clip, ...mouthTrack(p.rate, clip) });
         console.log(`sing: a song of ${(clip.length / p.rate).toFixed(1)} s for ${who.n}`);
         return '';

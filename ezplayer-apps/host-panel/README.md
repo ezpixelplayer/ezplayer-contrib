@@ -34,6 +34,25 @@ is not from ShowPlay. Switched-on apps start by themselves (inside their schedul
 
 The ShowPlay app ids are put into the page when it is built (see below), so build it again when a ShowPlay app is added.
 
+## 📊 Statistics
+
+While the panel runs, every ShowPlay app reports to it (`stats.mjs` in each app): **a game played** (its players, the winner,
+whether the computer won, and the scores) and **each use of an app** (a message, a picture, a decoration, a photo, a door of the
+calendar, a song…). The panel keeps them in its private document `stats`, night by night, and the settings page shows:
+
+- for any night ("Tonight" first): games played, players, uses, and **the most used apps** in order, with each game's **top score of
+  the night** and who made it, and how many games people and the computer won;
+- **when it was busy**: games and uses per hour, in the order of the night;
+- **the whole season**: totals per app, the nights each was used and the **record of the season**;
+- **⬇️ Download (CSV)**: every night and app, for a spreadsheet.
+
+Under **Statistics settings**: when a night ends (06:00 by default, so a show past midnight is one night), whether to keep the
+players' names (off: only the scores), and **Start a new season** (clears everything, asked inside the page).
+
+Keep the panel **on during the show**: what happens while it is off is not counted (the games themselves are never slowed: a
+missing panel is simply skipped). It counts the apps' reports only (events from `app:<instance>`), on the home network.
+The last 400 nights and the latest 300 games in detail are kept.
+
 ## The app itself
 
 `main.mjs` does almost nothing: it publishes the status `{ phase: 'idle', message: 'Host panel ready', players: [] }`
@@ -62,5 +81,7 @@ Each pack version (`ezplayer-apps-<pack>/<pack>-host-panel`) is the same panel w
 colour; its theme of the night starts on its own pack.
 
 ## Changes
+
+- **Version 2:** 📊 statistics: every app reports games (players, winner, scores) and uses; the panel keeps them night by night and shows the most used apps, the top scores of the night, when it was busy, the season and a CSV download.
 
 - **Version 1:** first version.

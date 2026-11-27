@@ -1,7 +1,7 @@
 {
     "id": "rhythm",
     "name": "Rhythm on the lights",
-    "version": "1",
+    "version": "2",
     "description": "A rhythm game on a matrix of the show: notes fall to the beat, up to 4 phones tap them in time",
     "icon": "🥁",
     "runtime": "node",

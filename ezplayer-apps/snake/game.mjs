@@ -90,6 +90,13 @@ export class Game {
         return { kind: this.reason === 'The board is full!' || this.reason === 'Time is up!' ? 'win' : 'lose', vars };
     }
 
+    /** the game for the statistics (player.mjs sends it when the game ends): null when it did not really end */
+    statResult() {
+        const p = this.players[0];
+        if (!p || this.reason === 'You stopped the game.') return null;
+        return { players: [{ name: p.name, score: this.score }], winner: this.reason === 'The board is full!' || this.reason === 'Time is up!' ? p.name : '', cpuWon: false };
+    }
+
     step(now) {
         if (this.phase === 'over') { if (now > this.until) this.reset(); return; }
         if (this.phase !== 'ready' && this.phase !== 'playing') return;

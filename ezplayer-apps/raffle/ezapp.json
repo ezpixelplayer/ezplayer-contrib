@@ -1,7 +1,7 @@
 {
     "id": "raffle",
     "name": "Raffle",
-    "version": "1",
+    "version": "2",
     "description": "A prize draw on a matrix of the show: names or ticket numbers spin, slow down and stop on the winner; visitors can join from their phone",
     "icon": "🎟️",
     "runtime": "node",

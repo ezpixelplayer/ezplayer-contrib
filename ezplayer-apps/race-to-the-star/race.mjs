@@ -19,8 +19,10 @@
  */
 
 import { Ending, cleanEnd, colourName } from './ending.mjs';
+import { statsReporter } from './stats.mjs';
 
 const ending = new Ending();   // a sound, the words, a machine when someone reaches the star
+const stats = statsReporter();   // each race, for the host panel's statistics
 const END_TEXTS = { endWinText: '{winner} reached the star!' };
 
 const base = (process.env.EZP_API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
@@ -242,6 +244,11 @@ class Race {
         this.winner = winner;
         this.message = message;
         this.partyEndsAt = now + (winner !== null ? PARTY_MS : NO_WINNER_MS);
+        // the race for the statistics: one that nobody joined, everyone left or nobody climbed is not counted
+        if (this.players.length && this.players.some((p) => p.pos > 0)) {
+            try { stats.game({ players: this.players.map((p) => ({ name: p.name, score: Math.round(p.pos * 100) })), winner: winner !== null ? this.players[winner].name : '', cpuWon: false }); }
+            catch (e) { console.log('stats:', e.message); }
+        }
         if (winner !== null) {
             this.players[winner].done = true;
             const p = this.players[winner];

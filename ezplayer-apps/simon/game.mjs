@@ -107,6 +107,13 @@ export class Game {
         return { kind: this.won ? 'win' : 'lose', vars };
     }
 
+    /** the game for the statistics (player.mjs sends it when the game ends): null when it did not really end */
+    statResult() {
+        const p = this.players[0];
+        if (!p || this.reason === 'You stopped the game.') return null;
+        return { players: [{ name: p.name, score: this.score }], winner: this.won ? p.name : '', cpuWon: false };
+    }
+
     step(now) {
         if (this.phase === 'showing' && now > this.until) { this.phase = 'input'; this.until = now + this.s.pressSecs * 1000; }
         else if (this.phase === 'input' && now > this.until) this.finish('Time ran out.', now);

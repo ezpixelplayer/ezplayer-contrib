@@ -87,7 +87,7 @@ class Drawing extends Anim {
 export class Game {
     static startTypes = ['text', 'fx', 'draw', 'gif'];
 
-    constructor(s) { this.s = s; this.w = 32; this.h = 16; this.reset(); this.byPhone = new Map(); this.n = 0; }
+    constructor(s) { this.s = s; this.w = 32; this.h = 16; this.reset(); this.byPhone = new Map(); this.n = 0; this.usesBy = {}; }
 
     size(w, h) { this.w = w; this.h = h; }
     drawSize() {      // the phone draws at most 32 squares a side, keeping the matrix's shape
@@ -130,6 +130,8 @@ export class Game {
         }
         item.client = client; item.n = ++this.n;
         this.queue.push(item);
+        const what = { text: 'message', fx: 'effect', gif: 'picture', draw: 'drawing' }[kind];   // for the statistics
+        this.usesBy[what] = (this.usesBy[what] ?? 0) + 1;
         this.byPhone.set(client, now);
         if (this.byPhone.size > 2000) for (const [k, v] of this.byPhone) if (now - v > 3600000) this.byPhone.delete(k);
         return '';

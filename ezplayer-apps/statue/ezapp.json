@@ -1,7 +1,7 @@
 {
     "id": "statue",
     "name": "Statues",
-    "version": "1",
+    "version": "2",
     "description": "Musical statues with the lights: dance while the matrix is green, freeze when it turns red. The body sensor or each player's phone sees who moves",
     "icon": "🗽",
     "runtime": "node",

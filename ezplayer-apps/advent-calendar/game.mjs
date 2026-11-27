@@ -61,7 +61,7 @@ export function today(s, now = new Date()) {
 export class Game {
     static startTypes = ['open'];
 
-    constructor(s) { this.s = s; this.w = 32; this.h = 16; this.byPhone = new Map(); this.reset(); }
+    constructor(s) { this.s = s; this.w = 32; this.h = 16; this.byPhone = new Map(); this.reset(); this.usesBy = {}; }
     size(w, h) { this.w = w; this.h = h; }
     reset() { this.phase = 'idle'; this.queue = []; this.cur = null; this.players = []; }
 
@@ -74,6 +74,7 @@ export class Game {
         if (left > 0) return `You can open another door in ${left} s.`;
         if (this.queue.length >= 10) return 'The lights are busy. Try again in a moment.';
         this.queue.push({ ...doorsOf(this.s)[n - 1], door: n, client });
+        this.usesBy['door'] = (this.usesBy['door'] ?? 0) + 1;
         this.byPhone.set(client, now);
         if (this.byPhone.size > 2000) for (const [k, v] of this.byPhone) if (now - v > 3600000) this.byPhone.delete(k);
         return '';

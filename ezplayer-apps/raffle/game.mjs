@@ -123,6 +123,7 @@ export class Game {
         this.last = null;            // the last draw's winners, for the phones: { d, winners: [{ name, c }] }
         this.flash = null;           // a word for the host and the phones for a few seconds
         this.ver = 0;                // goes up when the visitors or the winners change (the entries are worked out again)
+        this.usesBy = {};            // for the statistics (player.mjs sends it): visitors joining, draws
         this.reset();
     }
 
@@ -173,6 +174,7 @@ export class Game {
             const l = low(name);
             for (const [c, v] of this.visitors) if (c !== client && low(v.name) === l) return 'Someone has joined with that name: add your surname or an initial.';
             if (!mine && this.visitors.size >= this.s.maxVisitors) return 'The draw is full.';
+            if (!mine) this.usesBy['join'] = (this.usesBy['join'] ?? 0) + 1;
             this.visitors.set(client, { name, at: mine?.at ?? now }); this.ver++;   // joining again only changes the name: still one entry
             return '';
         }
@@ -221,6 +223,7 @@ export class Game {
         }
         const picks = pickFair(pool, this.s.perDraw);
         this.id += 1; this.draws += 1;
+        this.usesBy['draw'] = (this.usesBy['draw'] ?? 0) + 1;
         this.cur = { d: this.draws, picks, k: 0, names: pool.map((e) => e.name), shown: [] };
         this.last = { d: this.draws, winners: [] };
         this.flash = null;
@@ -268,6 +271,9 @@ export class Game {
             else { this.phase = 'idle'; this.cur = null; }
         }
     }
+
+    /** a draw is not a game: it is counted in usesBy, never as a game played */
+    statResult() { return null; }
 
     /** the winner just shown, for the ending (a sound, the words, a machine) */
     outcome() {

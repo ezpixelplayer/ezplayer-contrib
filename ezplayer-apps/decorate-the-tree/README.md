@@ -103,6 +103,8 @@ numbers). A matrix or a flat model is not changed by any of this.
 
 ## Changes
 
+- **Version 17:** 📊 statistics: each use by a visitor is reported to the host panel, which keeps them night by night (the most used apps of the night).
+
 - **Version 16:** a round mega tree: the middle of the phone is the front of the real tree, with the visitors' left and right (the spots were turned a quarter round and mirrored); the front is set on the settings page while a white stripe shows it on the tree; the phones show only the front half (180°) or the whole tree with ◀ ▶ to turn it (360°), with an optional gold stripe where a visitor is looking; decorations are no longer mirrored on a round tree.
 
 - **Version 15:** bug fixes: no request to EZPlayer can freeze the tree any more (each has a time limit, and the lease is opened again when frames are refused), and an error in one frame starts the game again instead of stopping the app; the decorations are never overwritten with empty ones when the show is still loading, and setting up is tried again. The overlay leases stay exclusive (PR #21).

@@ -8,31 +8,31 @@ settings page on the home network.
 
 | App | Version | What visitors do | Ways to play |
 |---|---|---|---|
-| 🎁 **catch-the-presents** | 7 | Catch the presents falling down a matrix in a sleigh, alone or against a friend; a golden star is 3, coal takes 2 off | 👆 finger · 📱 tilt · 🧍 body |
-| 🏓 **pong** | 7 | Pong on a matrix, against the computer or a friend | 👆 finger · 📱 tilt · 🧍 body |
-| 👾 **space-invaders** | 7 | Defend the show from space invaders: move the ship, it fires | 👆 finger · 📱 tilt · 🧍 body |
-| 🍬 **slice-the-treats** | 6 | Swipe to slice the Christmas treats thrown up a matrix, not the coal | 👆 finger (swipe) |
-| 🐍 **snake** | 6 | Steer a snake, eat the apples, don't hit the walls | 👆 arrows or swipes |
-| ⭕ **tic-tac-toe** | 6 | Tic-tac-toe on a matrix, against the computer or a friend | 👆 tap |
-| 🔴 **four-in-a-row** | 6 | Four in a Row on a matrix, against the computer or a friend | 👆 tap |
-| 🟢 **simon** | 6 | Repeat the colours the lights show; one more each round | 👆 tap |
-| 🔢 **count-the-colours** | 5 | Party game for up to 8 phones: count how many times a colour flashes | 👆 tap |
-| 🌟 **race-to-the-star** | 5 | Up to 8 phones race climbers up a tree or matrix (tap, sing, shake or run); the winner lights the star | 👆 tap · 🎤 voice · 📱 shake · 🏃 run |
-| 💬 **messages** | 6 | Send a message, an animated picture (73 GIFs), an effect or a drawing to a matrix | — |
-| 📅 **advent-calendar** | 5 | Open one more door every day of December and see its surprise | — |
-| 🎄 **decorate-the-tree** | 16 | Hang decorations (baubles, candy canes, bells, presents…) with colours and effects, several at once; change the star's colour and effect, and the tree's colour | — |
-| 🎁 **fun** | 9 | Photo frame, wheel of fortune, animals, paint by numbers, the bell, snow on request (web address or DMX, with modes and lights), treasure hunt, guess the song | — |
-| ✨ **props** | 5 | Light up real models of the show (wings, arches, canes…) with an effect and colours | — |
-| 🎹 **play-the-lights** | 5 | Each model becomes a key on the phone: take turns playing the show like a keyboard | — |
-| 🎤 **sing** | 6 | Record a song; a singing model sings it on the show's speakers | — |
-| 🪢 **tug-of-war** | 3 | Two teams of phones tap as fast as they can; the rope moves to the side that pulls harder (alone: against the computer) | 👆 tap |
-| 📸 **photo-pixels** | 3 | Take a selfie and see it on a matrix in pixels, in a frame of the season; nothing is saved | 📸 camera |
-| 📝 **guestbook** | 3 | Leave your name and a short note; new notes scroll on a matrix and the book is read every few minutes | — |
-| 🥁 **rhythm** | 1 | Notes fall down a matrix in 4 coloured lanes to a beat the app makes itself; up to 4 phones tap the pads in time (judged on the phone, to the millisecond) | 👆 tap |
-| 🗽 **statue** | 1 | Musical statues: dance while the lights are green, freeze when they turn red; whoever moves is out (the body sensor or the phone in the hand sees it) | 🧍 body · 📱 phone |
-| 🎟️ **raffle** | 1 | A prize draw: names, ticket numbers or visitors who join from their phone spin on a matrix and stop on the winner; the host draws from the settings page or a show button | — |
-| ⏱️ **live-countdown** | 1 | A big countdown on a matrix to a moment (midnight, the couple's entrance, the finale), the last 10 seconds huge, then fireworks, a message, sound and a machine | — |
-| 🎛️ **host-panel** | 1 | For whoever runs the show: one page with every app (state, players now, on/off, start/stop) and "theme of the night" to switch on one pack and off the others. No visitors' page | — |
+| 🎁 **catch-the-presents** | 8 | Catch the presents falling down a matrix in a sleigh, alone or against a friend; a golden star is 3, coal takes 2 off | 👆 finger · 📱 tilt · 🧍 body |
+| 🏓 **pong** | 8 | Pong on a matrix, against the computer or a friend | 👆 finger · 📱 tilt · 🧍 body |
+| 👾 **space-invaders** | 8 | Defend the show from space invaders: move the ship, it fires | 👆 finger · 📱 tilt · 🧍 body |
+| 🍬 **slice-the-treats** | 7 | Swipe to slice the Christmas treats thrown up a matrix, not the coal | 👆 finger (swipe) |
+| 🐍 **snake** | 7 | Steer a snake, eat the apples, don't hit the walls | 👆 arrows or swipes |
+| ⭕ **tic-tac-toe** | 7 | Tic-tac-toe on a matrix, against the computer or a friend | 👆 tap |
+| 🔴 **four-in-a-row** | 7 | Four in a Row on a matrix, against the computer or a friend | 👆 tap |
+| 🟢 **simon** | 7 | Repeat the colours the lights show; one more each round | 👆 tap |
+| 🔢 **count-the-colours** | 6 | Party game for up to 8 phones: count how many times a colour flashes | 👆 tap |
+| 🌟 **race-to-the-star** | 6 | Up to 8 phones race climbers up a tree or matrix (tap, sing, shake or run); the winner lights the star | 👆 tap · 🎤 voice · 📱 shake · 🏃 run |
+| 💬 **messages** | 7 | Send a message, an animated picture (73 GIFs), an effect or a drawing to a matrix | — |
+| 📅 **advent-calendar** | 6 | Open one more door every day of December and see its surprise | — |
+| 🎄 **decorate-the-tree** | 17 | Hang decorations (baubles, candy canes, bells, presents…) with colours and effects, several at once; change the star's colour and effect, and the tree's colour | — |
+| 🎁 **fun** | 10 | Photo frame, wheel of fortune, animals, paint by numbers, the bell, snow on request (web address or DMX, with modes and lights), treasure hunt, guess the song | — |
+| ✨ **props** | 6 | Light up real models of the show (wings, arches, canes…) with an effect and colours | — |
+| 🎹 **play-the-lights** | 6 | Each model becomes a key on the phone: take turns playing the show like a keyboard | — |
+| 🎤 **sing** | 7 | Record a song; a singing model sings it on the show's speakers | — |
+| 🪢 **tug-of-war** | 4 | Two teams of phones tap as fast as they can; the rope moves to the side that pulls harder (alone: against the computer) | 👆 tap |
+| 📸 **photo-pixels** | 4 | Take a selfie and see it on a matrix in pixels, in a frame of the season; nothing is saved | 📸 camera |
+| 📝 **guestbook** | 4 | Leave your name and a short note; new notes scroll on a matrix and the book is read every few minutes | — |
+| 🥁 **rhythm** | 2 | Notes fall down a matrix in 4 coloured lanes to a beat the app makes itself; up to 4 phones tap the pads in time (judged on the phone, to the millisecond) | 👆 tap |
+| 🗽 **statue** | 2 | Musical statues: dance while the lights are green, freeze when they turn red; whoever moves is out (the body sensor or the phone in the hand sees it) | 🧍 body · 📱 phone |
+| 🎟️ **raffle** | 2 | A prize draw: names, ticket numbers or visitors who join from their phone spin on a matrix and stop on the winner; the host draws from the settings page or a show button | — |
+| ⏱️ **live-countdown** | 2 | A big countdown on a matrix to a moment (midnight, the couple's entrance, the finale), the last 10 seconds huge, then fireworks, a message, sound and a machine | — |
+| 🎛️ **host-panel** | 2 | For whoever runs the show: one page with every app (state, players now, on/off, start/stop) and "theme of the night" to switch on one pack and off the others. No visitors' page | — |
 | 🗓️ **agenda** | 1 | For whoever runs the show: one page to give every app its times (the player's own schedules, so they work with Agenda off) and dates such as 1 Dec–6 Jan | — |
 
 **Ways to play**: 👆 finger on the phone; 📱 tilt: tilting the phone (needs the page in https); 🧍 body: the body
@@ -150,3 +150,4 @@ sensor at the lights, see below.
 - **Build tools**: the new apps' pages (`page/`, `config/`) are built from their `_src`, and their theme-pack versions made from
   the Christmas app, with build tools kept outside this repository (`_tools/build.mjs`, `_tools/make_pack.mjs`); the notes on
   building in those apps' READMEs refer to them. The built pages here are complete: nothing needs building to use the apps.
+- **📊 Statistics (2026-11-27):** every app now reports to the **host panel** (`stats.mjs` in each app): each game played (players, winner, whether the computer won, scores) and each use by a visitor (a message, a decoration, a photo…). The panel (version 2) keeps them night by night in its private document and shows, for any night, the most used apps, the top score of each game, when it was busy, the season's records and a CSV download. Keep the panel on during the show; a missing panel never slows a game. All apps got a new version.

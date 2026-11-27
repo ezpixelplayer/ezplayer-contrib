@@ -1,7 +1,7 @@
 {
     "id": "play-the-lights",
     "name": "Play the lights",
-    "version": "5",
+    "version": "6",
     "description": "Each model of the chosen props becomes a key on the phone: visitors take turns playing the show like a keyboard",
     "icon": "🎹",
     "runtime": "node",

@@ -135,6 +135,14 @@ export class Game {
         return { kind: 'win', vars: { winner: this.teamName(this.winner), colour: colourName(this.teamColor(this.winner)), score: Math.round(Math.abs(this.pos) * 100) } };
     }
 
+    /** the game for the statistics (player.mjs sends it when the game ends): null when it did not really end */
+    statResult() {
+        const ps = this.players.filter((p) => !p.left), draw = !this.winner && this.reason.startsWith('A draw');
+        if (!ps.length || (!this.winner && !draw) || !ps.some((p) => p.taps > 0)) return null;   // stopped, too few, everyone left, nobody pulled
+        const cpuWon = !!this.cpuTeam && this.winner === this.cpuTeam;
+        return { players: ps.map((p) => ({ name: p.name, score: p.taps })), winner: this.winner && !cpuWon ? this.teamName(this.winner) : '', cpuWon, what: this.cpuTeam ? 'cpu' : 'teams' };
+    }
+
     step(now) {
         if (this.phase === 'idle') return;
         if (this.phase === 'pull') {

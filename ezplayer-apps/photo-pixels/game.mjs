@@ -111,7 +111,7 @@ function styled([r, g, b], style) {
 export class Game {
     static startTypes = ['photo'];
 
-    constructor(s) { this.s = s; this.w = 32; this.h = 16; this.reset(); this.byPhone = new Map(); this.n = 0; }
+    constructor(s) { this.s = s; this.w = 32; this.h = 16; this.reset(); this.byPhone = new Map(); this.n = 0; this.usesBy = {}; }
 
     size(w, h) { this.w = w; this.h = h; }
 
@@ -140,6 +140,7 @@ export class Game {
         else if (!this.s.noFrame) frame = this.s.frames[0];
         const style = this.s.styles.includes(d.style) ? d.style : this.s.styles[0];
         this.queue.push({ client, n: ++this.n, photo: { pw, ph, rgb }, frame, style });
+        this.usesBy['photo'] = (this.usesBy['photo'] ?? 0) + 1;
         this.byPhone.set(client, now);
         if (this.byPhone.size > 2000) for (const [k, v] of this.byPhone) if (now - v > 3600000) this.byPhone.delete(k);
         return '';

@@ -39,6 +39,7 @@ export class App {
         this.s = s; this.ready = false; this.keys = []; this.problems = [];
         this.holder = null; this.until = 0; this.lastTap = 0; this.queue = [];
         this.env = new Map(); this.down = new Map(); this.eng = new Map(); this.colOf = new Map(); this.last = 0; this.t = 0; this.taps = 0;
+        this.usesBy = {};   // turns given, for the statistics (multi.mjs sends it)
     }
 
     async prepare({ base, groups }) {
@@ -62,6 +63,7 @@ export class App {
         this.holder = this.queue.shift() ?? null;
         this.down.clear();   // the keys the last player held are let go
         this.until = this.holder ? now + this.s.turnSecs * 1000 : 0;
+        if (this.holder) this.usesBy['turn'] = (this.usesBy['turn'] ?? 0) + 1;
         this.lastTap = now;
     }
 

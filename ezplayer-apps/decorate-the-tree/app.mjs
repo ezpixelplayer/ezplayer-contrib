@@ -294,7 +294,8 @@ export class App {
         this.problems = []; this.twinkle = null;
         this.calib = null; this.calibN = null; this.looks = new Map();   // the front being set (a white stripe); visitors turning the tree (thin stripes)
         this.starCol = ''; this.starFx = null; this.starAng = null; this.starBy = new Map(); this.starAt = 0; this.starLastBy = null;
-        this.treeCol = ''; this.treeBy = new Map(); this.treeAt = 0; this.treeLastBy = null;   // the tree's colour, picked by a visitor ('' = the one in the settings)
+        this.treeCol = ''; this.treeBy = new Map(); this.treeAt = 0; this.treeLastBy = null;
+        this.usesBy = {};   // what visitors did, for the statistics (multi.mjs sends it): decorations hung, star and tree colours   // the tree's colour, picked by a visitor ('' = the one in the settings)
         // the star's colour, picked by a visitor ('' = the one in the settings)
     }
 
@@ -399,6 +400,7 @@ export class App {
         this.by.set(client, now);
         if (this.by.size > 2000) for (const [key, v] of this.by) if (now - v > 3600000) this.by.delete(key);
         this.lastSet = ok.map(([i]) => i); this.last = this.lastSet[this.lastSet.length - 1]; this.lastAt = now; this.lastBy = client; this.hung++;
+        this.usesBy['decoration'] = (this.usesBy['decoration'] ?? 0) + ok.length;
         this.showUntil = now + this.s.show * 1000;
         if (!this.orn.includes('0') && this.s.restart) { this.partyUntil = now + PARTY_MS; this.showUntil = this.partyUntil; }
         return taken ? `${ok.length} hung; ${taken} ${taken > 1 ? 'spots were' : 'spot was'} taken by someone faster.` : '';
@@ -415,6 +417,7 @@ export class App {
         this.treeBy.set(client, now);
         if (this.treeBy.size > 2000) for (const [k, v] of this.treeBy) if (now - v > 3600000) this.treeBy.delete(k);
         this.treeAt = now; this.treeLastBy = client;
+        this.usesBy['tree'] = (this.usesBy['tree'] ?? 0) + 1;
         this.showUntil = Math.max(this.showUntil, now + this.s.show * 1000);
         return '';
     }
@@ -433,6 +436,7 @@ export class App {
         this.starBy.set(client, now);
         if (this.starBy.size > 2000) for (const [k, v] of this.starBy) if (now - v > 3600000) this.starBy.delete(k);
         this.starAt = now; this.starLastBy = client;
+        this.usesBy['star'] = (this.usesBy['star'] ?? 0) + 1;
         this.showUntil = Math.max(this.showUntil, now + this.s.show * 1000);
         return '';
     }

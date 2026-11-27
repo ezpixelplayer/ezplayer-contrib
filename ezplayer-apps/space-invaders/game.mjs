@@ -129,6 +129,13 @@ export class Game {
         return { kind: this.reason === 'Time is up!' ? 'win' : 'lose', vars };
     }
 
+    /** the game for the statistics (player.mjs sends it when the game ends): null when it did not really end */
+    statResult() {
+        const p = this.players[0];
+        if (!p || this.reason === 'You stopped the game.' || this.reason === 'Nobody was playing.') return null;
+        return { players: [{ name: p.name, score: this.score }], winner: this.reason === 'Time is up!' ? p.name : '', cpuWon: false };
+    }
+
     step(now) {
         this.useSensor(now);
         if (this.phase === 'over') { if (now > this.until) this.reset(); this.last = now; return; }

@@ -198,6 +198,7 @@ export class Game {
         this.liveN = null;      // the last "timer" document seen (null: not read yet)
         this.armed = null;      // the moment seen still ahead by this process: only that one is celebrated (not after a restart)
         this.voice = opts.voice ?? new VoiceCount();
+        this.usesBy = {};       // each celebration (zero reached), for the statistics (player.mjs sends it)
         this.reset();
     }
     size(w, h) { this.w = w; this.h = h; this.anims = {}; }
@@ -246,12 +247,13 @@ export class Game {
             if (left <= 0) { if (this.armed === t && left > -party) ph = 'over'; }
             else if (this.s.always || left <= this.s.showMins * 60_000) ph = 'counting';
         }
-        if (ph === 'over' && this.phase !== 'over') this.partyAt = now;
+        if (ph === 'over' && this.phase !== 'over') { this.partyAt = now; this.usesBy['celebration'] = (this.usesBy['celebration'] ?? 0) + 1; }
         this.phase = ph;
         this.voice.step(this.s, t, left);
     }
 
     outcome() { return { kind: 'win', vars: { winner: this.messageText() } }; }
+    statResult() { return null; }   // a celebration is not a game: it is counted in usesBy
 
     saveState() { return { rel: this.rel }; }
     restore(st) {

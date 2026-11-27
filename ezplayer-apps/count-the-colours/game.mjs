@@ -118,6 +118,14 @@ export class Game {
         return { kind: 'win', vars: { winner: best.join(' and '), colour: '', score: top } };
     }
 
+    /** the game for the statistics (player.mjs sends it when the game ends): null when it did not really end */
+    statResult() {
+        const ps = this.players.filter((p) => !p.left);
+        if (this.reason || !ps.length) return null;   // stopped, or everyone left
+        const top = Math.max(...ps.map((p) => p.score)), best = ps.filter((p) => p.score === top);
+        return { players: ps.map((p) => ({ name: p.name, score: p.score })), winner: top > 0 && best.length === 1 ? best[0].name : '', cpuWon: false };
+    }
+
     step(now) {
         if (this.phase === 'idle' || now <= this.until) return;
         if (this.phase === 'lobby') this.newRound(now);
