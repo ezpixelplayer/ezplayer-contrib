@@ -1,7 +1,7 @@
 {
     "id": "host-panel",
     "name": "Host panel",
-    "version": "2",
+    "version": "3",
     "description": "One page for whoever runs the show: see every app, how many people play, switch apps on and off, pick the theme of the night, and see the statistics of every night (games, top scores, the most used apps)",
     "icon": "🎛️",
     "runtime": "node",

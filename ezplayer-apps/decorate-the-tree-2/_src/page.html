@@ -1,0 +1,17 @@
+<div class="panel">
+  <div class="tray" id="tray">
+    <div class="step" id="step1">1 · Pick your decoration</div>
+    <div class="trayTop">
+      <div class="trayDeco" id="trayDeco" role="button" aria-label="Your decoration: drag it onto the tree"><svg id="traySvg" viewBox="-14 -14 28 28"></svg></div>
+      <div class="trayRight"><div class="trayHint" id="trayHint">2 · Drag it onto the tree ⬇</div><div class="sw" id="cols"></div></div>
+    </div>
+    <div class="kinds" id="kinds"></div>
+    <div class="kinds"><span class="kinds" id="sizes"></span><button type="button" id="fxToggle" aria-expanded="false">✨ Effects ▾</button></div>
+    <div id="fxBox" class="hidden"><div class="hint" id="fxHint" style="text-align:center"></div><div class="kinds" id="fxs"></div></div>
+  </div>
+  <div class="treebox"><svg id="svg" viewBox="0 0 100 120" role="img" aria-label="The tree and its decorations"></svg></div>
+  <div class="turn hidden" id="turn"><button type="button" id="turnL" aria-label="Turn the tree to the left">◀</button><span id="turnLabel">Front</span><button type="button" id="turnR" aria-label="Turn the tree to the right">▶</button></div>
+  <div class="hint" id="placedHint"></div>
+  <button class="btn" id="hang" disabled>Hang them on the tree!</button>
+</div>
+<svg id="drag" class="drag hidden" viewBox="-14 -14 28 28" aria-hidden="true"></svg>
