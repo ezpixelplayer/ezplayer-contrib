@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0a16">
+<title>Decorate the tree 2.0</title>
+<style>
+  :root { color-scheme: dark; --bg: #0d0a16; --panel: #1a1428; --raise: #261d3a; --line: #3a2d52; --text: #fff; --dim: #bfb3d4; --accent: #ffc83c; --c1: #ff2a2a; --c2: #2a7bff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 12px 14px 24px; gap: 12px; min-height: 100dvh; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  h1 { margin: 4px 0 0; font-size: 24px; text-align: center; }
+  .panel { width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  label { color: var(--dim); font-size: 14px; }
+  input[type=text] { width: 100%; font: inherit; font-size: 18px; color: var(--text); background: var(--raise); border: 1px solid var(--line); border-radius: 12px; padding: 12px; user-select: text; -webkit-user-select: text; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  .seg button, .grid button { min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .btn { min-height: 54px; border-radius: 14px; border: 0; background: var(--accent); color: #1a1200; font: 800 18px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; cursor: pointer; width: 100%; }
+  .btn.ghost { background: var(--raise); color: var(--text); border: 1px solid var(--line); min-height: 44px; font-size: 15px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #msg { text-align: center; font-weight: 700; font-size: 18px; min-height: 26px; max-width: 420px; }
+  #note { text-align: center; color: #ff9a9a; min-height: 20px; font-size: 15px; max-width: 420px; }
+  #timer { text-align: center; color: var(--dim); font-size: 14px; min-height: 18px; }
+  .players { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+  .players span { flex: 1; text-align: center; padding: 6px; border-radius: 10px; border: 2px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .players span.turn { border-color: var(--accent); }
+  .big { text-align: center; font: 900 34px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .hidden { display: none !important; }
+  .tray { display: flex; flex-direction: column; gap: 7px; background: var(--raise); border: 1px solid var(--line); border-radius: 14px; padding: 10px; }
+  .step { font-weight: 800; color: var(--accent); }
+  .trayTop { display: flex; align-items: center; gap: 12px; }
+  .trayDeco { flex: none; width: 84px; height: 84px; border: 2px dashed var(--accent); border-radius: 16px; background: radial-gradient(circle at 50% 40%, #183a26, #07140c); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+  .trayDeco.off { opacity: .4; cursor: default; border-color: var(--line); }
+  .trayDeco svg { width: 100%; height: 100%; display: block; pointer-events: none; }
+  .trayRight { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .trayHint { font-weight: 700; line-height: 1.2; }
+  .tray .sw { justify-content: flex-start; gap: 6px; }
+  .tray .sw button { width: 30px; height: 30px; border-width: 2px; }
+  #fxToggle[aria-expanded="true"] { border-color: var(--accent); }
+  .treebox svg { width: 100%; max-width: 340px; display: block; margin: 0 auto; background: radial-gradient(circle at 50% 30%, #0c2a18, #050f09); border-radius: 16px; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  .treebox svg.dragging { touch-action: none; }
+  .placed { cursor: grab; touch-action: none; }
+  .xbtn { cursor: pointer; touch-action: none; }
+  .ghost { animation: blink .7s steps(2, start) infinite; pointer-events: none; }
+  @keyframes blink { to { visibility: hidden; } }
+  .drag { position: fixed; left: 0; top: 0; width: 72px; height: 72px; margin: -36px 0 0 -36px; pointer-events: none; z-index: 50; filter: drop-shadow(0 0 6px #fff8); }
+  .drag.off { opacity: .45; filter: grayscale(.6); }
+  body.dragging { overscroll-behavior: none; }
+  .sw { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .sw button { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+  .sw button[aria-pressed="true"] { border-color: #fff; }
+  .kinds { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .kinds button { border-radius: 999px; border: 2px solid var(--line); background: var(--panel); color: var(--text); padding: 6px 9px; font: 700 13px/1.2 system-ui, sans-serif; cursor: pointer; }
+  .kinds button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .turn { display: flex; align-items: center; justify-content: center; gap: 14px; }
+  .turn.hidden { display: none; }
+  .turn button { width: 52px; height: 42px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 20px/1 system-ui, sans-serif; cursor: pointer; }
+  .turn span { min-width: 110px; text-align: center; font-weight: 700; }
+  #placedHint { text-align: center; min-height: 18px; }
+  #placedHint.bad { color: #ff8a8a; font-weight: 700; }
+
+</style>
+</head>
+<body>
+<h1>🎄 Decorate the tree 2.0</h1>
+<div class="panel" id="namePanel">
+  <label for="name">Your name</label>
+  <input type="text" id="name" maxlength="16" placeholder="Your name" autocomplete="off">
+</div>
+<div class="panel">
+  <div class="tray" id="tray">
+    <div class="step" id="step1">1 · Pick your decoration</div>
+    <div class="trayTop">
+      <div class="trayDeco" id="trayDeco" role="button" aria-label="Your decoration: drag it onto the tree"><svg id="traySvg" viewBox="-14 -14 28 28"></svg></div>
+      <div class="trayRight"><div class="trayHint" id="trayHint">2 · Drag it onto the tree ⬇</div><div class="sw" id="cols"></div></div>
+    </div>
+    <div class="kinds" id="kinds"></div>
+    <div class="kinds"><span class="kinds" id="sizes"></span><button type="button" id="fxToggle" aria-expanded="false">✨ Effects ▾</button></div>
+    <div id="fxBox" class="hidden"><div class="hint" id="fxHint" style="text-align:center"></div><div class="kinds" id="fxs"></div></div>
+  </div>
+  <div class="treebox"><svg id="svg" viewBox="0 0 100 120" role="img" aria-label="The tree and its decorations"></svg></div>
+  <div class="turn hidden" id="turn"><button type="button" id="turnL" aria-label="Turn the tree to the left">◀</button><span id="turnLabel">Front</span><button type="button" id="turnR" aria-label="Turn the tree to the right">▶</button></div>
+  <div class="hint" id="placedHint"></div>
+  <button class="btn" id="hang" disabled>Hang them on the tree!</button>
+</div>
+<svg id="drag" class="drag hidden" viewBox="-14 -14 28 28" aria-hidden="true"></svg>
+
+<div id="timer"></div>
+<div id="msg">Connecting...</div>
+<div id="note"></div>
+<script>
+  const el = (id) => document.getElementById(id);
+  let app = null, status = { phase: 'idle', players: [] }, skew = 0, lastNoteText = '', lastNoteAt = 0;
+  try { el('name').value = localStorage.getItem('spName') || ''; } catch (e) {}
+  el('name').addEventListener('input', () => { try { localStorage.setItem('spName', el('name').value); } catch (e) {} });
+  const myName = () => el('name').value.trim();
+  const me = () => (app && (status.players || []).find((p) => p.id === app.clientId)) || null;
+  const meIndex = () => (app ? (status.players || []).findIndex((p) => p.id === app.clientId) : -1);
+  const nowMs = () => Date.now() + skew;
+  const say = (t) => { el('msg').textContent = t; };
+  const send = (o) => (app ? app.send(o).catch((e) => { el('note').textContent = 'Could not send: ' + e.message; lastNoteAt = Date.now(); }) : Promise.resolve());
+  function seg(box, list, cur, set) {
+    box.replaceChildren(...list.map(([v, t]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-pressed', String(v === cur));
+      b.addEventListener('click', () => { set(v); render(); }); return b;
+    }));
+  }
+  const secsLeft = (at) => Math.max(0, Math.ceil((at - nowMs()) / 1000));
+  let draw = () => {}, tickGame = () => '', onStatus = () => {};
+// This code is copyrighted.  The copyright holder is determined as documented in the Github repository history.
+// This code is licensed under the Affero General Public License, version 3.0 or later.  Other licenses may be available from the copyright holders.
+
+/**
+ * Small pictures for the theme packs (New Year, wedding, baptism, Easter, Halloween, Thanksgiving…): 8 x 8 maps drawn
+ * at any size on the lights (and on the phones' page, which includes this file), plus the things that move in the back
+ * of a game (snow, stars, confetti, petals, leaves, bats, bubbles). The same file on the lights and on the phone.
+ *
+ * In a map: '.' nothing, 'c' the item's own colour, 'd' that colour darker, 'w' white, 'g' gold, 'k' dark grey,
+ * 'r' red, 'G' green, 'b' brown, 'o' orange, 'p' pink, 'y' yellow, 's' silver, 'u' blue, 'v' violet, 'l' light green.
+ */
+
+const SPRITE_PAL = {
+    w: [255, 255, 255], g: [255, 200, 60], k: [70, 70, 80], r: [255, 40, 40], G: [40, 170, 60], b: [150, 85, 35], o: [255, 130, 20],
+    p: [255, 110, 190], y: [255, 230, 60], s: [180, 185, 200], u: [50, 120, 255], v: [150, 70, 255], l: [140, 230, 90],
+};
+
+const SPRITES = {
+    // --- shared ---
+    star: ['...g....', '...g....', '..ggg...', 'ggggggg.', '.ggwgg..', '..ggg...', '.gg.gg..', 'g.....g.'],
+    heart: ['........', '.cc.cc..', 'cwcccccc', 'cccccccc', 'cccccccc', '.cccccc.', '..cccc..', '...cc...'],
+    present: ['..g..g..', '...gg...', 'ccccgccc', 'ccccgccc', 'gggggggg', 'ccccgccc', 'ccccgccc', 'ccccgccc'],
+    flower: ['..p.p...', '.ppppp..', 'ppcycpp.', '.pyyyp..', 'ppcycpp.', '.ppppp..', '...G....', '..GGG...'],
+    balloon: ['..ccc...', '.cwccc..', '.ccccc..', '.ccccc..', '..ccc...', '...c....', '...w....', '....w...'],
+    candy: ['........', 'c......c', 'cc.cc.cc', '.cwcccc.', '.cccccc.', 'cc.cc.cc', 'c......c', '........'],
+    // --- New Year ---
+    glass: ['.w...w..', '.wcccw..', '.wcwcw..', '..ccc...', '...w....', '...w....', '...w....', '.wwwww..'],
+    bottle: ['...gg...', '...gg...', '...GG...', '..GGGG..', '..GwwG..', '..GwwG..', '..GGGG..', '..GGGG..'],
+    popper: ['c.y..p..', '.p..u...', 'y..g..c.', '...ggg..', '..gcg...', '.gcg....', 'gcg.....', 'gg......'],
+    coin: ['..gggg..', '.gyyyyg.', 'gyggggyg', 'gygyygyg', 'gygyygyg', 'gyggggyg', '.gyyyyg.', '..gggg..'],
+    bomb: ['.....o..', '....k.y.', '...kk...', '..kkkk..', '.kwkkkk.', '.kkkkkk.', '.kkkkkk.', '..kkkk..'],
+    clock: ['..wwww..', '.w.ww.w.', 'w...w..w', 'w...w..w', 'w...ww.w', 'w......w', '.w....w.', '..wwww..'],
+    rocket: ['...c....', '..cwc...', '..ccc...', '..cwc...', '..ccc...', '.cccc...', '.c.c.c..', '..o.o...'],
+    firework: ['c..c..c.', '.c.c.c..', '..ccc...', 'ccwwwcc.', '..ccc...', '.c.c.c..', 'c..c..c.', '........'],
+    grapes: ['....G...', '...GG...', '.ccc....', 'ccdcc...', '.ccdcc..', '..ccc...', '...c....', '........'],
+    tophat: ['........', '..kkkk..', '..kkkk..', '..kkkk..', '..rrrr..', '..kkkk..', 'kkkkkkkk', '........'],
+    // --- wedding ---
+    ring: ['...ww...', '..wuw...', '..ggg...', '.g...g..', 'g.....g.', 'g.....g.', '.g...g..', '..ggg...'],
+    rose: ['..rrr...', '.rdrrr..', '.rrdrr..', '..rrr...', '...G.G..', '...GG...', '..GG....', '...G....'],
+    dove: ['........', '..ww....', '.wkww...', 'oowwwww.', '..wwwwww', '...wwwww', '....ww..', '........'],
+    bell: ['...g....', '..ggg...', '.gggyg..', '.gggyg..', '.gggyg..', 'ggggggg.', '...g....', '........'],
+    cake: ['...y....', '...w....', '..pwwp..', '..wwww..', '.pwwwwp.', '.wwwwww.', 'pwwwwwwp', 'wwwwwwww'],
+    cloud: ['........', '..kkk...', '.kkkkkk.', 'kkkkkkkk', 'kkkkkkkk', '.u.u.u..', 'u.u.u...', '........'],
+    // --- baptism ---
+    shell: ['...cc...', '..cwcc..', '.cwcwcc.', 'cwcwcwcc', 'cwcwcwcc', '.cwcwcc.', '..cccc..', '...cc...'],
+    drop: ['...u....', '...u....', '..uuu...', '..uwu...', '.uuwuu..', '.uuuuu..', '..uuu...', '........'],
+    almond: ['........', '..cccc..', '.cwcccc.', 'cwcccccc', 'cccccccc', '.cccccc.', '..cccc..', '........'],
+    candle: ['...y....', '..yoy...', '...o....', '..www...', '..wcw...', '..www...', '..wcw...', '.ggggg..'],
+    babybottle: ['...pp...', '...pp...', '..wwww..', '..wcww..', '..wcww..', '..wcww..', '..wwww..', '..wwww..'],
+    // --- Easter ---
+    egg: ['...cc...', '..cccc..', '.cwwwwc.', '.cccccc.', 'cyycyycc', 'cccccccc', '.cccccc.', '..cccc..'],
+    goldegg: ['...gg...', '..gwgg..', '.gwggggg', '.gggggg.', 'gyyggyyg', 'gggggggg', '.gggggg.', '..gggg..'],
+    rottenegg: ['...ll...', '..lkll..', '.llllkl.', '.lklll..', 'llllkll.', 'lllllll.', '.lllll..', '..lll...'],
+    bunny: ['.w...w..', '.wp.wp..', '.wp.wp..', '.wwwww..', 'wwkwkww.', 'wwwpwww.', '.wwwww..', '.ww.ww..'],
+    chick: ['........', '..yyy...', '.yykyy..', '.yyyyoo.', '.yyyyy..', 'yyyyyyy.', '.yyyyy..', '..o.o...'],
+    carrot: ['...GG...', '..G.G...', '..ooo...', '..ooo...', '...oo...', '...oo...', '...o....', '...o....'],
+    butterfly: ['cc...cc.', 'cwc.cwc.', 'ccckccc.', '.cckcc..', 'ccckccc.', 'cwc.cwc.', 'cc...cc.', '........'],
+    basket: ['..bbbb..', '.b....b.', 'b......b', 'bbbbbbbb', 'bybybyby', '.bybyby.', '.bbbbbb.', '........'],
+    // --- Halloween ---
+    pumpkin: ['...G....', '..GG....', '.oooooo.', 'oo.oo.oo', 'oooooooo', 'oo....oo', '.oooooo.', '..oooo..'],
+    ghost: ['..www...', '.wwwww..', 'wwkwkww.', 'wwwwwww.', 'wwwkwww.', 'wwwwwww.', 'wwwwwww.', 'w.w.w.w.'],
+    bat: ['........', 'v..vv..v', 'vv.vv.vv', 'vvvvvvvv', '.vkvvkv.', '..vvvv..', '...vv...', '........'],
+    spider: ['k..k..k.', '.k.k.k..', '..kkk...', 'kkkkkkk.', '..krk...', '.k.k.k..', 'k..k..k.', '........'],
+    skull: ['.wwwww..', 'wwwwwww.', 'wkkwkkw.', 'wkkwkkw.', 'wwwkwww.', '.wwwww..', '.w.w.w..', '........'],
+    cauldron: ['.l.l.l..', 'lllllll.', 'kkkkkkkk', '.kkkkkk.', 'kkkkkkkk', 'kkkkkkkk', '.kkkkkk.', '.k....k.'],
+    witchhat: ['....v...', '...vv...', '...vv...', '..vvvv..', '..gggg..', '.vvvvvv.', 'vvvvvvvv', '........'],
+    lollipop: ['.cccc...', 'cwcwcc..', 'ccwcwc..', 'cwcwcc..', '.cccc...', '...w....', '...w....', '...w....'],
+    eye: ['........', '.wwwww..', 'wwwuwww.', 'wwukuww.', 'wwwuwww.', '.wwwww..', '........', '........'],
+    // --- Thanksgiving ---
+    leaf: ['....c...', '...cc...', '.ccccc..', 'cccdccc.', '.ccdcc..', '..cdc...', '...b....', '...b....'],
+    apple: ['....b...', '...bG...', '.rrrrr..', 'rrwrrrr.', 'rrrrrrr.', 'rrrrrrr.', '.rrrrr..', '..r.r...'],
+    rottenapple: ['....b...', '...bk...', '.bbbbb..', 'bbbkbbb.', 'bkbbbbb.', 'bbbbbkb.', '.bbbbb..', '..b.b...'],
+    acorn: ['..b.....', '.bbbb...', 'bbbbbb..', '.oooo...', '.oooo...', '.oooo...', '..oo....', '........'],
+    corn: ['..G.....', '.GyyG...', '.GyyG...', '.GyyG...', '.GyyG...', '..GyG...', '..GG....', '........'],
+    pie: ['........', '..bbbb..', '.boooob.', 'boowooob', 'bbbbbbbb', '.bbbbbb.', '........', '........'],
+    turkey: ['.ror.ro.', 'oryrory.', '.rbbbr..', '..bkbr..', '.bbbbr..', '.bbbb...', '..o.o...', '........'],
+    // --- Carnival ---
+    mask: ['........', 'g......g', 'cccccccc', 'c..cc..c', 'cccccccc', '.cc..cc.', '..g..g..', '........'],
+    streamer: ['c.......', '.c......', '..c.ccc.', '..cc...c', '.......c', '...ccc.c', '..c...c.', '..c.....'],
+    drum: ['.w....w.', '..w..w..', 'rrrrrrrr', 'rwgwgwgr', 'rgwgwgwr', 'rwgwgwgr', 'rrrrrrrr', '........'],
+    parrot: ['...rr...', '..rrrr..', '..rwkr..', '..rrrgg.', '..urru..', '.uuuuu..', '..yyy...', '..y.y...'],
+    // --- Valentine's Day ---
+    chocolate: ['........', '.rrrrrr.', 'rbbbbbbr', 'rbgbbgbr', 'rbbbbbbr', 'rbgbbgbr', 'rbbbbbbr', '.rrrrrr.'],
+    letter: ['........', 'kkkkkkkk', 'kwkwwkwk', 'kwwkkwwk', 'kwwrrwwk', 'kwwwwwwk', 'kkkkkkkk', '........'],
+    arrow: ['......gg', '......gg', '.....b..', '....b...', '...b....', '.cb.....', 'cc......', 'c.......'],
+    brokenheart: ['........', '.kk.kk..', 'kkkk.kkk', 'kkk.kkkk', 'kkkk.kkk', '.kk.kkk.', '..k.kk..', '...k....'],
+    // --- birthday ---
+    partyhat: ['...y....', '...c....', '..cyc...', '..ccc...', '.cyccy..', '.ccccc..', 'cyccccyc', 'gggggggg'],
+    // --- Children's Day ---
+    kite: ['...c....', '..ccc...', '.ccwcc..', 'ccwwwcc.', '.ccwcc..', '..ccc...', '...c..r.', '....rr.r'],
+    ball: ['..ryyu..', '.rryyuu.', 'rrryyuuu', 'rrryyuuu', 'GGGwwppp', '.GGwwpp.', '..Gwwp..', '........'],
+    icecream: ['..ccc...', '.cwccc..', '.ccccc..', '..ccc...', '.ggggg..', '..ggg...', '..gg....', '...g....'],
+    teddy: ['.b....b.', 'bbbbbbbb', '.bkbbkb.', '.bbbbbb.', '..bkkb..', '.bbbbbb.', 'bbbbbbbb', '.bb..bb.'],
+    rainbow: ['........', '..rrrr..', '.roooor.', 'royyyyor', 'royGGyor', 'roG..Gor', '........', '........'],
+    broccoli: ['.GG.GG..', 'GGGGGGG.', 'GGlGGlGG', '.GGGGGG.', '..lll...', '...l....', '...l....', '........'],
+    // --- 4th of July ---
+    flag: ['uuurrrrr', 'uwuwwwww', 'uuurrrrr', 'uwuwwwww', 'rrrrrrrr', 'wwwwwwww', 'rrrrrrrr', 'wwwwwwww'],
+    hotdog: ['........', '.bbbbbb.', 'boooooob', 'byyyyyyb', 'boooooob', '.bbbbbb.', '........', '........'],
+    eagle: ['k......k', 'kk....kk', 'kkkwwkkk', '.kkwkkk.', '..kkkk..', '...yy...', '..y..y..', '........'],
+};
+
+/** the colour of a map cell (null: nothing); col: the item's own colour */
+function spriteCell(name, gx, gy, col) {
+    const m = SPRITES[name];
+    if (!m) return null;
+    const ch = (m[gy] || '')[gx];
+    if (!ch || ch === '.') return null;
+    if (ch === 'c') return col;
+    if (ch === 'd') return col.map((v) => Math.round(v * 0.55));
+    return SPRITE_PAL[ch] || col;
+}
+
+/** draws a map b pixels across with its top-left at (0, 0) through P(x, y, rgb, k); tiny sizes become a dot of its main colour */
+function drawSprite(P, name, col, b, k = 1) {
+    if (!SPRITES[name]) return;
+    if (b <= 2) {   // too small for a picture: its most used colour
+        const count = new Map();
+        for (const row of SPRITES[name]) for (const ch of row) if (ch !== '.') count.set(ch, (count.get(ch) || 0) + 1);
+        const main = [...count.entries()].sort((a, b2) => b2[1] - a[1])[0]?.[0] ?? 'c';
+        const c = main === 'c' ? col : main === 'd' ? col.map((v) => Math.round(v * 0.55)) : SPRITE_PAL[main] || col;
+        for (let y = 0; y < b; y++) for (let x = 0; x < b; x++) P(x, y, c, k);
+        return;
+    }
+    for (let y = 0; y < b; y++) for (let x = 0; x < b; x++) {
+        const c = spriteCell(name, Math.min(7, Math.floor((x + 0.5) * 8 / b)), Math.min(7, Math.floor((y + 0.5) * 8 / b)), col);
+        if (c) P(x, y, c, k);
+    }
+}
+
+/** the map at a point of a shape that goes from -1 to 1 both ways (for decorations drawn round a spot): rgb or null */
+function spriteAt(name, x, y, col) {
+    if (x < -1 || x > 1 || y < -1 || y > 1) return null;
+    return spriteCell(name, Math.min(7, Math.floor((x + 1) * 4)), Math.min(7, Math.floor((y + 1) * 4)), col);
+}
+
+const CONFETTI = [[255, 60, 60], [255, 200, 60], [60, 160, 255], [80, 220, 100], [255, 110, 200], [170, 90, 255]];
+/** what moves in the back of a game, dim: 'snow', 'stars', 'confetti', 'petals', 'leaves', 'bats', 'bubbles' or 'none' */
+function backdrop(set, w, h, t, kind) {
+    if (!kind || kind === 'none') return;
+    const n = Math.ceil(w * h / 40);
+    for (let i = 0; i < n; i++) {
+        const sx = i * 7.3, sy = i * 13.7;
+        if (kind === 'stars') {   // still, twinkling
+            const k = 0.5 + 0.5 * Math.sin(t * (1 + (i % 5) * 0.4) + i);
+            set(Math.floor(sx % w), Math.floor(sy % h), [40, 40, 60].map((v) => v * k));
+            continue;
+        }
+        if (kind === 'bubbles') {   // rising
+            const x = (sx + Math.sin(t * 0.9 + i) * 1.2) % w, y = h - 1 - ((sy % h) + t * (1 + (i % 3) * 0.5)) % h;
+            set((x + w) % w, y, [20, 40, 60]);
+            continue;
+        }
+        const fall = kind === 'bats' ? 0.6 : kind === 'leaves' || kind === 'petals' ? 1.1 : 1.5 + (i % 3);
+        const sway = kind === 'leaves' || kind === 'petals' ? 2.5 : kind === 'bats' ? 3 : 1.5;
+        const x = (sx + Math.sin(t * 0.7 + i) * sway) % w, y = kind === 'bats' ? (sy % h + Math.sin(t * 2 + i) * 1.5 + h) % h : ((sy % h) + t * fall) % h;
+        const col = kind === 'snow' ? [26, 26, 36] : kind === 'confetti' ? CONFETTI[i % CONFETTI.length].map((v) => v * 0.16)
+            : kind === 'petals' ? [50, 20, 36] : kind === 'leaves' ? (i % 2 ? [55, 25, 5] : [45, 35, 5]) : [26, 10, 40];
+        set((x + w) % w, y, col);
+        if (kind === 'bats' && Math.floor(t * 6 + i) % 2) { set((x + w + 1) % w, y - 1, col); set((x + w - 1) % w, y - 1, col); }
+    }
+}
+
+  el('namePanel').classList.add('hidden');
+  const NS = 'http://www.w3.org/2000/svg';
+  // the choices in the tray: the decoration, its colour, effects (up to maxFx together) and size; sfx: the star's effects
+  let kind = '', col = 0, fx = [], size = 1, sfx = null;
+  try { kind = localStorage.getItem('tree2Kind') || ''; fx = JSON.parse(localStorage.getItem('tree2Fx') || '[]'); size = +(localStorage.getItem('tree2Size') || 1); } catch (e) {}
+  // tapping an effect adds it or takes it away; Steady goes alone; at most maxFx together (the oldest goes)
+  const toggle = (list, k, max) => { if (list.includes(k)) return list.length > 1 ? list.filter((x) => x !== k) : list;
+    if (k === 'steady' || max < 2) return [k]; const l = list.filter((x) => x !== 'steady').concat(k); return l.slice(-max); };
+  // a decoration drawn on the phone's tree, in its colour (r: its size in the drawing)
+  function deco(ns, k, x, y, colour, r, extra) {
+    const mk = (tag, at) => { const e = document.createElementNS(ns, tag); for (const [a, v] of Object.entries(at)) e.setAttribute(a, v); return e; };
+    const g = mk('g', { transform: `translate(${x} ${y})` }), c = '#' + colour, gold = colour === 'ffc83c' ? '#fff' : '#ffc83c';
+    if (k === 'star') { const p = []; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, q = i % 2 ? r * 0.42 : r * 1.1; p.push((q * Math.cos(a)).toFixed(2) + ',' + (q * Math.sin(a)).toFixed(2)); } g.append(mk('polygon', { points: p.join(' '), fill: c })); }
+    else if (k === 'cane') { const d = `M${-r * 0.3} ${r} L${-r * 0.3} ${-r * 0.2} A${r * 0.45} ${r * 0.45} 0 0 1 ${r * 0.6} ${-r * 0.2}`;
+      g.append(mk('path', { d, fill: 'none', stroke: c, 'stroke-width': r * 0.5, 'stroke-linecap': 'round' }), mk('path', { d, fill: 'none', stroke: '#fff', 'stroke-width': r * 0.5, 'stroke-dasharray': `${r * 0.35} ${r * 0.35}` })); }
+    else if (k === 'bell') g.append(mk('path', { d: `M${-r} ${r * 0.7} Q${-r * 0.7} ${r * 0.5} ${-r * 0.6} ${-r * 0.2} Q${-r * 0.5} ${-r} 0 ${-r} Q${r * 0.5} ${-r} ${r * 0.6} ${-r * 0.2} Q${r * 0.7} ${r * 0.5} ${r} ${r * 0.7} Z`, fill: c }), mk('circle', { cx: 0, cy: r * 0.85, r: r * 0.22, fill: gold }));
+    else if (k === 'present') g.append(mk('rect', { x: -r * 0.8, y: -r * 0.6, width: r * 1.6, height: r * 1.5, fill: c }), mk('rect', { x: -r * 0.15, y: -r * 0.6, width: r * 0.3, height: r * 1.5, fill: gold }),
+      mk('rect', { x: -r * 0.8, y: r * 0.05, width: r * 1.6, height: r * 0.3, fill: gold }), mk('circle', { cx: -r * 0.25, cy: -r * 0.8, r: r * 0.22, fill: gold }), mk('circle', { cx: r * 0.25, cy: -r * 0.8, r: r * 0.22, fill: gold }));
+    else if (k === 'flake') for (let i = 0; i < 3; i++) { const a = i * Math.PI / 3; g.append(mk('line', { x1: -r * Math.cos(a), y1: -r * Math.sin(a), x2: r * Math.cos(a), y2: r * Math.sin(a), stroke: c, 'stroke-width': r * 0.32, 'stroke-linecap': 'round' })); }
+    else if (typeof SPRITES !== 'undefined' && SPRITES[k] && !['bauble', 'cane', 'star', 'bell', 'present', 'flake', 'heart'].includes(k)) {   // a theme pack's picture
+      const rgb = [parseInt(colour.slice(0, 2), 16), parseInt(colour.slice(2, 4), 16), parseInt(colour.slice(4, 6), 16)], cs = r * 2.2 / 8;
+      for (let gy = 0; gy < 8; gy++) for (let gx = 0; gx < 8; gx++) { const cc = spriteCell(k, gx, gy, rgb); if (cc) g.append(mk('rect', { x: (-r * 1.1 + gx * cs).toFixed(2), y: (-r * 1.1 + gy * cs).toFixed(2), width: (cs + 0.05).toFixed(2), height: (cs + 0.05).toFixed(2), fill: `rgb(${cc.join(',')})` })); }
+    }
+    else if (k === 'heart') g.append(mk('path', { d: `M0 ${r} C${-r * 1.6} ${-r * 0.1} ${-r * 0.6} ${-r * 1.3} 0 ${-r * 0.35} C${r * 0.6} ${-r * 1.3} ${r * 1.6} ${-r * 0.1} 0 ${r} Z`, fill: c }));
+    else g.append(mk('circle', { r, fill: c }), mk('circle', { cx: -r * 0.35, cy: -r * 0.35, r: r * 0.25, fill: '#ffffff88' }));
+    if (extra) for (const [a, v] of Object.entries(extra)) g.setAttribute(a, v);
+    return g;
+  }
+  // placed: the decorations put on the drawing but not hung yet ({u, v, k, c, f, s, bad}); sel: the one being changed
+  // (an index), -1 (the tray: a new one), 'star' or 'tree'
+  let placed = [], sentList = [], sel = -1, tcol = 0, nextAt = 0, sentAt = 0, starNext = 0, treeNext = 0, mine = new Set();
+  // the phone's drawing: a triangle 100 x 120, at v (0 top, 1 bottom) this wide; fx across it 0..1
+  const PW = (v) => 12 + 76 * v;
+  const P = (fx, v) => [50 + (fx - 0.5) * PW(v), 12 + v * 96];
+  const wrapT = (x) => ((x % 1) + 1.5) % 1 - 0.5;
+  // a round tree: u is where it is round the trunk (turns from the front, + to the right); the phone shows the half
+  // facing the visitor (va: how far they turned the tree, 360° only), the front in the middle
+  let va = 0, lookTimer = 0, swipeX = null;
+  const SIDES = ['Front', 'Front right', 'Right side', 'Back right', 'Back', 'Back left', 'Left side', 'Front left'];
+  const fxOf = (u) => { if (!status.round) return u; const r = wrapT(u - va); return Math.abs(r) <= 0.26 ? 0.5 + 2 * r : null; };   // null: the other side
+  const uOfFx = (fx) => (status.round ? Math.round(wrapT((fx - 0.5) / 2 + va) * 1000) / 1000 : Math.round(fx * 1000) / 1000);
+  const rOf = (s) => Math.max(2.2, Math.min(11, (status.rPhone || 4) * ((status.sizeMul || [0.7, 1, 1.5])[s] || 1)));   // a decoration's size on the drawing
+  const turnBy = (k) => { va = ((Math.round(va * 8) + k) % 8 + 8) % 8 / 8;
+    clearTimeout(lookTimer); if (status.lookGuide) lookTimer = setTimeout(() => send({ type: 'look', a: va }), 300);   // where they stopped turning
+    render(); };
+  el('turnL').addEventListener('click', () => turnBy(-1));
+  el('turnR').addEventListener('click', () => turnBy(1));
+  el('svg').addEventListener('touchstart', (e) => { swipeX = status.turn && !drag && e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
+  el('svg').addEventListener('touchend', (e) => { if (swipeX === null || drag) { swipeX = null; return; } const dx = e.changedTouches[0].clientX - swipeX; swipeX = null; if (Math.abs(dx) > 40) turnBy(dx < 0 ? 1 : -1); }, { passive: true });
+
+  // ---- the live preview: at most 5 a second while the finger moves, the last position always sent
+  let prevAt = 0, prevTimer = 0, prevPending = null, lastPrev = null;
+  function flushPreview() {
+    clearTimeout(prevTimer); prevTimer = 0;
+    if (!prevPending || !app) return;
+    prevAt = Date.now(); lastPrev = prevPending; prevPending = null;
+    send({ type: 'preview', u: lastPrev.u, v: lastPrev.v, k: lastPrev.k, c: lastPrev.c + 1, f: lastPrev.f, s: lastPrev.s });
+  }
+  function preview(p, now) {
+    prevPending = { u: p.u, v: p.v, k: p.k, c: p.c, f: [...p.f], s: p.s };
+    const wait = 200 - (Date.now() - prevAt);
+    if (now && wait <= 0) flushPreview();
+    else if (!prevTimer) prevTimer = setTimeout(flushPreview, Math.max(0, wait));
+  }
+  // placed but not hung: the ghost on the tree is kept alive every 2 s (it goes 1.5 s after the last preview otherwise)
+  setInterval(() => { if (!drag && placed.length && !sentAt && !status.party && status.phase !== 'unconfigured') preview(placed[typeof sel === 'number' && sel >= 0 ? sel : placed.length - 1], true); }, 2000);
+
+  // the effects are folded away (the tray stays small, so the tree is on the screen too); a tap opens them
+  let fxOpen = false;
+  el('fxToggle').addEventListener('click', () => { fxOpen = !fxOpen; render(); });
+
+  // ---- dragging (pointer events: touch and mouse)
+  let drag = null;   // { from: -1 (the tray) or a placed index, id, sx, sy, moved, touch, at: {u, v, on} }
+  const svgPoint = (cx, cy) => { const m = el('svg').getScreenCTM(); if (!m) return null; const p = el('svg').createSVGPoint(); p.x = cx; p.y = cy; return p.matrixTransform(m.inverse()); };
+  function pointOf(cx, cy) {   // a point of the screen -> where it is on the tree: {u, v, on}
+    const p = svgPoint(cx, cy);
+    if (!p) return { on: false };
+    const v = (p.y - 12) / 96, fx = 0.5 + (p.x - 50) / PW(Math.max(0, Math.min(1, v)));
+    return { on: v >= -0.01 && v <= 1.01 && fx >= -0.03 && fx <= 1.03, u: uOfFx(Math.max(0, Math.min(1, fx))), v: Math.round(Math.max(0, Math.min(1, v)) * 1000) / 1000 };
+  }
+  const trayItem = () => ({ k: kind, c: col, f: [...fx], s: size });
+  function startDrag(e, from) {
+    if (e.button > 0 || drag || sel === 'star' || sel === 'tree' || status.party || status.phase === 'unconfigured') return;
+    if (from === -1 && placed.length >= (status.maxDeco || 1)) { note(`Up to ${status.maxDeco || 1} at once: hang them, or take one off (✕).`); return; }
+    e.preventDefault();
+    drag = { from, id: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false, touch: e.pointerType !== 'mouse', at: null };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (er) {}
+    el('svg').classList.add('dragging'); document.body.classList.add('dragging');
+    const p = from === -1 ? trayItem() : placed[from];
+    const d = el('drag'); d.replaceChildren(deco(NS, p.k, 0, 0, status.colors[p.c], 6 * ((status.sizeMul || [0.7, 1, 1.5])[p.s] || 1)));
+    moveDrag(e);
+  }
+  function moveDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    e.preventDefault();
+    if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 6) drag.moved = true;
+    if (!drag.moved) return;
+    const y = e.clientY - (drag.touch ? 44 : 0);   // a finger hides what it drags: the decoration is shown (and goes) a little above it
+    const d = el('drag'); d.classList.remove('hidden'); d.style.transform = `translate(${e.clientX}px, ${y}px)`;
+    drag.at = pointOf(e.clientX, y);
+    d.classList.toggle('off', !drag.at.on);
+    if (drag.at.on) preview({ ...(drag.from === -1 ? trayItem() : placed[drag.from]), u: drag.at.u, v: drag.at.v });
+  }
+  function endDrag(e, cancel) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const g = drag; drag = null;
+    el('drag').classList.add('hidden'); el('svg').classList.remove('dragging'); document.body.classList.remove('dragging');
+    if (!g.moved && !cancel) {   // a tap: on a placed one, change it in the tray; on the tray, how it works
+      if (g.from >= 0) { sel = g.from; const p = placed[sel]; kind = p.k; col = p.c; fx = [...p.f]; size = p.s; }
+      else note('Drag it with your finger onto the tree.');
+      render(); return;
+    }
+    const at = g.at || { on: false };
+    if (cancel || !at.on) {
+      if (g.from >= 0) { placed.splice(g.from, 1); sel = -1; note('Taken off.'); }
+      else if (!cancel) note('Not on the tree: drop it on the tree.');
+      render(); return;
+    }
+    if (g.from === -1) { placed.push({ ...trayItem(), u: at.u, v: at.v, bad: '' }); sel = placed.length - 1; }
+    else { Object.assign(placed[g.from], { u: at.u, v: at.v, bad: '' }); sel = g.from; }
+    preview(placed[sel], true);
+    render();
+  }
+  el('trayDeco').addEventListener('pointerdown', (e) => startDrag(e, -1));
+  window.addEventListener('pointermove', moveDrag, { passive: false });
+  window.addEventListener('pointerup', (e) => endDrag(e, false));
+  window.addEventListener('pointercancel', (e) => endDrag(e, true));
+  document.addEventListener('touchmove', (e) => { if (drag) e.preventDefault(); }, { passive: false });   // no page scroll while dragging
+  const note = (t) => { el('note').textContent = t; lastNoteAt = Date.now(); };
+
+  draw = () => {
+    if (drag) return;   // the drawing stays as it is while something is dragged
+    if (!Array.isArray(status.colors)) return;   // nothing to draw before the first status (the tree, colours and decorations come with it)
+    const s = status, svg = el('svg'), decos = s.decos || [], all = s.allKinds || ['bauble'], maxD = s.maxDeco || 1;
+    const kl = s.kindList || [['bauble', 'Bauble', '🔴']], sizes = s.sizes || [];
+    if (!kl.some(([k]) => k === kind)) kind = kl[0][0];
+    if (!sizes.length) size = 1; else if (!sizes.some(([i]) => i === size)) size = sizes.some(([i]) => i === 1) ? 1 : sizes[0][0];
+    placed = placed.filter((p) => kl.some(([k]) => k === p.k));
+    if (sel === 'star' ? !s.starPick : sel === 'tree' ? !s.treePick : sel >= placed.length) sel = -1;
+    if (!s.turn) va = 0;
+    el('turn').classList.toggle('hidden', !s.turn);
+    el('turnLabel').textContent = SIDES[Math.round(va * 8) % 8];
+    // my ghost on the real tree: the app says whether that place is allowed (and why not)
+    const myG = (s.ghosts || []).find((x) => app && x.by === app.clientId);
+    if (myG) for (const p of placed) if (p.u === myG.u && p.v === myG.v) p.bad = myG.ok ? '' : myG.why || '';
+    svg.replaceChildren();
+    // the tree, in its colour (darker on the phone); a visitor can tap it to change its colour
+    const tc = sel === 'tree' ? (s.treeCols || [])[tcol] || '1e9e3c' : s.treeCol || '1e9e3c';
+    const dk = (h, k) => '#' + [0, 2, 4].map((i) => Math.round(parseInt(h.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('');
+    const mk = (tag, at) => { const e = document.createElementNS(NS, tag); for (const [a, v] of Object.entries(at)) e.setAttribute(a, v); return e; };
+    const tri = mk('polygon', { points: '50,6 94,108 6,108', fill: dk(tc, 0.45), stroke: sel === 'tree' ? '#fff' : dk(tc, 0.8), 'stroke-width': sel === 'tree' ? '1' : '0.5' });
+    if (s.treePick) { tri.style.cursor = 'pointer'; tri.onclick = () => { if (sel === 'tree') sel = -1; else sel = 'tree'; render(); }; }
+    svg.append(tri, mk('rect', { x: 44, y: 108, width: 12, height: 9, fill: '#5a3412' }));
+    // the star: in its colour on the lights (or the colour being picked); a visitor can tap it to change it
+    const pts = [];
+    for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? 2.6 : 6.4; pts.push((50 + r * Math.cos(a)).toFixed(2) + ',' + (7 + r * Math.sin(a)).toFixed(2)); }
+    const star = mk('polygon', { points: pts.join(' '), fill: '#' + (sel === 'star' ? s.colors[col] : s.starCol || 'ffbe28'), stroke: sel === 'star' ? '#fff' : '#0008', 'stroke-width': sel === 'star' ? '0.9' : '0.5' });
+    if (s.starPick) { star.style.cursor = 'pointer'; star.onclick = () => { if (sel === 'star') sel = -1; else sel = 'star'; render(); }; }
+    svg.append(star);
+    // the decorations hung (yours with a white ring), then the others' ghosts (blinking), then yours not hung yet
+    decos.forEach(([u, v, k, c, f, sz], i) => {
+      const x = fxOf(u); if (x === null) return;
+      const [px, py] = P(x, v);
+      svg.append(deco(NS, all[k] || 'bauble', px, py, s.colors[c - 1], rOf(sz), mine.has(i) ? { stroke: '#fff', 'stroke-width': '0.5' } : null));
+    });
+    for (const g of s.ghosts || []) {
+      if (app && g.by === app.clientId) continue;
+      const x = fxOf(g.u); if (x === null) continue;
+      const [px, py] = P(x, g.v);
+      svg.append(mk('circle', { cx: px, cy: py, r: rOf(g.s) + 1, fill: 'none', stroke: '#' + s.colors[g.c - 1], 'stroke-width': '0.8', 'stroke-dasharray': '1.5 1', class: 'ghost' }));
+    }
+    placed.forEach((p, i) => {
+      const x = fxOf(p.u); if (x === null) return;
+      const [px, py] = P(x, p.v), r = rOf(p.s), on = i === sel;
+      const g = deco(NS, p.k, px, py, s.colors[p.c], r, { class: 'placed', stroke: p.bad ? '#ff5050' : on ? '#fff' : '#ffffffcc', 'stroke-width': on ? '0.6' : '0.4', 'stroke-dasharray': on ? '' : '1 0.7' });
+      g.addEventListener('pointerdown', (e) => startDrag(e, i));
+      const xb = mk('g', { class: 'xbtn', transform: `translate(${(px + r * 0.95).toFixed(2)} ${(py - r * 0.95).toFixed(2)})` });
+      xb.append(mk('circle', { r: 2.6, fill: '#000c', stroke: '#fff', 'stroke-width': '0.4' }), mk('path', { d: 'M-1.1 -1.1 L1.1 1.1 M1.1 -1.1 L-1.1 1.1', stroke: '#fff', 'stroke-width': '0.6', 'stroke-linecap': 'round' }));
+      xb.setAttribute('aria-label', 'Take it off');
+      xb.addEventListener('pointerdown', (e) => e.stopPropagation());
+      xb.addEventListener('click', (e) => { e.stopPropagation(); placed.splice(i, 1); sel = -1; render(); });
+      svg.append(g, xb);
+    });
+    // the tray: the decoration drawn big, the choices; or the star's / the tree's colours while one of them is picked
+    const pickStar = sel === 'star', pickTree = sel === 'tree';
+    el('trayDeco').classList.toggle('off', pickStar || pickTree || placed.length >= maxD);
+    el('traySvg').replaceChildren(pickStar ? mk('polygon', { points: pts.map((q) => q.split(',').map((n, j) => ((+n - (j ? 7 : 50)) * 1.6).toFixed(2)).join(',')).join(' '), fill: '#' + s.colors[col] })
+      : pickTree ? mk('polygon', { points: '0,-11 10,10 -10,10', fill: '#' + ((s.treeCols || [])[tcol] || '1e9e3c') })
+      : deco(NS, kind, 0, 0, s.colors[col], 6 * ((s.sizeMul || [0.7, 1, 1.5])[size] || 1)));
+    el('step1').textContent = pickStar ? 'The star: pick its colour and effects' : pickTree ? 'The tree: pick its colour' : typeof sel === 'number' && sel >= 0 ? 'Changing the one with the white outline' : '1 · Pick your decoration';
+    el('trayHint').textContent = pickStar || pickTree ? 'Then press the button below.' : placed.length >= maxD ? `That is ${maxD}: hang them, or take one off (✕).` : '2 · Drag it onto the tree ⬇';
+    const upd = () => { if (typeof sel === 'number' && sel >= 0 && placed[sel]) { Object.assign(placed[sel], { k: kind, c: col, f: [...fx], s: size, bad: '' }); preview(placed[sel], true); } };   // a change goes to the one being changed
+    el('kinds').classList.toggle('hidden', kl.length < 2 || pickStar || pickTree);
+    el('kinds').replaceChildren(...kl.map(([k, n, e]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = e + ' ' + n; b.setAttribute('aria-pressed', String(k === kind));
+      b.onclick = () => { kind = k; upd(); try { localStorage.setItem('tree2Kind', k); } catch (er) {} render(); }; return b; }));
+    el('sizes').classList.toggle('hidden', sizes.length < 2 || pickStar || pickTree);
+    el('sizes').replaceChildren(...sizes.map(([i, n]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = n; b.setAttribute('aria-pressed', String(i === size));
+      b.onclick = () => { size = i; upd(); try { localStorage.setItem('tree2Size', String(i)); } catch (er) {} render(); }; return b; }));
+    const fl = pickStar ? s.starFxList || [] : s.fxList || [], okKeys = fl.map(([k]) => k), max = s.maxFx || 3;
+    if (pickStar) { if (!sfx) sfx = (s.starFx || []).filter((k) => okKeys.includes(k)); sfx = sfx.filter((k) => okKeys.includes(k)).slice(-max); if (!sfx.length && okKeys.length) sfx = [okKeys[0]]; }
+    else { fx = fx.filter((k) => okKeys.includes(k)).slice(-max); if (!fx.length && okKeys.length) fx = [okKeys[0]]; }
+    const curFx = pickStar ? sfx : fx;
+    el('fxToggle').classList.toggle('hidden', fl.length < 2 || pickTree);
+    el('fxToggle').textContent = '✨ ' + (curFx.length ? curFx.map((k) => (fl.find(([x]) => x === k) || [k, k])[1]).join(' + ') : 'Effects') + (fxOpen ? ' ▴' : ' ▾');
+    el('fxToggle').setAttribute('aria-expanded', String(fxOpen));
+    el('fxBox').classList.toggle('hidden', !fxOpen || fl.length < 2 || pickTree);
+    el('fxs').replaceChildren(...fl.map(([k, n, e]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = e + ' ' + n; b.setAttribute('aria-pressed', String(curFx.includes(k)));
+      b.onclick = () => { if (pickStar) sfx = toggle(sfx, k, max); else { fx = toggle(fx, k, max); upd(); try { localStorage.setItem('tree2Fx', JSON.stringify(fx)); } catch (er) {} } render(); }; return b; }));
+    el('fxHint').textContent = pickTree ? '' : fl.length > 1 && max > 1 ? `Effects: tap up to ${max}; they take turns on the lights (Steady goes alone).` : '';
+    const sw = (list, cur, set, label) => list.map((h, k) => { const b = document.createElement('button'); b.type = 'button'; b.style.background = '#' + h; b.setAttribute('aria-label', label + ' ' + (k + 1)); b.setAttribute('aria-pressed', String(k === cur)); b.onclick = () => { set(k); render(); }; return b; });
+    el('cols').replaceChildren(...(pickTree ? sw(s.treeCols || [], tcol, (k) => { tcol = k; }, 'Tree colour') : sw(s.colors || [], col, (k) => { col = k; upd(); }, 'Colour')));
+    const left = Math.ceil(((pickStar ? starNext : pickTree ? treeNext : nextAt) - Date.now()) / 1000);
+    el('hang').textContent = pickStar ? 'Colour the star!' : pickTree ? 'Colour the tree!' : placed.length > 1 ? `Hang them on the tree! (${placed.length})` : 'Hang it on the tree!';
+    el('hang').disabled = !app || (!pickStar && !pickTree && !placed.length) || left > 0 || s.party || s.phase === 'unconfigured' || Date.now() - sentAt < 3000;
+    const bad = placed.find((p) => p.bad);
+    el('placedHint').textContent = bad ? '⚠️ ' + bad.bad + '. Drag it somewhere else.' : placed.length ? `${placed.length} placed (dashed): drag to move, ✕ to take off.` : '';
+    el('placedHint').classList.toggle('bad', !!bad);
+    const others = (s.ghosts || []).filter((g) => !app || g.by !== app.clientId).length;
+    const n = decos.length, of = ' (' + n + ' of ' + (s.maxOn || n) + ')';
+    say(s.phase === 'unconfigured' ? s.message : s.party ? '🎉 The tree is full! Party on the lights!'
+      : pickTree ? (left > 0 ? 'You can change the tree\'s colour again in ' + left + ' s.' : 'Pick a colour for the tree, then press Colour the tree!')
+      : pickStar ? (left > 0 ? 'You can change the star again in ' + left + ' s.' : 'Pick a colour and effects for the star, then press Colour the star!')
+      : left > 0 ? 'You can hang more decorations in ' + left + ' s.' + of
+      : !placed.length ? 'Drag your decoration onto the tree: it blinks on the real tree where you hold it.' + of + (s.turn ? ' Turn the tree with ◀ ▶ (or swipe) to decorate it all the way round.' : s.round ? ' This is the front of the tree, as you see it.' : '') + (s.starPick || s.treePick ? ' Tap ' + [s.starPick && 'the star', s.treePick && 'the tree'].filter(Boolean).join(' or ') + ' to change its colour.' : '') + (others ? ' 👀 Someone else is placing one too.' : '')
+      : (placed.length < maxD ? 'Drag more, or press ' : 'Press ') + (placed.length > 1 ? 'Hang them on the tree!' : 'Hang it on the tree!') + of);
+  };
+  tickGame = () => { if (Math.max(nextAt, starNext, treeNext) > Date.now() - 1000) draw(); return ''; };
+  onStatus = (o, s) => {
+    if (s.lastBy && app && s.lastBy === app.clientId && s.hung !== o.hung) {   // mine were hung: those go from the placed ones (refused ones stay, with why)
+      const okSet = new Set(s.lastOk || []), hungNow = sentList.filter((_, i) => okSet.has(i));
+      placed = placed.filter((p) => !hungNow.includes(p));
+      mine = new Set(s.lastSet || []); sel = -1; nextAt = Date.now() + (s.every || 0) * 1000; sentAt = 0; sentList = [];
+    }
+    if (s.starLastBy && app && s.starLastBy === app.clientId && s.starAt !== o.starAt) { sfx = null; starNext = Date.now() + (s.starEvery || 0) * 1000; sentAt = 0; sel = -1; }
+    if (s.treeLastBy && app && s.treeLastBy === app.clientId && s.treeAt !== o.treeAt) { treeNext = Date.now() + (s.starEvery || 0) * 1000; sentAt = 0; sel = -1; }
+    if (s.party && !o.party) { placed = []; sel = -1; }
+    if (app && s.notices && s.notices[app.clientId]) sentAt = 0;
+  };
+  el('hang').addEventListener('click', () => {
+    if (sel === 'tree') { sentAt = Date.now(); send({ type: 'tree', c: tcol + 1 }); say('Colouring the tree… watch the lights 🎄'); el('hang').disabled = true; return; }
+    if (sel === 'star') { sentAt = Date.now(); send({ type: 'star', c: col + 1, ...(sfx && sfx.length ? { f: sfx } : {}) }); say('Colouring the star… watch the lights ✨'); el('hang').disabled = true; return; }
+    if (!placed.length) return;
+    sentAt = Date.now(); sentList = [...placed];
+    send({ type: 'hang', d: placed.map((p) => [p.u, p.v, p.k, p.c + 1, p.f, p.s]) });
+    say((placed.length > 1 ? 'Hanging them' : 'Hanging it') + '… watch the lights ✨'); el('hang').disabled = true;
+  });
+
+  function render() {
+    draw();
+    el('timer').textContent = tickGame() || '';
+    const n = app && status.notices && status.notices[app.clientId];
+    if (n && n !== lastNoteText) { lastNoteText = n; lastNoteAt = Date.now(); el('note').textContent = n; }
+    if (!n) lastNoteText = '';
+    if (Date.now() - lastNoteAt > 5000) el('note').textContent = '';
+  }
+  function init() {
+    app = EZApp.connect();
+    app.onStatus((s, snap) => {
+      if (!s) return;
+      if (snap && typeof snap.at === 'number') skew = snap.at - Date.now();
+      const old = status; status = s; onStatus(old, s);
+      render();
+    });
+    app.ready.then(render).catch((e) => say('Could not reach the player: ' + e.message));
+    setInterval(() => { el('timer').textContent = tickGame() || ''; }, 250);
+    render();
+  }
+  // The player serves the SDK next to every app page, on the LAN and through the cloud.
+  const sdk = document.createElement('script');
+  sdk.src = '_sdk.js';
+  sdk.onload = init;
+  sdk.onerror = () => say('Could not load the app SDK.');
+  document.head.appendChild(sdk);
+</script>
+</body>
+</html>

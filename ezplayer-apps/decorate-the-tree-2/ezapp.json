@@ -1,0 +1,13 @@
+{
+    "id": "decorate-the-tree-2",
+    "name": "Decorate the tree 2.0",
+    "version": "1",
+    "description": "Visitors drag decorations anywhere onto a tree of the show from their phones and see them blink on the real tree while they place them; colours corrected for LEDs",
+    "icon": "🎄",
+    "runtime": "node",
+    "start": ["main.mjs"],
+    "page": "page/",
+    "config": "config/",
+    "platforms": ["win32", "darwin", "linux"],
+    "events": { "perMinute": 3000, "perClientPerSecond": 8 }
+}

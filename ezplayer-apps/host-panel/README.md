@@ -82,6 +82,8 @@ colour; its theme of the night starts on its own pack.
 
 ## Changes
 
+- **Version 3:** the theme of the night knows Decorate the tree 2.0 (decorate-the-tree-2 and its pack versions).
+
 - **Version 2:** 📊 statistics: every app reports games (players, winner, scores) and uses; the panel keeps them night by night and shows the most used apps, the top scores of the night, when it was busy, the season and a CSV download.
 
 - **Version 1:** first version.

@@ -21,6 +21,7 @@ settings page on the home network.
 | 💬 **messages** | 7 | Send a message, an animated picture (73 GIFs), an effect or a drawing to a matrix | — |
 | 📅 **advent-calendar** | 6 | Open one more door every day of December and see its surprise | — |
 | 🎄 **decorate-the-tree** | 17 | Hang decorations (baubles, candy canes, bells, presents…) with colours and effects, several at once; change the star's colour and effect, and the tree's colour | — |
+| 🎄 **decorate-the-tree-2** | 1 | Decorate the tree 2.0: pick a decoration, colour, effect and size, then drag it anywhere on the tree while it shows live on the real tree; colours with gamma and balance (colour test on the settings page) | 👆 drag |
 | 🎁 **fun** | 10 | Photo frame, wheel of fortune, animals, paint by numbers, the bell, snow on request (web address or DMX, with modes and lights), treasure hunt, guess the song | — |
 | ✨ **props** | 6 | Light up real models of the show (wings, arches, canes…) with an effect and colours | — |
 | 🎹 **play-the-lights** | 6 | Each model becomes a key on the phone: take turns playing the show like a keyboard | — |
@@ -32,7 +33,7 @@ settings page on the home network.
 | 🗽 **statue** | 2 | Musical statues: dance while the lights are green, freeze when they turn red; whoever moves is out (the body sensor or the phone in the hand sees it) | 🧍 body · 📱 phone |
 | 🎟️ **raffle** | 2 | A prize draw: names, ticket numbers or visitors who join from their phone spin on a matrix and stop on the winner; the host draws from the settings page or a show button | — |
 | ⏱️ **live-countdown** | 2 | A big countdown on a matrix to a moment (midnight, the couple's entrance, the finale), the last 10 seconds huge, then fireworks, a message, sound and a machine | — |
-| 🎛️ **host-panel** | 2 | For whoever runs the show: one page with every app (state, players now, on/off, start/stop) and "theme of the night" to switch on one pack and off the others. No visitors' page | — |
+| 🎛️ **host-panel** | 3 | For whoever runs the show: one page with every app (state, players now, on/off, start/stop) and "theme of the night" to switch on one pack and off the others. No visitors' page | — |
 | 🗓️ **agenda** | 1 | For whoever runs the show: one page to give every app its times (the player's own schedules, so they work with Agenda off) and dates such as 1 Dec–6 Jan | — |
 
 **Ways to play**: 👆 finger on the phone; 📱 tilt: tilting the phone (needs the page in https); 🧍 body: the body
@@ -151,3 +152,4 @@ sensor at the lights, see below.
   the Christmas app, with build tools kept outside this repository (`_tools/build.mjs`, `_tools/make_pack.mjs`); the notes on
   building in those apps' READMEs refer to them. The built pages here are complete: nothing needs building to use the apps.
 - **📊 Statistics (2026-11-27):** every app now reports to the **host panel** (`stats.mjs` in each app): each game played (players, winner, whether the computer won, scores) and each use by a visitor (a message, a decoration, a photo…). The panel (version 2) keeps them night by night in its private document and shows, for any night, the most used apps, the top score of each game, when it was busy, the season's records and a CSV download. Keep the panel on during the show; a missing panel never slows a game. All apps got a new version.
+- **🎄 Decorate the tree 2.0 (`decorate-the-tree-2`, new, 2026-11-28; decorate-the-tree is unchanged):** visitors pick the decoration, colour, effect(s) and size (Small / Medium / Large) and **drag** it anywhere on the tree; **while dragging it blinks on the real tree** where the finger is (at most 3 visitors at once). **Colours** go through gamma (2.2 by default, 1.0 = off), dimming in linear light and an R/G/B balance, so LEDs show the colours of the phone; a **🎨 Colour test** on the settings page lights pure red/green/blue (to check the colour order), the decoration colours, white and grey on the tree, and the star in red→green→blue, with changes applied live. Round mega trees keep the front calibration and 180°/360°. Also in the 11 theme packs (`<pack>-tree-2`).

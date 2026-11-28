@@ -1,0 +1,32 @@
+  .tray { display: flex; flex-direction: column; gap: 7px; background: var(--raise); border: 1px solid var(--line); border-radius: 14px; padding: 10px; }
+  .step { font-weight: 800; color: var(--accent); }
+  .trayTop { display: flex; align-items: center; gap: 12px; }
+  .trayDeco { flex: none; width: 84px; height: 84px; border: 2px dashed var(--accent); border-radius: 16px; background: radial-gradient(circle at 50% 40%, #183a26, #07140c); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+  .trayDeco.off { opacity: .4; cursor: default; border-color: var(--line); }
+  .trayDeco svg { width: 100%; height: 100%; display: block; pointer-events: none; }
+  .trayRight { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .trayHint { font-weight: 700; line-height: 1.2; }
+  .tray .sw { justify-content: flex-start; gap: 6px; }
+  .tray .sw button { width: 30px; height: 30px; border-width: 2px; }
+  #fxToggle[aria-expanded="true"] { border-color: var(--accent); }
+  .treebox svg { width: 100%; max-width: 340px; display: block; margin: 0 auto; background: radial-gradient(circle at 50% 30%, #0c2a18, #050f09); border-radius: 16px; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  .treebox svg.dragging { touch-action: none; }
+  .placed { cursor: grab; touch-action: none; }
+  .xbtn { cursor: pointer; touch-action: none; }
+  .ghost { animation: blink .7s steps(2, start) infinite; pointer-events: none; }
+  @keyframes blink { to { visibility: hidden; } }
+  .drag { position: fixed; left: 0; top: 0; width: 72px; height: 72px; margin: -36px 0 0 -36px; pointer-events: none; z-index: 50; filter: drop-shadow(0 0 6px #fff8); }
+  .drag.off { opacity: .45; filter: grayscale(.6); }
+  body.dragging { overscroll-behavior: none; }
+  .sw { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .sw button { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+  .sw button[aria-pressed="true"] { border-color: #fff; }
+  .kinds { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .kinds button { border-radius: 999px; border: 2px solid var(--line); background: var(--panel); color: var(--text); padding: 6px 9px; font: 700 13px/1.2 system-ui, sans-serif; cursor: pointer; }
+  .kinds button[aria-pressed="true"] { border-color: var(--accent); background: #3a2f12; }
+  .turn { display: flex; align-items: center; justify-content: center; gap: 14px; }
+  .turn.hidden { display: none; }
+  .turn button { width: 52px; height: 42px; border-radius: 12px; border: 2px solid var(--line); background: var(--raise); color: var(--text); font: 700 20px/1 system-ui, sans-serif; cursor: pointer; }
+  .turn span { min-width: 110px; text-align: center; font-weight: 700; }
+  #placedHint { text-align: center; min-height: 18px; }
+  #placedHint.bad { color: #ff8a8a; font-weight: 700; }
